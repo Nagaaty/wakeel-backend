@@ -1,0 +1,20 @@
+{
+  "name": "wakeel-mobile-complete",
+  "version": "1.0.0",
+  "description": "Wakeel Egypt — Complete Mobile App (React Native + Node.js + PostgreSQL)",
+  "private": true,
+  "scripts": {
+    "backend":         "cd backend && npm start",
+    "backend:dev":     "cd backend && npm run dev",
+    "backend:install": "cd backend && npm install",
+    "backend:migrate": "cd backend && npm run migrate",
+    "backend:seed":    "cd backend && npm run seed",
+    "mobile":          "cd mobile  && npx expo start",
+    "mobile:android":  "cd mobile  && npx expo start --android",
+    "mobile:ios":      "cd mobile  && npx expo start --ios",
+    "mobile:install":  "cd mobile  && npm install",
+    "install:all":     "npm run backend:install && npm run mobile:install",
+    "setup":           "npm run install:all && npm run backend:migrate && npm run backend:seed",
+    "start":           "npm run backend:dev"
+  }
+}
