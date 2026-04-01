@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput, Alert, Modal } from 'react-native';
 import { router } from 'expo-router';
+import { useDispatch } from 'react-redux';
+import { register } from '../../src/store/slices/authSlice';
+import { lawyersAPI } from '../../src/services/api';
 import { useTheme } from '../../src/theme';
 import { Btn, Inp } from '../../src/components/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function RegisterLawyerScreen() {
   const C = useTheme();
+  const dispatch = useDispatch<any>();
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(2);
   const [loading, setLoading] = useState(false);
@@ -41,14 +45,38 @@ export default function RegisterLawyerScreen() {
 
   const updateForm = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await dispatch(register({
+        name: form.name.trim(),
+        email: form.email.toLowerCase().trim(),
+        phone: form.phone,
+        password: form.password,
+        role: 'lawyer',
+      }));
+      if (res.meta.requestStatus === 'fulfilled') {
+        const d = res.payload as any;
+        if (d.token) {
+          try {
+            await lawyersAPI.saveProfile({
+              city: form.city,
+              experience_years: Number(form.experience) || 0,
+              specialization: form.specialization,
+              consultation_fee: Number(form.fee) || 0,
+              office_name: form.officeName,
+              court_degree: form.courtDegree,
+              bar_number: form.syndicateId
+            });
+          } catch (e) {}
+        }
+        router.replace('/(lawyer-tabs)/' as any);
+      } else {
+        Alert.alert('خطأ', res.payload as string || 'حدث خطأ أثناء التسجيل');
+      }
+    } finally {
       setLoading(false);
-      Alert.alert('تم الإرسال', 'سيتم مراجعة طلبك خلال 24-48 ساعة', [
-        { text: 'موافق', onPress: () => router.replace('/(auth)/login' as any) }
-      ]);
-    }, 1500);
+    }
   };
 
   const TITLES: Record<number, string> = {
