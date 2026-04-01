@@ -1,0 +1,26 @@
+﻿app/compare.tsx(125,35): error TS2352: Conversion of type '(AxiosResponse<any, any, {}> | null)[]' to type 'LawyerProfile[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'AxiosResponse<any, any, {}> | null' is not comparable to type 'LawyerProfile'.
+    Type 'AxiosResponse<any, any, {}>' is missing the following properties from type 'LawyerProfile': id, user_id, name, specialization, and 4 more.
+app/edit-profile.tsx(87,75): error TS7006: Parameter 'v' implicitly has an 'any' type.
+app/edit-profile.tsx(88,74): error TS7006: Parameter 'v' implicitly has an 'any' type.
+app/edit-profile.tsx(89,70): error TS7006: Parameter 'v' implicitly has an 'any' type.
+app/edit-profile.tsx(94,71): error TS7006: Parameter 'v' implicitly has an 'any' type.
+app/edit-profile.tsx(95,67): error TS7006: Parameter 'v' implicitly has an 'any' type.
+app/edit-profile.tsx(96,77): error TS7006: Parameter 'v' implicitly has an 'any' type.
+app/lawyer-setup.tsx(113,19): error TS2345: Argument of type '"app.success"' is not assignable to parameter of type '"app.name" | "app.tagline" | "app.loading" | "app.error" | "app.retry" | "app.cancel" | "app.confirm" | "app.save" | "app.close" | "app.back" | "app.next" | "app.done" | "app.continue" | ... 236 more ... | "settings.version"'.
+app/lawyer-setup.tsx(113,37): error TS2345: Argument of type '"lawyer.setup.success"' is not assignable to parameter of type '"app.name" | "app.tagline" | "app.loading" | "app.error" | "app.retry" | "app.cancel" | "app.confirm" | "app.save" | "app.close" | "app.back" | "app.next" | "app.done" | "app.continue" | ... 236 more ... | "settings.version"'.
+app/lawyer/dashboard.tsx(643,26): error TS2554: Expected 1-2 arguments, but got 0.
+app/messages/index.tsx(201,37): error TS2367: This comparison appears to be unintentional because the types 'string' and 'number' have no overlap.
+app/messages/index.tsx(212,34): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app/messages/index.tsx(273,39): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app/onboarding.tsx(116,18): error TS2367: This comparison appears to be unintentional because the types '"client"' and '"lawyer"' have no overlap.
+app/review.tsx(187,31): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+app/support.tsx(63,17): error TS2345: Argument of type '({ role: "assistant"; content: string; } | { role: "user"; content: string; })[]' is not assignable to parameter of type 'SetStateAction<{ role: "assistant"; content: string; }[]>'.
+  Type '({ role: "assistant"; content: string; } | { role: "user"; content: string; })[]' is not assignable to type '{ role: "assistant"; content: string; }[]'.
+    Type '{ role: "assistant"; content: string; } | { role: "user"; content: string; }' is not assignable to type '{ role: "assistant"; content: string; }'.
+      Type '{ role: "user"; content: string; }' is not assignable to type '{ role: "assistant"; content: string; }'.
+        Types of property 'role' are incompatible.
+          Type '"user"' is not assignable to type '"assistant"'.
+src/store/slices/bookingsSlice.ts(29,66): error TS2339: Property 'booking' does not exist on type 'AxiosResponse<any, any, {}>'.
+src/store/slices/bookingsSlice.ts(29,96): error TS2339: Property 'booking' does not exist on type 'AxiosResponse<any, any, {}>'.
+src/utils/storeReview.ts(54,25): error TS2339: Property 'openStoreFrontAsync' does not exist on type 'typeof import("C:/Users/Omar Nagaty/Downloads/wakeel-sprint8/wakeel-sprint7/mobile/node_modules/expo-store-review/build/StoreReview")'.
