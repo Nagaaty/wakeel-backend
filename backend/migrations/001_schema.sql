@@ -333,7 +333,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_earnings INTEGER DEFAULT 0;
 -- OTP codes for phone verification
 CREATE TABLE IF NOT EXISTS otp_codes (
   id          SERIAL PRIMARY KEY,
-  phone       VARCHAR(20) NOT NULL,
+  phone       VARCHAR(255) NOT NULL,
   user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
   code        VARCHAR(6) NOT NULL,
   purpose     VARCHAR(30) DEFAULT 'verify',   -- verify | login | reset
