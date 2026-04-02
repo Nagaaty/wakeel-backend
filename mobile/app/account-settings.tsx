@@ -155,7 +155,7 @@ export default function AccountSettingsScreen() {
   const C = useTheme();
   const { isRTL } = useI18n();
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const serif = { fontFamily: 'CormorantGaramond-Bold' };
 
   const [modal, setModal] = useState<null | 'email' | 'password' | 'phone' | 'twofa'>(null);
