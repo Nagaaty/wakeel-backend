@@ -185,6 +185,29 @@ export default function AccountSettingsScreen() {
     }
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      isRTL ? 'حذف الحساب' : 'Delete Account',
+      isRTL ? 'هل أنت متأكد؟ سيتم حذف حسابك نهائياً ولا يمكن التراجع عن ذلك.' : 'Are you sure? This will permanently delete your account and cannot be undone.',
+      [
+        { text: isRTL ? 'إلغاء' : 'Cancel', style: 'cancel' },
+        {
+          text: isRTL ? 'حذف نهائي' : 'Delete Forever',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authAPI.deleteAccount();
+              Alert.alert(isRTL ? 'تم حذف الحساب' : 'Account Deleted');
+              router.replace('/(auth)/login' as any);
+            } catch (e: any) {
+              Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || 'Failed to delete account');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       {/* ── Header ─────────────────────────────────────────────────────── */}
@@ -258,6 +281,12 @@ export default function AccountSettingsScreen() {
             icon="📄" C={C} isRTL={isRTL}
             title={isRTL ? 'الشروط والأحكام' : 'Terms of service'}
             onPress={() => router.push('/about' as any)}
+          />
+          <SettingRow
+            icon="🗑️" C={C} isRTL={isRTL} danger
+            title={isRTL ? 'حذف الحساب' : 'Delete Account'}
+            subtitle={isRTL ? 'تحذير: هذا الإجراء لا يمكن التراجع عنه' : 'Warning: This action cannot be undone'}
+            onPress={handleDeleteAccount}
           />
         </View>
 
