@@ -14,6 +14,7 @@ export default function RegisterScreen() {
   const loading  = useSelector(selLoading);
   const error    = useSelector(selError);
   const insets   = useSafeAreaInsets();
+  const { isRTL } = useI18n();
 
   const [name,     setName]     = useState('');
   const [email,    setEmail]    = useState('');
@@ -27,7 +28,6 @@ export default function RegisterScreen() {
       router.push('/(auth)/register-lawyer' as any);
       return;
     }
-
     if (!name || !email || !password) return;
     if (!agreed) return;
     dispatch(clearError());
@@ -51,8 +51,12 @@ export default function RegisterScreen() {
       >
         <View style={{ alignItems: 'center', marginBottom: 28 }}>
           <Text style={{ fontSize: 48, marginBottom: 8 }}>⚖️</Text>
-          <Text style={{ fontSize: 26, fontWeight: '800', color: C.text, fontFamily: 'CormorantGaramond-Bold' }}>إنشاء حساب جديد</Text>
-          <Text style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>انضم لمنصة Wakeel القانونية</Text>
+          <Text style={{ fontSize: 26, fontWeight: '800', color: C.text, fontFamily: 'CormorantGaramond-Bold' }}>
+            {isRTL ? 'إنشاء حساب جديد' : 'Create Account'}
+          </Text>
+          <Text style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>
+            {isRTL ? 'انضم لمنصة Wakeel القانونية' : 'Join the Wakeel Legal Platform'}
+          </Text>
         </View>
 
         <View style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 20, padding: 24 }}>
@@ -63,7 +67,9 @@ export default function RegisterScreen() {
           ) : null}
 
           {/* Role selector */}
-          <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>نوع الحساب *</Text>
+          <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>
+            {isRTL ? 'نوع الحساب *' : 'Account type *'}
+          </Text>
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 18 }}>
             {(['client', 'lawyer'] as const).map(r => (
               <TouchableOpacity
@@ -78,10 +84,14 @@ export default function RegisterScreen() {
               >
                 <Text style={{ fontSize: 22, marginBottom: 4 }}>{r === 'client' ? '👤' : '⚖️'}</Text>
                 <Text style={{ color: role === r ? C.gold : C.text, fontWeight: '700', fontSize: 13 }}>
-                  {r === 'client' ? 'عميل' : 'محامٍ'}
+                  {r === 'client'
+                    ? (isRTL ? 'عميل' : 'Client')
+                    : (isRTL ? 'محامٍ' : 'Lawyer')}
                 </Text>
                 <Text style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>
-                  {r === 'client' ? 'أبحث عن محامٍ' : 'أقدم خدمات قانونية'}
+                  {r === 'client'
+                    ? (isRTL ? 'أبحث عن محامٍ' : 'I need a lawyer')
+                    : (isRTL ? 'أقدم خدمات قانونية' : 'I offer legal services')}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -90,10 +100,22 @@ export default function RegisterScreen() {
           {/* Client Specific Inputs */}
           {role === 'client' && (
             <>
-              <Inp C={C} label="الاسم الكامل *"         value={name}     onChangeText={setName}     placeholder="محمد أحمد علي"   autoCapitalize="words" />
-              <Inp C={C} label="البريد الإلكتروني *"    value={email}    onChangeText={setEmail}    placeholder="your@email.com"   keyboardType="email-address" autoCapitalize="none" />
-              <Inp C={C} label="رقم الهاتف"             value={phone}    onChangeText={setPhone}    placeholder="01xxxxxxxxx"      keyboardType="phone-pad" />
-              <Inp C={C} label="كلمة المرور *"           value={password} onChangeText={setPassword} placeholder="8 أحرف على الأقل" secureTextEntry />
+              <Inp C={C} label={isRTL ? 'الاسم الكامل *' : 'Full name *'}
+                value={name} onChangeText={setName}
+                placeholder={isRTL ? 'محمد أحمد علي' : 'John Smith'}
+                autoCapitalize="words" />
+              <Inp C={C} label={isRTL ? 'البريد الإلكتروني *' : 'Email address *'}
+                value={email} onChangeText={setEmail}
+                placeholder="your@email.com"
+                keyboardType="email-address" autoCapitalize="none" />
+              <Inp C={C} label={isRTL ? 'رقم الهاتف' : 'Phone number'}
+                value={phone} onChangeText={setPhone}
+                placeholder={isRTL ? '01xxxxxxxxx' : '+20 1xx xxx xxxx'}
+                keyboardType="phone-pad" />
+              <Inp C={C} label={isRTL ? 'كلمة المرور *' : 'Password *'}
+                value={password} onChangeText={setPassword}
+                placeholder={isRTL ? '8 أحرف على الأقل' : 'At least 8 characters'}
+                secureTextEntry />
 
               {/* Terms agreement */}
               <TouchableOpacity
@@ -109,11 +131,14 @@ export default function RegisterScreen() {
                   {agreed && <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>✓</Text>}
                 </View>
                 <Text style={{ color: C.muted, fontSize: 13, lineHeight: 20, flex: 1 }}>
-                  بالتسجيل توافق على{' '}
-                  <Text style={{ color: C.gold, fontWeight: '600' }}>شروط الاستخدام</Text>
-                  {' '}و{' '}
-                  <Text style={{ color: C.gold, fontWeight: '600' }}>سياسة الخصوصية</Text>
-                  {' '}الخاصة بـ Wakeel
+                  {isRTL ? 'بالتسجيل توافق على ' : 'By registering you agree to our '}
+                  <Text style={{ color: C.gold, fontWeight: '600' }}>
+                    {isRTL ? 'شروط الاستخدام' : 'Terms of Service'}
+                  </Text>
+                  {isRTL ? ' و' : ' and '}
+                  <Text style={{ color: C.gold, fontWeight: '600' }}>
+                    {isRTL ? 'سياسة الخصوصية' : 'Privacy Policy'}
+                  </Text>
                 </Text>
               </TouchableOpacity>
             </>
@@ -125,14 +150,22 @@ export default function RegisterScreen() {
             disabled={role === 'client' ? (loading || !name || !email || !password || !agreed) : false}
             full size="lg"
           >
-            {role === 'lawyer' ? 'متابعة كـ محامٍ ←' : (loading ? '⏳ جاري التسجيل...' : 'إنشاء حساب عميل')}
+            {role === 'lawyer'
+              ? (isRTL ? 'متابعة كـ محامٍ ←' : 'Continue as Lawyer →')
+              : loading
+                ? (isRTL ? '⏳ جاري التسجيل...' : '⏳ Creating account...')
+                : (isRTL ? 'إنشاء حساب عميل' : 'Create Client Account')}
           </Btn>
         </View>
 
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20, gap: 6 }}>
-          <Text style={{ color: C.muted, fontSize: 14 }}>لديك حساب؟</Text>
+          <Text style={{ color: C.muted, fontSize: 14 }}>
+            {isRTL ? 'لديك حساب؟' : 'Already have an account?'}
+          </Text>
           <Link href="/(auth)/login">
-            <Text style={{ color: C.gold, fontSize: 14, fontWeight: '700' }}>تسجيل الدخول</Text>
+            <Text style={{ color: C.gold, fontSize: 14, fontWeight: '700' }}>
+              {isRTL ? 'تسجيل الدخول' : 'Sign in'}
+            </Text>
           </Link>
         </View>
       </ScrollView>

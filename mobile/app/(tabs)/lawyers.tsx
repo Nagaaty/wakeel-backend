@@ -24,12 +24,15 @@ import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
 // Card: padding(44) + topRow(68) + stars(20) + winbar(16) + bio(36) + meta(20) + actions(36) + save(36) + margin(18) = 294
 const LAWYER_CARD_HEIGHT = 294;
 
-const CATEGORIES = ['','الأحوال الشخصية','الشركات','العقارات','القانون الجنائي','قانون العمل','الملكية الفكرية','الهجرة','المصرفي'];
-const CITIES     = ['','القاهرة','الإسكندرية','الجيزة','المنصورة','طنطا','بورسعيد','الأقصر','أسوان'];
-const SORT_OPTS: [string,string][] = [
-  ['rating','⭐ الأعلى تقييماً'],
-  ['price_asc','💰 السعر ↑'],
-  ['wins','🏆 الأكثر فوزاً'],
+const CATEGORIES_AR = ['','الأحوال الشخصية','الشركات','العقارات','القانون الجنائي','قانون العمل','الملكية الفكرية','الهجرة','المصرفي'];
+const CATEGORIES_EN = ['','Family Law','Corporate','Real Estate','Criminal','Labor Law','IP Law','Immigration','Banking'];
+const CITIES_AR     = ['','القاهرة','الإسكندرية','الجيزة','المنصورة','طنطا','بورسعيد','الأقصر','أسوان'];
+const CITIES_EN     = ['','Cairo','Alexandria','Giza','Mansoura','Tanta','Port Said','Luxor','Aswan'];
+// sort options: [value, arLabel, enLabel]
+const SORT_OPTS: [string,string,string][] = [
+  ['rating','⭐ الأعلى تقييماً','⭐ Top Rated'],
+  ['price_asc','💰 السعر ↑','💰 Price ↑'],
+  ['wins','🏆 الأكثر فوزاً','🏆 Most Wins'],
 ];
 
 // Compact Grid LawyerCard
@@ -191,6 +194,7 @@ export default function LawyersTab() {
   const total    = useSelector(selLawyersTotal);
   const insets   = useSafeAreaInsets();
   const isLoggedIn = useSelector(selLoggedIn);
+  const { isRTL } = useI18n();
   const [favorites, setFavorites] = useState<number[]>([]);
 
   // Memoize onToggleFav to avoid re-rendering LawyerCard grid/list pointlessly
@@ -200,16 +204,15 @@ export default function LawyersTab() {
       const d: any = await favoritesAPI.toggle(id);
       if (d.saved) {
         setFavorites(f => [...f, id]);
-        Alert.alert('تم حفظ المحامي', 'تمت الإضافة للمفضلة بنجاح');
+        Alert.alert(isRTL ? 'تم حفظ المحامي' : 'Saved', isRTL ? 'تمت الإضافة للمفضلة بنجاح' : 'Added to favourites');
       } else {
         setFavorites(f => f.filter(x => x !== id));
-        Alert.alert('تم إزالة المحامي', 'تم الإزالة من المفضلة');
+        Alert.alert(isRTL ? 'تم إزالة المحامي' : 'Removed', isRTL ? 'تم الإزالة من المفضلة' : 'Removed from favourites');
       }
     } catch {
-      // Toggle locally optimistic fallback if offline
       setFavorites(f => f.includes(id) ? f.filter(x => x !== id) : [...f, id]);
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, isRTL]);
   const [search, setSearch]   = useState('');
   const [category, setCategory] = useState(params.cat || '');
   const [city, setCity]       = useState('');
@@ -256,7 +259,9 @@ export default function LawyersTab() {
       {/* Header */}
       <View style={{ backgroundColor:C.surface, paddingTop:10, paddingHorizontal:16, paddingBottom:10, borderBottomWidth:1, borderBottomColor:C.border }}>
         <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-          <Text style={{ ...serif, color:C.text, fontWeight:'700', fontSize:22 }}>ابحث عن محاميك</Text>
+          <Text style={{ ...serif, color:C.text, fontWeight:'700', fontSize:22 }}>
+            {isRTL ? 'ابحث عن محاميك' : 'Find Your Lawyer'}
+          </Text>
           <View style={{ flexDirection:'row', alignItems:'center', gap: 8 }}>
             <TouchableOpacity onPress={()=>setIsGrid(!isGrid)} style={{ padding: 6 }}>
               <Text style={{ fontSize: 18 }}>{isGrid ? '📋' : '🔲'}</Text>
@@ -264,7 +269,7 @@ export default function LawyersTab() {
             <TouchableOpacity onPress={()=>setShowSort(!showSort)}
               style={{ flexDirection:'row', alignItems:'center', gap:4, backgroundColor:C.card, borderWidth:1, borderColor:C.border, borderRadius:8, paddingHorizontal:10, paddingVertical:6 }}>
               <Text style={{ color:C.text, fontSize:12 }}>
-                {SORT_OPTS.find(s=>s[0]===sort)?.[1] || 'ترتيب'} ▾
+                {SORT_OPTS.find(s=>s[0]===sort)?.[isRTL ? 1 : 2] || (isRTL ? 'ترتيب' : 'Sort')} ▾
               </Text>
             </TouchableOpacity>
           </View>
@@ -273,10 +278,10 @@ export default function LawyersTab() {
         {/* Sort dropdown */}
         {showSort && (
           <View style={{ backgroundColor:C.card, borderWidth:1, borderColor:C.border, borderRadius:10, marginBottom:8, overflow:'hidden' }}>
-            {SORT_OPTS.map(([val, label]) => (
+            {SORT_OPTS.map(([val, arLabel, enLabel]) => (
               <TouchableOpacity key={val} onPress={()=>{ setSort(val); setShowSort(false); }}
                 style={{ padding:12, borderBottomWidth:1, borderBottomColor:C.border, flexDirection:'row', justifyContent:'space-between' }}>
-                <Text style={{ color:C.text, fontSize:13 }}>{label}</Text>
+                <Text style={{ color:C.text, fontSize:13 }}>{isRTL ? arLabel : enLabel}</Text>
                 {sort===val && <Text style={{ color:C.gold }}>✓</Text>}
               </TouchableOpacity>
             ))}
@@ -287,7 +292,8 @@ export default function LawyersTab() {
         <View style={{ flexDirection:'row', backgroundColor:C.card2, borderWidth:1, borderColor:C.border, borderRadius:12, paddingHorizontal:12, paddingVertical:10, alignItems:'center', gap:8, marginBottom:10 }}>
           <Text style={{ fontSize:16 }}>🔍</Text>
           <TextInput value={search} onChangeText={onSearchChange}
-            placeholder="ابحث بالاسم أو التخصص..." placeholderTextColor={C.muted}
+            placeholder={isRTL ? 'ابحث بالاسم أو التخصص...' : 'Search by name or specialty...'}
+            placeholderTextColor={C.muted}
             style={{ flex:1, color:C.text, fontSize:14 }} />
           {search.length > 0 && (
             <TouchableOpacity onPress={()=>{ setSearch(''); load({ search:'' }, true); }}>
@@ -297,16 +303,17 @@ export default function LawyersTab() {
         </View>
 
         {/* Category chips */}
-        <FlatList horizontal data={CATEGORIES} keyExtractor={i=>i||'all'}
+        <FlatList horizontal data={isRTL ? CATEGORIES_AR : CATEGORIES_EN} keyExtractor={i=>i||'all'}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap:8, marginBottom:8 }}
-          renderItem={({ item }) => {
-            const active = category === item;
+          renderItem={({ item, index }) => {
+            const apiValue = CATEGORIES_AR[index]; // always send Arabic to backend
+            const active = category === apiValue;
             return (
-              <TouchableOpacity onPress={()=>setCategory(item)}
+              <TouchableOpacity onPress={()=>setCategory(active ? '' : apiValue)}
                 style={{ paddingHorizontal:14, paddingVertical:7, borderRadius:20, borderWidth:1, borderColor:active?C.gold:C.border, backgroundColor:active?`${C.gold}15`:'transparent' }}>
                 <Text style={{ color:active?C.gold:C.text, fontSize:12, fontWeight:active?'700':'400' }}>
-                  {item||'All Categories'}
+                  {item || (isRTL ? 'الكل' : 'All')}
                 </Text>
               </TouchableOpacity>
             );
@@ -314,16 +321,17 @@ export default function LawyersTab() {
         />
 
         {/* City chips */}
-        <FlatList horizontal data={CITIES} keyExtractor={i=>i||'all'}
+        <FlatList horizontal data={isRTL ? CITIES_AR : CITIES_EN} keyExtractor={i=>i||'all'}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap:8 }}
-          renderItem={({ item }) => {
-            const active = city === item;
+          renderItem={({ item, index }) => {
+            const apiValue = CITIES_AR[index];
+            const active = city === apiValue;
             return (
-              <TouchableOpacity onPress={()=>setCity(item)}
+              <TouchableOpacity onPress={()=>setCity(active ? '' : apiValue)}
                 style={{ paddingHorizontal:12, paddingVertical:6, borderRadius:20, borderWidth:1, borderColor:active?C.accent:C.border, backgroundColor:active?`${C.accent}15`:'transparent' }}>
                 <Text style={{ color:active?C.accent:C.muted, fontSize:11, fontWeight:active?'700':'400' }}>
-                  {item||'📍 All Cities'}
+                  {item || (isRTL ? '📍 كل المدن' : '📍 All Cities')}
                 </Text>
               </TouchableOpacity>
             );
@@ -375,7 +383,7 @@ export default function LawyersTab() {
         ListFooterComponent={loading && page > 1 ? <ActivityIndicator color={C.gold} style={{ padding:20 }} /> : null}
         ListEmptyComponent={
           !loading
-            ? <Empty C={C} icon="🔍" title="No results" subtitle="Try a different search or category" action={{ label:'View All Lawyers', onPress:()=>{ setSearch(''); setCategory(''); setCity(''); load({search:'',category:'',city:''},true); }}} />
+            ? <Empty C={C} icon="🔍" title={isRTL ? 'لا توجد نتائج' : 'No results'} subtitle={isRTL ? 'جرب بحثاً مختلفاً' : 'Try a different search or category'} action={{ label: isRTL ? 'عرض كل المحامين' : 'View All Lawyers', onPress:()=>{ setSearch(''); setCategory(''); setCity(''); load({search:'',category:'',city:''},true); }}} />
             : <View style={{ padding:40, alignItems:'center' }}><Spinner C={C} size="large" /></View>
         }
       />
