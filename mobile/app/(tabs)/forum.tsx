@@ -26,6 +26,10 @@ export default function ForumTab() {
   const [answersLoading, setAnswersLoading] = useState(false);
   const [answerText, setAnswerText]     = useState('');
   const [postingAnswer, setPostingAnswer] = useState(false);
+  // Repost modal state
+  const [repostPost, setRepostPost]     = useState<any | null>(null);
+  const [repostText, setRepostText]     = useState('');
+  const [postingRepost, setPostingRepost] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -100,15 +104,23 @@ export default function ForumTab() {
     } catch {} finally { setPostingAnswer(false); }
   }, [answerText, commentPost]);
 
-  const handleShare = useCallback(async (post: any) => {
-    try {
-      await Share.share({
-        title: 'سؤال قانوني على وكيل',
-        message: `📜 ${post.question}\n\nشاركني رأيك عبر تطبيق وكيل — منصة المحامين المعتمدين في مصر`,
-      });
-      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, shares_count: (p.shares_count || 0) + 1 } : p));
-    } catch {}
+  const handleShare = useCallback((post: any) => {
+    setRepostPost(post);
+    setRepostText('');
   }, []);
+
+  const submitRepost = useCallback(async () => {
+    if (!repostPost) return;
+    setPostingRepost(true);
+    try {
+      const quote = `🔁 ${isRTL ? 'إعادة نشر' : 'Repost'}: "${repostPost.question.slice(0, 80)}${repostPost.question.length > 80 ? '...' : ''}"\n\n${repostText}`;
+      await forumAPI.createQuestion({ question: quote, category: repostPost.category || 'الكل', anonymous: false });
+      setPosts(prev => prev.map(p => p.id === repostPost.id ? { ...p, shares_count: (p.shares_count || 0) + 1 } : p));
+      setRepostPost(null);
+      loadPosts();
+    } catch {}
+    finally { setPostingRepost(false); }
+  }, [repostPost, repostText, isRTL]);
 
 
   return (
@@ -117,7 +129,7 @@ export default function ForumTab() {
       <View style={{ paddingTop: insets.top + 16, backgroundColor: C.surface, paddingBottom: 10, borderBottomWidth: 1, borderColor: '#D3D6DB' }}>
         <View style={{ paddingHorizontal: 16, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text style={{ fontSize: 26, fontWeight: '800', color: C.text, fontFamily: 'CormorantGaramond-Bold' }}>
-            مجتمع وكيل
+            {isRTL ? 'مجتمع وكيل' : 'Wakeel Community'}
           </Text>
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 16 }}>
             <TouchableOpacity style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: feedBg, alignItems: 'center', justifyContent: 'center' }}>
@@ -145,18 +157,21 @@ export default function ForumTab() {
                 <Avatar C={C} initials="ME" size={44} />
                 <TouchableOpacity onPress={() => setModalOpen(true)} style={{ flex: 1, backgroundColor: feedBg, borderRadius: 24, paddingHorizontal: 16, paddingVertical: 12 }}>
                   <Text style={{ color: '#65676B', fontSize: 15, textAlign: isRTL ? 'right' : 'left' }}>
-                    بم تفكر؟ نصيحة، أو سؤال قانوني...
+                    {isRTL ? 'بم تفكر؟ نصيحة، أو سؤال قانوني...' : 'What\'s on your mind? A legal tip or question...'}
                   </Text>
                 </TouchableOpacity>
               </View>
               {/* Quick Actions */}
               <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderColor: feedBg }}>
-                {[['صورة/فيديو', '📸'], ['ملف/مستند', '📎'], ['استشارة حية', '⚖️']].map(([label, icon], i) => (
-                  <TouchableOpacity key={i} style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <Text style={{ fontSize: 18 }}>{icon}</Text>
-                    <Text style={{ color: '#65676B', fontWeight: '600', fontSize: 13 }}>{label}</Text>
-                  </TouchableOpacity>
-                ))}
+                {(isRTL
+                ? [['صورة/فيديو', '📸'], ['ملف/مستند', '📎'], ['استشارة حية', '⚖️']]
+                : [['Photo/Video', '📸'], ['File/Doc', '📎'], ['Live Consult', '⚖️']]
+              ).map(([label, icon], i) => (
+                <TouchableOpacity key={i} style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 18 }}>{icon}</Text>
+                  <Text style={{ color: '#65676B', fontWeight: '600', fontSize: 13 }}>{label}</Text>
+                </TouchableOpacity>
+              ))}
               </View>
             </View>
           </>
@@ -208,8 +223,8 @@ export default function ForumTab() {
                 <Text style={{ color: '#65676B', fontSize: 13 }}>{p.likes_count || 0}</Text>
               </View>
               <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 12 }}>
-                <Text style={{ color: '#65676B', fontSize: 13 }}>{p.answer_count || 0} تعليق</Text>
-                <Text style={{ color: '#65676B', fontSize: 13 }}>{p.shares_count || 0} مشاركة</Text>
+                <Text style={{ color: '#65676B', fontSize: 13 }}>{p.answer_count || 0} {isRTL ? 'تعليق' : 'comments'}</Text>
+                <Text style={{ color: '#65676B', fontSize: 13 }}>{p.shares_count || 0} {isRTL ? 'إعادة نشر' : 'reposts'}</Text>
               </View>
             </View>
 
@@ -217,18 +232,20 @@ export default function ForumTab() {
             <View style={{ marginHorizontal: 16, borderTopWidth: 1, borderColor: feedBg, paddingVertical: 4, flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
               
               <TouchableOpacity onPress={() => handleLike(p.id)} style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 8 }}>
-                <Text style={{ fontSize: 20, color: likedPosts.has(p.id) ? '#1877F2' : '#65676B' }}>{likedPosts.has(p.id) ? '👍' : '🤘'}</Text>
-                <Text style={{ color: likedPosts.has(p.id) ? '#1877F2' : '#65676B', fontSize: 14, fontWeight: '600' }}>أعجبني</Text>
+                <Text style={{ fontSize: 20, color: likedPosts.has(p.id) ? '#1877F2' : '#65676B' }}>{likedPosts.has(p.id) ? '👍' : '👍'}</Text>
+                <Text style={{ color: likedPosts.has(p.id) ? '#1877F2' : '#65676B', fontSize: 14, fontWeight: likedPosts.has(p.id) ? '700' : '600' }}>
+                  {isRTL ? 'أعجبني' : 'Like'}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => openComments(p)} style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 8 }}>
                 <Text style={{ fontSize: 20, color: '#65676B' }}>💬</Text>
-                <Text style={{ color: '#65676B', fontSize: 14, fontWeight: '600' }}>تعليق</Text>
+                <Text style={{ color: '#65676B', fontSize: 14, fontWeight: '600' }}>{isRTL ? 'تعليق' : 'Comment'}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => handleShare(p)} style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 8 }}>
-                <Text style={{ fontSize: 20, color: '#65676B' }}>📤</Text>
-                <Text style={{ color: '#65676B', fontSize: 14, fontWeight: '600' }}>مشاركة</Text>
+                <Text style={{ fontSize: 20, color: '#65676B' }}>🔁</Text>
+                <Text style={{ color: '#65676B', fontSize: 14, fontWeight: '600' }}>{isRTL ? 'إعادة نشر' : 'Repost'}</Text>
               </TouchableOpacity>
 
             </View>
@@ -254,61 +271,86 @@ export default function ForumTab() {
         <Text style={{ fontSize: 24, color: '#FFF' }}>✍️</Text>
       </TouchableOpacity>
 
-      {/* ─── Comments Modal ───────────────────────────────────────── */}
+      {/* ─── Comments Modal (Redesigned) ───────────────────────────── */}
       <Modal visible={!!commentPost} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setCommentPost(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: C.surface }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-            <TouchableOpacity onPress={() => { setCommentPost(null); setAnswerText(''); }}>
-              <Text style={{ color: C.text, fontSize: 16 }}>إغلاق</Text>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: C.bg }}>
+          {/* Drag handle */}
+          <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 4 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: C.border }} />
+          </View>
+          {/* Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
+            <Text style={{ color: C.text, fontSize: 18, fontWeight: '800', fontFamily: 'CormorantGaramond-Bold' }}>
+              {isRTL ? '💬 الردود' : '💬 Replies'}
+            </Text>
+            <TouchableOpacity onPress={() => { setCommentPost(null); setAnswerText(''); }}
+              style={{ backgroundColor: C.card2, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ color: C.muted, fontSize: 14, fontWeight: '600' }}>{isRTL ? 'إغلاق' : 'Close'}</Text>
             </TouchableOpacity>
-            <Text style={{ color: C.text, fontSize: 17, fontWeight: '700', fontFamily: 'CormorantGaramond-Bold' }}>التعليقات والإجابات</Text>
-            <View style={{ width: 40 }} />
           </View>
 
-          {/* Original Question */}
+          {/* Original Post Summary */}
           {commentPost && (
-            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.card2 }}>
-              <Text style={{ color: C.muted, fontSize: 12, marginBottom: 4 }}>{commentPost.asked_by || 'مستخدم'}</Text>
-              <Text style={{ color: C.text, fontSize: 14, lineHeight: 22 }}>{commentPost.question}</Text>
+            <View style={{ margin: 12, backgroundColor: C.gold + '12', borderLeftWidth: 3, borderLeftColor: C.gold, borderRadius: 10, padding: 12 }}>
+              <Text style={{ color: C.muted, fontSize: 11, marginBottom: 4, fontWeight: '600' }}>
+                {isRTL ? '📌 السؤال الأصلي' : '📌 Original Question'}
+              </Text>
+              <Text style={{ color: C.text, fontSize: 13, lineHeight: 20 }} numberOfLines={3}>{commentPost.question}</Text>
             </View>
           )}
 
           {/* Answers list */}
           {answersLoading ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={C.gold} /></View>
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={C.gold} size="large" /></View>
           ) : (
             <FlatList
               data={answers}
               keyExtractor={a => String(a.id)}
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 16, gap: 12 }}
+              contentContainerStyle={{ padding: 12, gap: 10, paddingBottom: 20 }}
               ListEmptyComponent={
-                <View style={{ alignItems: 'center', paddingTop: 40, gap: 8 }}>
-                  <Text style={{ fontSize: 40 }}>💭</Text>
-                  <Text style={{ color: C.muted, fontSize: 14 }}>لا توجد إجابات بعد — كن أول من يجيب!</Text>
+                <View style={{ alignItems: 'center', paddingTop: 50, gap: 10 }}>
+                  <Text style={{ fontSize: 48 }}>💭</Text>
+                  <Text style={{ color: C.text, fontSize: 16, fontWeight: '700' }}>
+                    {isRTL ? 'لا توجد ردود بعد' : 'No replies yet'}
+                  </Text>
+                  <Text style={{ color: C.muted, fontSize: 13, textAlign: 'center' }}>
+                    {isRTL ? 'كن أول من يشارك رأيه القانوني!' : 'Be the first to share your legal insight!'}
+                  </Text>
                 </View>
               }
               renderItem={({ item: a }) => (
-                <View style={{ backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <Avatar C={C} initials={(a.lawyer_name || 'م').substring(0,2).toUpperCase()} size={34} />
-                    <View>
-                      <Text style={{ color: C.text, fontWeight: '700', fontSize: 13 }}>{a.lawyer_name || 'محامي'}</Text>
-                      <Text style={{ color: C.muted, fontSize: 11 }}>{new Date(a.created_at).toLocaleDateString('ar-EG')}</Text>
-                    </View>
-                    {a.is_accepted && <Text style={{ marginLeft: 'auto', color: C.gold, fontSize: 12, fontWeight: '700' }}>✔️ مقبول</Text>}
+                <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: a.is_accepted ? C.gold + '25' : C.card2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: a.is_accepted ? C.gold : C.muted }}>
+                      {(a.lawyer_name || 'م').substring(0, 2).toUpperCase()}
+                    </Text>
                   </View>
-                  <Text style={{ color: C.text, fontSize: 14, lineHeight: 22 }}>{a.answer}</Text>
+                  <View style={{ flex: 1, backgroundColor: C.card, borderRadius: 16, borderTopLeftRadius: 4, padding: 12, borderWidth: 1, borderColor: a.is_accepted ? C.gold + '40' : C.border }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <Text style={{ color: C.text, fontWeight: '700', fontSize: 13 }}>{a.lawyer_name || (isRTL ? 'محامي' : 'Lawyer')}</Text>
+                      {a.is_accepted && <Text style={{ color: C.gold, fontSize: 11, fontWeight: '700' }}>✔️ {isRTL ? 'مقبول' : 'Accepted'}</Text>}
+                    </View>
+                    <Text style={{ color: C.text, fontSize: 14, lineHeight: 22 }}>{a.answer}</Text>
+                    <Text style={{ color: C.muted, fontSize: 11, marginTop: 6 }}>
+                      {new Date(a.created_at).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US')}
+                    </Text>
+                  </View>
                 </View>
               )}
             />
           )}
 
           {/* Answer input */}
-          <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: C.border, flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
+          <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: C.border, flexDirection: 'row', gap: 10, alignItems: 'flex-end', paddingBottom: insets.bottom + 12 }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.gold + '20', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: C.gold }}>
+                {user?.name ? user.name.substring(0, 2).toUpperCase() : 'ME'}
+              </Text>
+            </View>
             <TextInput
               multiline
-              placeholder="اكتب إجابتك القانونية..."
+              placeholder={isRTL ? 'شارك رأيك القانوني...' : 'Share your legal insight...'}
               placeholderTextColor={C.muted}
               value={answerText}
               onChangeText={setAnswerText}
@@ -322,29 +364,38 @@ export default function ForumTab() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ─── Create Post Modal ────────────────────────────────────────────── */}
+      {/* ─── Create Post Modal ─────────────────────────────────────────── */}
       <Modal visible={modalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: C.surface }}>
+          <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 4 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: C.border }} />
+          </View>
           {/* Modal Header */}
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
             <TouchableOpacity onPress={() => setModalOpen(false)}>
-              <Text style={{ color: C.text, fontSize: 16 }}>إلغاء</Text>
+              <Text style={{ color: C.text, fontSize: 16 }}>{isRTL ? 'إلغاء' : 'Cancel'}</Text>
             </TouchableOpacity>
-            <Text style={{ color: C.text, fontSize: 18, fontWeight: '700', fontFamily: 'CormorantGaramond-Bold' }}>إنشاء منشور</Text>
+            <Text style={{ color: C.text, fontSize: 18, fontWeight: '700', fontFamily: 'CormorantGaramond-Bold' }}>
+              {isRTL ? 'إنشاء منشور' : 'New Post'}
+            </Text>
             <TouchableOpacity onPress={handlePost} disabled={!newPostText.trim() || posting}>
-              <Text style={{ color: !newPostText.trim() || posting ? C.muted : C.gold, fontSize: 16, fontWeight: '700' }}>نشر</Text>
+              <Text style={{ color: !newPostText.trim() || posting ? C.muted : C.gold, fontSize: 16, fontWeight: '700' }}>
+                {isRTL ? 'نشر' : 'Post'}
+              </Text>
             </TouchableOpacity>
           </View>
           
           <View style={{ padding: 16, flexDirection: isRTL ? 'row-reverse' : 'row', gap: 12 }}>
-            <Avatar C={C} initials="ME" size={44} />
-            <Text style={{ fontWeight: '700', fontSize: 16, color: C.text, marginTop: 10 }}>أنت</Text>
+            <Avatar C={C} initials={user?.name ? user.name.substring(0,2).toUpperCase() : 'ME'} size={44} />
+            <Text style={{ fontWeight: '700', fontSize: 16, color: C.text, marginTop: 10 }}>
+              {user?.name || (isRTL ? 'أنت' : 'You')}
+            </Text>
           </View>
 
           <TextInput
             autoFocus
             multiline
-            placeholder="بم تفكر؟ نصيحة، أو سؤال قانوني..."
+            placeholder={isRTL ? 'بم تفكر؟ نصيحة، أو سؤال قانوني...' : 'What\'s on your mind? A legal question or tip...'}
             placeholderTextColor={C.muted}
             value={newPostText}
             onChangeText={setNewPostText}
@@ -356,6 +407,51 @@ export default function ForumTab() {
             <TouchableOpacity><Text style={{ fontSize: 24 }}>📸</Text></TouchableOpacity>
             <TouchableOpacity><Text style={{ fontSize: 24 }}>📎</Text></TouchableOpacity>
             <TouchableOpacity><Text style={{ fontSize: 24 }}>👤</Text></TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ─── Repost Modal ─────────────────────────────────────────────── */}
+      <Modal visible={!!repostPost} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setRepostPost(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: C.surface }}>
+          <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 4 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: C.border }} />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+            <TouchableOpacity onPress={() => setRepostPost(null)}>
+              <Text style={{ color: C.text, fontSize: 16 }}>{isRTL ? 'إلغاء' : 'Cancel'}</Text>
+            </TouchableOpacity>
+            <Text style={{ color: C.text, fontSize: 18, fontWeight: '800', fontFamily: 'CormorantGaramond-Bold' }}>
+              🔁 {isRTL ? 'إعادة نشر' : 'Repost'}
+            </Text>
+            <TouchableOpacity onPress={submitRepost} disabled={postingRepost}>
+              <Text style={{ color: postingRepost ? C.muted : C.gold, fontSize: 16, fontWeight: '700' }}>
+                {postingRepost ? '⏳' : (isRTL ? 'نشر' : 'Share')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ padding: 16 }}>
+            <TextInput
+              autoFocus={false}
+              multiline
+              placeholder={isRTL ? 'أضف تعليقك (اختياري)...' : 'Add your comment (optional)...'}
+              placeholderTextColor={C.muted}
+              value={repostText}
+              onChangeText={setRepostText}
+              style={{ fontSize: 16, color: C.text, textAlign: isRTL ? 'right' : 'left', minHeight: 60, marginBottom: 16 }}
+            />
+            {/* Quoted post preview */}
+            {repostPost && (
+              <View style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14 }}>
+                <Text style={{ color: C.muted, fontSize: 11, marginBottom: 6, fontWeight: '600' }}>
+                  🔁 {repostPost.asked_by || (isRTL ? 'مستخدم' : 'User')}
+                </Text>
+                <Text style={{ color: C.text, fontSize: 14, lineHeight: 22 }} numberOfLines={4}>
+                  {repostPost.question}
+                </Text>
+              </View>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>

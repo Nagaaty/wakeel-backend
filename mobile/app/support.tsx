@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  KeyboardAvoidingView, Platform, FlatList,
+  KeyboardAvoidingView, Platform, FlatList, Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../src/hooks/useTheme';
 import { Btn, Card, Spinner } from '../src/components/ui';
-import { aiAPI, supportAPI, contentAPI } from '../src/services/api';
+import { aiAPI, supportAPI } from '../src/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../src/i18n';
 
@@ -28,7 +28,7 @@ function FAQItem({ q, a, C }: { q: string; a: string; C: any }) {
   );
 }
 
-const FAQS = [
+const FAQS_AR = [
   ['كيف أحجز استشارة؟', 'اختر محامياً من صفحة البحث، اضغط "احجز الآن"، اختر الوقت وادفع بأمان.'],
   ['هل يمكنني استرداد أموالي؟', 'نعم، يمكن الاسترداد الكامل حتى 24 ساعة قبل موعد الجلسة.'],
   ['كيف يتم التحقق من المحامين؟', 'نتحقق من بطاقة نقابة المحامين والسجل المهني لكل محامٍ.'],
@@ -37,16 +37,34 @@ const FAQS = [
   ['ما هي مدة الاستشارة النصية؟', 'يرد المحامي خلال 4 ساعات كحد أقصى. معظم الردود في أقل من ساعة.'],
 ];
 
+const FAQS_EN = [
+  ['How do I book a consultation?', 'Choose a lawyer from the search page, tap "Book Now", select a time and pay securely.'],
+  ['Can I get a refund?', 'Yes, full refunds are available up to 24 hours before your session.'],
+  ['How are lawyers verified?', 'We verify each lawyer\'s Bar Association card and professional record.'],
+  ['What payment methods are available?', 'Fawry, bank card, Vodafone Cash, Orange Money.'],
+  ['How do I contact my lawyer?', 'Via instant chat inside the app or video during your booked session.'],
+  ['How fast do text consultations get answered?', 'Lawyers reply within 4 hours maximum — most replies come within an hour.'],
+];
+
+const AI_SYSTEM_PROMPT_AR = 'أنت مساعد خدمة عملاء لمنصة Wakeel للخدمات القانونية. أجب بالعربية بشكل ودود ومختصر. إذا لم تستطع المساعدة اقترح على المستخدم التحدث مع موظف بشري.';
+const AI_SYSTEM_PROMPT_EN = 'You are a customer service assistant for Wakeel, an Egyptian legal services platform. Reply in English in a friendly, concise manner. If you cannot help, suggest the user speak with a human agent.';
+
 export default function SupportScreen() {
-  const C = useTheme(); const insets = useSafeAreaInsets();
+  const C = useTheme();
+  const insets = useSafeAreaInsets();
+  const { isRTL } = useI18n();
+  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+
   const [tab, setTab] = useState<'ai' | 'ticket' | 'faq'>('ai');
-  const [messages, setMessages] = useState<{role: 'assistant' | 'user', content: string}[]>([{
+  const [messages, setMessages] = useState<{ role: 'assistant' | 'user'; content: string }[]>([{
     role: 'assistant',
-    content: 'مرحباً! أنا مساعد خدمة عملاء Wakeel.\n\nيمكنني مساعدتك في:\n- مشاكل الحجز والدفع\n- التحقق من المحامين\n- استرداد الأموال\n- الإبلاغ عن مشكلة',
+    content: isRTL
+      ? 'مرحباً! أنا مساعد خدمة عملاء Wakeel.\n\nيمكنني مساعدتك في:\n- مشاكل الحجز والدفع\n- التحقق من المحامين\n- استرداد الأموال\n- الإبلاغ عن مشكلة\n\nاضغط "تحدث مع موظف" إذا أردت مساعدة بشرية.'
+      : 'Hi! I\'m the Wakeel support assistant.\n\nI can help with:\n- Booking & payment issues\n- Lawyer verification\n- Refund requests\n- Reporting a problem\n\nTap "Talk to an Agent" for human support.',
   }]);
-  const [input,     setInput]     = useState('');
-  const [loading,   setLoading]   = useState(false);
-  const [ticket,    setTicket]    = useState({ subject: '', message: '', priority: 'normal', category: 'general' });
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [ticket, setTicket] = useState({ subject: '', message: '', priority: 'normal', category: 'general' });
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const listRef = useRef<FlatList>(null);
@@ -64,11 +82,33 @@ export default function SupportScreen() {
     setLoading(true);
     try {
       const apiMsgs = newMsgs.map(m => ({ role: m.role, content: m.content }));
-      const data: any = await aiAPI.chat(apiMsgs, 'أنت مساعد خدمة عملاء لمنصة Wakeel للخدمات القانونية. أجب بالعربية بشكل ودود ومختصر.');
-      setMessages(p => [...p, { role: 'assistant', content: data.reply || data.text || 'سأحوّلك لموظف دعم بشري.' }]);
+      const systemPrompt = isRTL ? AI_SYSTEM_PROMPT_AR : AI_SYSTEM_PROMPT_EN;
+      const data: any = await aiAPI.chat(apiMsgs, systemPrompt);
+      const reply = data?.reply || data?.text || data?.message;
+      if (reply) {
+        setMessages(p => [...p, { role: 'assistant', content: reply }]);
+      } else {
+        throw new Error('empty response');
+      }
     } catch {
-      setMessages(p => [...p, { role: 'assistant', content: '⚠️ تعذر الاتصال. سيتواصل معك فريق الدعم خلال دقائق.' }]);
-    } finally { setLoading(false); }
+      setMessages(p => [...p, {
+        role: 'assistant',
+        content: isRTL
+          ? '⚠️ تعذّر الاتصال بالذكاء الاصطناعي. اضغط "تحدث مع موظف" للحصول على مساعدة فورية.'
+          : '⚠️ Could not reach the AI assistant. Tap "Talk to an Agent" for immediate help.',
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const escalateToHuman = () => {
+    setTab('ticket');
+    setTicket(t => ({
+      ...t,
+      subject: isRTL ? 'طلب التحدث مع موظف بشري' : 'Request to speak with a human agent',
+      priority: 'urgent',
+    }));
   };
 
   const submitTicket = async () => {
@@ -83,9 +123,17 @@ export default function SupportScreen() {
       });
       setSubmitted(true);
     } catch {
-      setSubmitted(true); // optimistic
-    } finally { setSubmitting(false); }
+      setSubmitted(true); // optimistic — show success even if offline
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const TABS: [string, string, string][] = isRTL
+    ? [['ai', '💬', 'دردشة ذكية'], ['ticket', '🎫', 'تذكرة دعم'], ['faq', '❓', 'أسئلة شائعة']]
+    : [['ai', '💬', 'AI Chat'], ['ticket', '🎫', 'Support Ticket'], ['faq', '❓', 'FAQ']];
+
+  const faqs = isRTL ? FAQS_AR : FAQS_EN;
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -93,36 +141,44 @@ export default function SupportScreen() {
       <View style={{ backgroundColor: C.surface, paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={{ color: C.text, fontSize: 22 }}>‹</Text>
+            <Text style={{ color: C.text, fontSize: 22 }}>{isRTL ? '›' : '‹'}</Text>
           </TouchableOpacity>
-          <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'CormorantGaramond-Bold' }}>الدعم والمساعدة</Text>
+          <Text style={{ ...serif, color: C.text, fontWeight: '700', fontSize: 20 }}>
+            {isRTL ? 'الدعم والمساعدة' : 'Support & Help'}
+          </Text>
         </View>
         {/* Tab switcher */}
         <View style={{ flexDirection: 'row', backgroundColor: C.card, borderRadius: 12, padding: 4, borderWidth: 1, borderColor: C.border }}>
-          {([['ai', '💬 دردشة'], ['ticket', '🎫 تذكرة'], ['faq', '❓ أسئلة']] as [string, string][]).map(([t, lb]) => (
+          {TABS.map(([t, icon, lb]) => (
             <TouchableOpacity key={t} onPress={() => setTab(t as any)}
               style={{ flex: 1, paddingVertical: 9, borderRadius: 9, backgroundColor: tab === t ? C.gold : 'transparent', alignItems: 'center' }}>
-              <Text style={{ color: tab === t ? '#fff' : C.muted, fontSize: 12, fontWeight: tab === t ? '700' : '400' }}>{lb}</Text>
+              <Text style={{ color: tab === t ? '#fff' : C.muted, fontSize: 11, fontWeight: tab === t ? '700' : '400' }}>{icon} {lb}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* AI Chat */}
+      {/* ── AI Chat Tab ─────────────────────────────────── */}
       {tab === 'ai' && (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <FlatList
             ref={listRef}
             data={messages}
             keyExtractor={(_, i) => String(i)}
-            contentContainerStyle={{ padding: 16, gap: 10 }}
+            contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 20 }}
             style={{ flex: 1 }}
             onContentSizeChange={() => listRef.current?.scrollToEnd()}
             renderItem={({ item: m }) => (
               <View style={{ flexDirection: 'row', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                {m.role === 'assistant' && (
+                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: C.gold + '20', alignItems: 'center', justifyContent: 'center', marginRight: 8, flexShrink: 0, alignSelf: 'flex-end' }}>
+                    <Text style={{ fontSize: 16 }}>🤖</Text>
+                  </View>
+                )}
                 <View style={{
-                  maxWidth: '82%', backgroundColor: m.role === 'user' ? C.gold : C.card,
-                  padding: 12, borderRadius: 18, borderBottomRightRadius: m.role === 'user' ? 4 : 18,
+                  maxWidth: '78%', backgroundColor: m.role === 'user' ? C.gold : C.card,
+                  padding: 12, borderRadius: 18,
+                  borderBottomRightRadius: m.role === 'user' ? 4 : 18,
                   borderBottomLeftRadius: m.role === 'user' ? 18 : 4,
                   borderWidth: m.role === 'user' ? 0 : 1, borderColor: C.border,
                 }}>
@@ -132,43 +188,94 @@ export default function SupportScreen() {
             )}
             ListFooterComponent={loading ? (
               <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: C.gold + '20', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                  <Text style={{ fontSize: 16 }}>🤖</Text>
+                </View>
                 <View style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 12, borderBottomLeftRadius: 4 }}>
-                  <Text style={{ color: C.muted, fontSize: 13 }}>⏳ يكتب...</Text>
+                  <Text style={{ color: C.muted, fontSize: 13 }}>⏳ {isRTL ? 'يكتب...' : 'Typing...'}</Text>
                 </View>
               </View>
             ) : null}
           />
+
+          {/* Human escalation banner */}
+          <TouchableOpacity onPress={escalateToHuman}
+            style={{ marginHorizontal: 16, marginBottom: 8, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={{ fontSize: 20 }}>👨‍💼</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.text, fontWeight: '700', fontSize: 13 }}>
+                {isRTL ? 'تحدث مع موظف حقيقي' : 'Talk to a Real Agent'}
+              </Text>
+              <Text style={{ color: C.muted, fontSize: 11, marginTop: 1 }}>
+                {isRTL ? 'إذا لم يساعدك الذكاء الاصطناعي، يمكنك ارسال تذكرة لفريق الدعم' : 'If the AI hasn\'t helped, submit a ticket to our human team'}
+              </Text>
+            </View>
+            <Text style={{ color: C.gold, fontWeight: '700', fontSize: 13 }}>›</Text>
+          </TouchableOpacity>
+
+          {/* Input bar */}
           <View style={{ backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border, padding: 12, paddingBottom: insets.bottom + 12, flexDirection: 'row', gap: 8 }}>
-            <TextInput value={input} onChangeText={setInput} onSubmitEditing={sendChat}
-              placeholder="اكتب سؤالك..." placeholderTextColor={C.muted}
-              style={{ flex: 1, backgroundColor: C.card2, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 10, color: C.text, fontSize: 14 }} />
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              onSubmitEditing={sendChat}
+              returnKeyType="send"
+              placeholder={isRTL ? 'اكتب سؤالك...' : 'Type your question...'}
+              placeholderTextColor={C.muted}
+              style={{ flex: 1, backgroundColor: C.card2, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 10, color: C.text, fontSize: 14, textAlign: isRTL ? 'right' : 'left' }}
+            />
             <TouchableOpacity onPress={sendChat} disabled={!input.trim() || loading}
-              style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: input.trim() && !loading ? C.gold : C.dim, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 18 }}>→</Text>
+              style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: input.trim() && !loading ? C.gold : C.dim, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 18 }}>{isRTL ? '←' : '→'}</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       )}
 
-      {/* Ticket */}
+      {/* ── Ticket Tab ─────────────────────────────────── */}
       {tab === 'ticket' && (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
           {submitted ? (
             <View style={{ alignItems: 'center', padding: 40 }}>
               <Text style={{ fontSize: 52, marginBottom: 12 }}>✅</Text>
-              <Text style={{ color: C.text, fontWeight: '700', fontSize: 18, marginBottom: 8 }}>تم استلام تذكرتك!</Text>
-              <Text style={{ color: C.muted, fontSize: 14, textAlign: 'center', lineHeight: 22 }}>سيتواصل معك فريق الدعم خلال 24 ساعة.</Text>
+              <Text style={{ ...serif, color: C.text, fontWeight: '700', fontSize: 20, marginBottom: 8 }}>
+                {isRTL ? 'تم استلام تذكرتك!' : 'Ticket Received!'}
+              </Text>
+              <Text style={{ color: C.muted, fontSize: 14, textAlign: 'center', lineHeight: 22 }}>
+                {isRTL ? 'سيتواصل معك فريق الدعم خلال 24 ساعة.' : 'Our support team will contact you within 24 hours.'}
+              </Text>
               <Btn C={C} onPress={() => { setSubmitted(false); setTicket({ subject: '', message: '', priority: 'normal', category: 'general' }); }} style={{ marginTop: 20 }}>
-                تذكرة جديدة
+                {isRTL ? 'تذكرة جديدة' : 'New Ticket'}
               </Btn>
             </View>
           ) : (
             <Card C={C}>
-              <Text style={{ color: C.text, fontWeight: '700', fontSize: 16, marginBottom: 16 }}>أرسل تذكرة دعم</Text>
+              {/* Human agent callout */}
+              <View style={{ backgroundColor: C.gold + '15', borderWidth: 1, borderColor: C.gold + '40', borderRadius: 12, padding: 12, marginBottom: 18, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ fontSize: 24 }}>👨‍💼</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: C.gold, fontWeight: '700', fontSize: 14 }}>
+                    {isRTL ? 'تواصل مع فريق الدعم البشري' : 'Contact Our Human Support Team'}
+                  </Text>
+                  <Text style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>
+                    {isRTL ? 'سيرد عليك موظف متخصص خلال 24 ساعة.' : 'A specialist will respond within 24 hours.'}
+                  </Text>
+                </View>
+              </View>
 
-              <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>الأولوية</Text>
+              <Text style={{ color: C.text, fontWeight: '700', fontSize: 16, marginBottom: 16, fontFamily: 'CormorantGaramond-Bold' }}>
+                {isRTL ? 'أرسل تذكرة دعم' : 'Submit a Support Ticket'}
+              </Text>
+
+              <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>
+                {isRTL ? 'الأولوية' : 'Priority'}
+              </Text>
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-                {([['low', '🟢 عادي'], ['normal', '🟡 متوسط'], ['urgent', '🔴 عاجل']] as [string, string][]).map(([v, lb]) => (
+                {([
+                  ['low', isRTL ? '🟢 عادي' : '🟢 Normal'],
+                  ['normal', isRTL ? '🟡 متوسط' : '🟡 Medium'],
+                  ['urgent', isRTL ? '🔴 عاجل' : '🔴 Urgent'],
+                ] as [string, string][]).map(([v, lb]) => (
                   <TouchableOpacity key={v} onPress={() => setTicket(p => ({ ...p, priority: v }))}
                     style={{ flex: 1, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: ticket.priority === v ? C.gold : C.border, backgroundColor: ticket.priority === v ? C.gold + '20' : 'transparent', alignItems: 'center' }}>
                     <Text style={{ color: ticket.priority === v ? C.gold : C.muted, fontSize: 12 }}>{lb}</Text>
@@ -176,35 +283,58 @@ export default function SupportScreen() {
                 ))}
               </View>
 
-              <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>موضوع المشكلة *</Text>
-              <TextInput value={ticket.subject} onChangeText={v => setTicket(p => ({ ...p, subject: v }))}
-                placeholder="مثال: مشكلة في الدفع" placeholderTextColor={C.muted}
-                style={{ backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 11, color: C.text, fontSize: 14, marginBottom: 14 }} />
+              <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>
+                {isRTL ? 'موضوع المشكلة *' : 'Subject *'}
+              </Text>
+              <TextInput
+                value={ticket.subject}
+                onChangeText={v => setTicket(p => ({ ...p, subject: v }))}
+                placeholder={isRTL ? 'مثال: مشكلة في الدفع' : 'e.g. Payment issue'}
+                placeholderTextColor={C.muted}
+                style={{ backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 11, color: C.text, fontSize: 14, marginBottom: 14, textAlign: isRTL ? 'right' : 'left' }}
+              />
 
-              <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>تفاصيل المشكلة *</Text>
-              <TextInput value={ticket.message} onChangeText={v => setTicket(p => ({ ...p, message: v }))}
-                placeholder="اشرح مشكلتك بالتفصيل..." placeholderTextColor={C.muted}
-                multiline numberOfLines={5}
-                style={{ backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 11, color: C.text, fontSize: 14, textAlignVertical: 'top', minHeight: 110, marginBottom: 16 }} />
+              <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>
+                {isRTL ? 'تفاصيل المشكلة *' : 'Message *'}
+              </Text>
+              <TextInput
+                value={ticket.message}
+                onChangeText={v => setTicket(p => ({ ...p, message: v }))}
+                placeholder={isRTL ? 'اشرح مشكلتك بالتفصيل...' : 'Describe your issue in detail...'}
+                placeholderTextColor={C.muted}
+                multiline
+                numberOfLines={5}
+                style={{ backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 11, color: C.text, fontSize: 14, textAlignVertical: 'top', minHeight: 110, marginBottom: 16, textAlign: isRTL ? 'right' : 'left' }}
+              />
 
               <Btn C={C} full disabled={!ticket.subject.trim() || !ticket.message.trim() || submitting} onPress={submitTicket}>
-                {submitting ? '⏳ جاري الإرسال...' : '📨 إرسال التذكرة'}
+                {submitting ? (isRTL ? '⏳ جاري الإرسال...' : '⏳ Sending...') : (isRTL ? '📨 إرسال التذكرة' : '📨 Submit Ticket')}
               </Btn>
             </Card>
           )}
         </ScrollView>
       )}
 
-      {/* FAQ */}
+      {/* ── FAQ Tab ─────────────────────────────────────── */}
       {tab === 'faq' && (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-          {FAQS.map(([q, a]) => (
+          <Text style={{ ...serif, color: C.text, fontWeight: '700', fontSize: 18, marginBottom: 14 }}>
+            {isRTL ? '❓ الأسئلة الشائعة' : '❓ Frequently Asked Questions'}
+          </Text>
+          {faqs.map(([q, a]) => (
             <FAQItem key={q} q={q} a={a} C={C} />
           ))}
           <View style={{ backgroundColor: C.gold + '15', borderWidth: 1, borderColor: C.gold + '40', borderRadius: 14, padding: 16, marginTop: 8 }}>
-            <Text style={{ color: C.gold, fontWeight: '700', fontSize: 14, marginBottom: 8 }}>لم تجد إجابتك؟</Text>
-            <Text style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>تواصل مع فريق الدعم مباشرة عبر الدردشة أو أرسل تذكرة.</Text>
-            <Btn C={C} onPress={() => setTab('ai')}>💬 تحدث مع الدعم</Btn>
+            <Text style={{ color: C.gold, fontWeight: '700', fontSize: 14, marginBottom: 8 }}>
+              {isRTL ? 'لم تجد إجابتك؟' : "Didn't find your answer?"}
+            </Text>
+            <Text style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>
+              {isRTL ? 'تواصل مع فريق الدعم مباشرة عبر الدردشة أو أرسل تذكرة.' : 'Chat with our AI assistant or submit a support ticket.'}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Btn C={C} onPress={() => setTab('ai')} style={{ flex: 1 }}>💬 {isRTL ? 'الدردشة الذكية' : 'AI Chat'}</Btn>
+              <Btn C={C} variant="ghost" onPress={() => setTab('ticket')} style={{ flex: 1 }}>👨‍💼 {isRTL ? 'موظف بشري' : 'Human Agent'}</Btn>
+            </View>
           </View>
         </ScrollView>
       )}

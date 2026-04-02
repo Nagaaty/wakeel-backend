@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platfor
 import { router } from 'expo-router';
 import { useDispatch } from 'react-redux';
 import { register } from '../../src/store/slices/authSlice';
-import { lawyersAPI } from '../../src/services/api';
+import { lawyersAPI, authAPI } from '../../src/services/api';
 import { useTheme } from '../../src/theme';
 import { Btn, Inp } from '../../src/components/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,13 +24,13 @@ export default function RegisterLawyerScreen() {
     next[i] = val;
     updateForm('otp', next);
     if (val && i < 5) {
-      setTimeout(() => otpInputs.current[i + 1]?.focus(), 50);
+      setTimeout(() => otpInputs.current[i + 1]?.focus(), 10);
     }
   };
 
   const handleOtpKeyDown = (i: number, key: string) => {
     if (key === 'Backspace' && !form.otp[i] && i > 0) {
-      setTimeout(() => otpInputs.current[i - 1]?.focus(), 50);
+      setTimeout(() => otpInputs.current[i - 1]?.focus(), 10);
     }
   };
 
@@ -44,6 +44,30 @@ export default function RegisterLawyerScreen() {
   });
 
   const updateForm = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
+
+  const handleSendUnauthOtp = async () => {
+    setLoading(true);
+    try {
+      await authAPI.sendOtpPublic({ phone: form.phone, email: form.email, purpose: 'verify' });
+      setStep(3);
+    } catch(e: any) {
+      Alert.alert('خطأ', e?.message || 'تعذر إرسال الرمز');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyUnauthOtp = async () => {
+    setLoading(true);
+    try {
+      await authAPI.verifyOtpPublic({ phone: form.phone, email: form.email, code: form.otp.join(''), purpose: 'verify' });
+      setStep(4);
+    } catch(e: any) {
+      Alert.alert('خطأ', e?.message || 'الرمز غير صحيح');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -126,7 +150,9 @@ export default function RegisterLawyerScreen() {
 
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 'auto' }}>
               <Btn C={C} variant="ghost" onPress={() => router.back()} style={{ flex: 1, borderWidth: 1, borderColor: C.border }}>← رجوع</Btn>
-              <Btn C={C} onPress={() => setStep(3)} style={{ flex: 2 }} disabled={!form.name || !form.email || !form.phone || !form.password || form.nationalIq.length < 14}>متابعة ←</Btn>
+              <Btn C={C} onPress={handleSendUnauthOtp} style={{ flex: 2 }} disabled={!form.name || !form.email || !form.phone || !form.password || form.nationalIq.length < 14 || loading}>
+                {loading ? '⏳ جاري الإرسال...' : 'متابعة ←'}
+              </Btn>
             </View>
           </View>
         )}
@@ -143,7 +169,7 @@ export default function RegisterLawyerScreen() {
               <Text style={{ color: C.gold, fontWeight: '700' }}>{form.phone || '01XXXXXXXXXX'}</Text>
             </Text>
 
-            <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', direction: 'ltr', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
               {form.otp.map((d, i) => (
                 <TextInput
                   key={i}
@@ -158,10 +184,10 @@ export default function RegisterLawyerScreen() {
                 />
               ))}
             </View>
-            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 32 }}>للتجربة: أدخل أي 6 أرقام</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 32 }}>تم إرسال رسالة نصية و بريد إلكتروني</Text>
 
-            <Btn C={C} onPress={() => setStep(4)} full size="lg" disabled={form.otp.some(x => !x)} style={{ marginBottom: 24 }}>
-              تحقق وتابع ✓
+            <Btn C={C} onPress={handleVerifyUnauthOtp} full size="lg" disabled={form.otp.some(x => !x) || loading} style={{ marginBottom: 24 }}>
+              {loading ? '⏳ جاري التحقق...' : 'تحقق وتابع ✓'}
             </Btn>
 
             <Text style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>
@@ -266,8 +292,8 @@ export default function RegisterLawyerScreen() {
 
             <View style={{ backgroundColor: '#DBEAFE', borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 }}>
               <Text style={{ fontSize: 24, color: '#1D4ED8' }}>ℹ️</Text>
-              <Text style={{ flex: 1, color: '#1E40AF', fontSize: 12, lineHeight: 18 }}>
-                سيتم مراجعة طلبك خلال 24-48 ساعة. ستتلقى إشعاراً عند الموافقة.
+              <Text style={{ flex: 1, color: '#1E40AF', fontSize: 13, lineHeight: 20, fontWeight: '600' }}>
+                يمكنك الاستمرار والبدء في استخدام وكيل فوراً! يرجى استكمال المستندات في الإعدادات لاحقاً للحصول على شارة التوثيق.
               </Text>
             </View>
 

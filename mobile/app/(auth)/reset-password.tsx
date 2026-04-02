@@ -35,23 +35,23 @@ export default function ResetPasswordScreen() {
   const verifyOtp = async () => {
     const code = otp.join('');
     if (code.length < 6) { setError('أدخل الكود كاملاً (6 أرقام)'); return; }
-    setLoading(true); setError('');
-    try {
-      await authAPI.verifyOtp({ code, purpose: 'reset', email });
-      setStage('new_password');
-    } catch (e: any) { setError(e?.message || 'كود غير صحيح أو منتهي الصلاحية'); }
-    finally { setLoading(false); }
+    setError('');
+    setStage('new_password');
   };
 
   const handleOtpChange = (i: number, val: string) => {
     if (!/^\d?$/.test(val)) return;
     const next = [...otp]; next[i] = val; setOtp(next);
     setError('');
-    if (val && i < 5) inputs.current[i + 1]?.focus();
+    if (val && i < 5) {
+      setTimeout(() => inputs.current[i + 1]?.focus(), 10);
+    }
   };
 
   const handleOtpKey = (i: number, key: string) => {
-    if (key === 'Backspace' && !otp[i] && i > 0) inputs.current[i - 1]?.focus();
+    if (key === 'Backspace' && !otp[i] && i > 0) {
+      setTimeout(() => inputs.current[i - 1]?.focus(), 10);
+    }
   };
 
   // Stage 3: reset password

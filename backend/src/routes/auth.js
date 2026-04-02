@@ -126,17 +126,37 @@ router.get('/me', requireAuth, async (req, res, next) => {
 // PATCH /api/auth/me
 router.patch('/me', requireAuth, async (req, res, next) => {
   try {
-    const { name, phone, bio, avatar_url } = req.body;
+    const { name, phone, bio, avatar_url, cover_url } = req.body;
     const { rows: [user] } = await pool.query(
       `UPDATE users SET
          name       = COALESCE($1, name),
          phone      = COALESCE($2, phone),
          bio        = COALESCE($3, bio),
-         avatar_url = COALESCE($4, avatar_url)
-       WHERE id=$5 RETURNING *`,
-      [name, phone, bio, avatar_url, req.user.id]
+         avatar_url = COALESCE($4, avatar_url),
+         cover_url  = COALESCE($5, cover_url)
+       WHERE id=$6 RETURNING *`,
+      [name, phone, bio, avatar_url, cover_url, req.user.id]
     );
     res.json(safeUser(user));
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/auth/me  — soft-delete (GDPR-safe)
+router.delete('/me', requireAuth, async (req, res, next) => {
+  try {
+    await pool.query(
+      `UPDATE users SET
+         deleted_at    = NOW(),
+         email         = CONCAT('deleted_', id, '@wakeel.deleted'),
+         phone         = NULL,
+         name          = 'Deleted User',
+         avatar_url    = NULL,
+         cover_url     = NULL,
+         password_hash = 'DELETED'
+       WHERE id=$1`,
+      [req.user.id]
+    );
+    res.json({ ok: true, message: 'Account deleted' });
   } catch (err) { next(err); }
 });
 
@@ -164,32 +184,23 @@ router.post('/forgot-password', async (req, res, next) => {
     const { rows: [user] } = await pool.query('SELECT * FROM users WHERE email=$1', [email?.toLowerCase()]);
     // Always return 200 to prevent email enumeration
     if (user) {
-      const token = crypto.randomBytes(32).toString('hex');
-      await pool.query(
-        `INSERT INTO otp_codes (phone, user_id, code, purpose, expires_at) VALUES ($1,$2,$3,'reset',NOW()+INTERVAL '1 hour')`,
-        [email, user.id, token]
-      );
-      await sendPasswordReset({ to: email, name: user.name, resetToken: token }).catch(console.error);
+      await sendEmailOTP(email, user.name, user.id, 'reset').catch(console.error);
     }
-    res.json({ ok: true, message: 'If that email exists, a reset link was sent' });
+    res.json({ ok: true, message: 'If that email exists, an OTP was sent' });
   } catch (err) { next(err); }
 });
 
 // POST /api/auth/reset-password
 router.post('/reset-password', async (req, res, next) => {
   try {
-    const { token, newPassword } = req.body;
-    if (!token || !newPassword) return res.status(400).json({ message: 'token and newPassword required' });
+    const { token, newPassword, email } = req.body;
+    if (!token || !newPassword || !email) return res.status(400).json({ message: 'token, email and newPassword required' });
 
-    const { rows: [otp] } = await pool.query(
-      `SELECT * FROM otp_codes WHERE code=$1 AND purpose='reset' AND used_at IS NULL AND expires_at > NOW()`,
-      [token]
-    );
-    if (!otp) return res.status(400).json({ message: 'Invalid or expired reset token' });
+    const result = await verifyOTP(email.toLowerCase(), token, 'reset');
+    if (!result.valid) return res.status(400).json({ message: result.reason === 'wrong_code' ? 'Invalid OTP code' : 'Expired token' });
 
     const hash = await bcrypt.hash(newPassword, 12);
-    await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [hash, otp.user_id]);
-    await pool.query('UPDATE otp_codes SET used_at=NOW() WHERE id=$1', [otp.id]);
+    await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [hash, result.userId]);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -202,6 +213,32 @@ router.post('/send-otp', requireAuth, async (req, res, next) => {
     if (!target) return res.status(400).json({ message: 'phone required' });
     await sendPhoneOTP(target, req.user.id, purpose);
     res.json({ ok: true, message: 'OTP sent' });
+  } catch (err) { next(err); }
+});
+
+// POST /api/auth/send-otp-public  — send OTP without login
+router.post('/send-otp-public', async (req, res, next) => {
+  try {
+    const { phone, email, purpose = 'verify' } = req.body;
+    const target = email || phone;
+    if (!target) return res.status(400).json({ message: 'phone or email required' });
+    if (email) {
+      await sendEmailOTP(email, 'Wakeel User', null, purpose);
+    } else {
+      await sendPhoneOTP(target, null, purpose);
+    }
+    res.json({ ok: true, message: 'OTP sent' });
+  } catch (err) { next(err); }
+});
+
+// POST /api/auth/verify-otp-public — verify without login
+router.post('/verify-otp-public', async (req, res, next) => {
+  try {
+    const { code, phone, email, purpose = 'verify' } = req.body;
+    const target = email || phone;
+    const result = await verifyOTP(target, code, purpose);
+    if (!result.valid) return res.status(400).json({ message: result.reason });
+    res.json({ ok: true, verified: true });
   } catch (err) { next(err); }
 });
 

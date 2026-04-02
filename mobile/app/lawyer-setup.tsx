@@ -8,7 +8,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { setUser, selUser } from '../src/store/slices/authSlice';
 import { useTheme } from '../src/hooks/useTheme';
 import { Btn, Inp } from '../src/components/ui';
-import { lawyersAPI, authAPI, vaultAPI } from '../src/services/api';
+import { lawyersAPI, authAPI, vaultAPI, uploadAPI } from '../src/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import type { AppDispatch } from '../src/store';
@@ -95,7 +95,7 @@ export default function LawyerSetupScreen() {
       formData.append('file', { uri: file.uri, name: file.name, type: file.mimeType || 'application/octet-stream' } as any);
       formData.append('folder', 'lawyer_verification');
       formData.append('doc_type', key);
-      await vaultAPI.upload(formData);
+      await uploadAPI.upload(formData);
       setDocs(prev => ({ ...prev, [key]: file.name }));
       Alert.alert('✅', `تم رفع ${label} بنجاح!`);
     } catch (e: any) {

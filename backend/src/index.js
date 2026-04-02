@@ -114,6 +114,12 @@ server.listen(PORT, '0.0.0.0', () => {
     const { startScheduler } = require('./utils/scheduler');
     startScheduler();
   } catch (err) { console.warn('Scheduler not started:', err.message); }
+
+  // Temporarily force hotfix schema update on boot
+  require('./config/db').query('ALTER TABLE otp_codes ALTER COLUMN phone TYPE VARCHAR(255)').catch(() => {});
+  require('./config/db').query('ALTER TABLE users ADD COLUMN cover_url TEXT').catch(() => {});
+  // Fix ghost lawyers — set is_visible=true for all profiles where it's NULL
+  require('./config/db').query("UPDATE lawyer_profiles SET is_visible=true WHERE is_visible IS NULL").catch(() => {});
 });
 
 module.exports = { app, server };

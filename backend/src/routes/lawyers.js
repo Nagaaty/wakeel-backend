@@ -13,7 +13,7 @@ router.get('/', async (req, res, next) => {
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const params = [];
-    const conditions = ['u.role=$1', 'u.deleted_at IS NULL', 'lp.is_visible=true'];
+    const conditions = ['u.role=$1', 'u.deleted_at IS NULL', 'lp.is_visible IS NOT FALSE'];
     params.push('lawyer');
 
     if (search) {
@@ -169,8 +169,8 @@ router.post('/me/profile', requireAuth, async (req, res, next) => {
   try {
     const { specialization, city, consultation_fee, experience_years, bio, bar_number, service_prices } = req.body;
     const { rows: [profile] } = await pool.query(
-      `INSERT INTO lawyer_profiles (user_id, specialization, city, consultation_fee, experience_years, bio, bar_number, service_prices)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      `INSERT INTO lawyer_profiles (user_id, specialization, city, consultation_fee, experience_years, bio, bar_number, service_prices, is_visible)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true)
        ON CONFLICT (user_id) DO UPDATE SET
          specialization   = EXCLUDED.specialization,
          city             = EXCLUDED.city,
@@ -178,7 +178,8 @@ router.post('/me/profile', requireAuth, async (req, res, next) => {
          experience_years = EXCLUDED.experience_years,
          bio              = EXCLUDED.bio,
          bar_number       = EXCLUDED.bar_number,
-         service_prices   = COALESCE(EXCLUDED.service_prices, lawyer_profiles.service_prices)
+         service_prices   = COALESCE(EXCLUDED.service_prices, lawyer_profiles.service_prices),
+         is_visible       = true
        RETURNING *`,
       [req.user.id, specialization, city, consultation_fee, experience_years, bio, bar_number,
        service_prices ? JSON.stringify(service_prices) : null]

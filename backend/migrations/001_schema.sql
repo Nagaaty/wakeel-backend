@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   role         VARCHAR(20) NOT NULL DEFAULT 'client' CHECK (role IN ('client','lawyer','admin')),
   city         VARCHAR(100) DEFAULT 'Cairo',
   avatar       TEXT,
+  cover_url    TEXT,
   is_active    BOOLEAN DEFAULT TRUE,
   is_verified  BOOLEAN DEFAULT FALSE,
   created_at   TIMESTAMPTZ DEFAULT NOW(),

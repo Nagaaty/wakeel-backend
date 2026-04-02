@@ -1,12 +1,12 @@
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { selUser, setUser } from '../src/store/slices/authSlice';
 import { useTheme } from '../src/theme';
 import { Btn, Inp, Avatar, Card } from '../src/components/ui';
-import { authAPI } from '../src/services/api';
+import { authAPI, uploadAPI } from '../src/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../src/i18n';
 
@@ -27,22 +27,53 @@ export default function EditProfileScreen() {
         allowsEditing: true, aspect: [1,1], quality: 0.8,
       });
       if (!result.canceled) {
-        // Upload avatar immediately after picking
-      const formData = new FormData();
-      formData.append('avatar', {
-        uri: result.assets[0].uri,
-        name: 'avatar.jpg',
-        type: result.assets[0].mimeType || 'image/jpeg',
-      } as any);
-      try {
-        const updated: any = await authAPI.update(formData);
-        if (updated?.avatar) {
-          dispatch(setUser({ ...user, avatar: updated.avatar }));
-        }
-        Alert.alert('✅', 'تم تحديث الصورة الشخصية!');
-      } catch {
-        Alert.alert('✅', 'تم اختيار الصورة. ستُحفظ عند الضغط على حفظ.');
+        setSaving(true);
+        const formData = new FormData();
+        formData.append('file', {
+          uri: result.assets[0].uri,
+          name: 'avatar.jpg',
+          type: result.assets[0].mimeType || 'image/jpeg',
+        } as any);
+        formData.append('folder', 'avatars');
+        try {
+          const uploadRes: any = await uploadAPI.upload(formData);
+          if (uploadRes?.url) {
+            const updated: any = await authAPI.update({ avatar_url: uploadRes.url });
+            dispatch(setUser({ ...user, ...updated }));
+            Alert.alert('✅', 'تم تحديث الصورة الشخصية!');
+          }
+        } catch (e: any) { Alert.alert('خطأ', e?.message || 'فشل الرفع'); }
+        finally { setSaving(false); }
       }
+    } catch (e: any) { Alert.alert('خطأ', e?.message); }
+  };
+
+  const pickCover = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') { Alert.alert('','نحتاج إذن الوصول للصور'); return; }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true, aspect: [16,9], quality: 0.8,
+      });
+      if (!result.canceled) {
+        setSaving(true);
+        const formData = new FormData();
+        formData.append('file', {
+          uri: result.assets[0].uri,
+          name: 'cover.jpg',
+          type: result.assets[0].mimeType || 'image/jpeg',
+        } as any);
+        formData.append('folder', 'covers');
+        try {
+          const uploadRes: any = await uploadAPI.upload(formData);
+          if (uploadRes?.url) {
+            const updated: any = await authAPI.update({ cover_url: uploadRes.url });
+            dispatch(setUser({ ...user, ...updated }));
+            Alert.alert('✅', 'تم تحديث صورة الغلاف!');
+          }
+        } catch (e: any) { Alert.alert('خطأ', e?.message || 'فشل الرفع'); }
+        finally { setSaving(false); }
       }
     } catch (e: any) { Alert.alert('خطأ', e?.message); }
   };
@@ -76,11 +107,21 @@ export default function EditProfileScreen() {
         <Text style={{ color:C.text, fontWeight:'700', fontSize:20 }}>✏️ تعديل الملف الشخصي</Text>
       </View>
       <ScrollView contentContainerStyle={{ padding:16, paddingBottom:100 }}>
-        <View style={{ alignItems:'center', marginBottom:24 }}>
-          <Avatar C={C} initials={initials} size={72} />
-          <TouchableOpacity onPress={pickAvatar}>
-          <Text style={{ color:C.gold, fontSize:13, marginTop:8 }}>اضغط لتغيير الصورة</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 16, marginBottom: 24, justifyContent: 'center' }}>
+          <View style={{ alignItems:'center' }}>
+            <Avatar C={C} initials={initials} size={72} url={user?.avatar_url || user?.avatar} />
+            <TouchableOpacity onPress={pickAvatar}>
+              <Text style={{ color:C.gold, fontSize:12, marginTop:8, fontWeight: '700' }}>تغيير الصورة 📸</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ alignItems:'center' }}>
+            <View style={{ width:120, height:72, backgroundColor: C.border, borderRadius: 12, overflow: 'hidden' }}>
+              {user?.cover_url && <Image source={{ uri: user.cover_url }} style={{ width: '100%', height: '100%' }} />} 
+            </View>
+            <TouchableOpacity onPress={pickCover}>
+              <Text style={{ color:C.gold, fontSize:12, marginTop:8, fontWeight: '700' }}>تغيير الغلاف 🖼️</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <Card C={C} style={{ marginBottom:16 }}>
           <Text style={{ color:C.text, fontWeight:'700', fontSize:14, marginBottom:14 }}>المعلومات الشخصية</Text>

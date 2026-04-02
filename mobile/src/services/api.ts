@@ -42,8 +42,11 @@ export const authAPI = {
   resetPassword:  (data: any) => api.post('/auth/reset-password', data),
   sendOtp:        (data: any) => api.post('/auth/send-otp', data),
   verifyOtp:      (data: any) => api.post('/auth/verify-otp', data),
+  sendOtpPublic:  (data: any) => api.post('/auth/send-otp-public', data),
+  verifyOtpPublic:(data: any) => api.post('/auth/verify-otp-public', data),
   logout:         ()          => api.post('/auth/logout'),
   updateProfile:  (data: any) => api.patch('/auth/me', data),
+  deleteAccount:  ()          => api.delete('/auth/me'),
 };
 
 export const lawyersAPI = {
@@ -111,6 +114,11 @@ export const courtDatesAPI = {
   list:   ()           => api.get('/court-dates'),
   create: (data: any)  => api.post('/court-dates', data),
   delete: (id: string | number) => api.delete(`/court-dates/${id}`),
+};
+
+export const uploadAPI = {
+  upload: (data: FormData) => api.post('/upload', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  multiple: (data: FormData) => api.post('/upload/multiple', data, { headers: { 'Content-Type': 'multipart/form-data' } })
 };
 
 

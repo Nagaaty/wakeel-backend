@@ -19,11 +19,6 @@ import {
 import { storage } from "../../src/utils/storage";
 import type { BiometricType } from "../../src/utils/biometric";
 
-const DEMO_ACCOUNTS = [
-  { email: "client@demo.com", password: "demo1234", role: "client" },
-  { email: "lawyer@demo.com", password: "demo1234", role: "lawyer" },
-  { email: "admin@demo.com",  password: "demo1234", role: "admin"  },
-];
 
 // ── Animated biometric button ──────────────────────────────────────────────
 function BiometricButton({ type, onPress, busy, C, isRTL }: {
@@ -290,20 +285,6 @@ export default function LoginScreen() {
           )}
         </View>
 
-        {/* Demo accounts */}
-        <View style={{ backgroundColor: C.card2, borderRadius: 12, padding: 14, marginBottom: 20 }}>
-          <Text style={{ color: C.muted, fontSize: 11, fontWeight: "700", marginBottom: 10 }}>
-            🔑 {isRTL ? "حسابات تجريبية" : "Demo Accounts"}
-          </Text>
-          {DEMO_ACCOUNTS.map(acc => (
-            <TouchableOpacity key={acc.email}
-              onPress={() => { setEmail(acc.email); setPassword(acc.password); setRole(acc.role as any); }}
-              style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", paddingVertical: 6 }}>
-              <Text style={{ color: C.muted, fontSize: 12 }}>{acc.role}</Text>
-              <Text style={{ color: C.gold, fontSize: 12, fontWeight: "600" }}>{acc.email}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         <View style={{ flexDirection: "row", justifyContent: "center", gap: 6 }}>
           <Text style={{ color: C.muted, fontSize: 14 }}>{t("auth.noAccount")}</Text>

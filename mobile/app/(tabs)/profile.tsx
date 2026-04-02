@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme, toggleTheme, isDark } from '../../src/theme';
-import { Share } from 'react-native';
+import { Share, Image } from 'react-native';
 import { hapticLight, hapticSelect } from '../../src/utils/haptics';
 import { useAuth } from '../../src/hooks/useAuth';
 import { Avatar, Tag, Btn, Section, Card, Spinner } from '../../src/components/ui';
@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../../src/i18n';
 
 // ─── Demo data ────────────────────────────────────────────────────────────────
-const DEMO_CASES = [
+const DEMO_CASES: any[] = [
   {
     id: 1, lawyerId: 1, lawyerName: 'Dr. Ahmed Hassan', lawyerInitials: 'AH',
     type: 'Criminal Defense', status: 'Active',
@@ -314,10 +314,15 @@ export default function ProfileTab() {
         <View>
           {/* Gold gradient cover band */}
           <View style={{ height: 140, backgroundColor: C.gold, overflow: 'hidden' }}>
-            {/* Decorative overlay rings */}
-            <View style={{ position: 'absolute', right: -40, top: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: '#fff', opacity: 0.06 }} />
-            <View style={{ position: 'absolute', right: 40, top: -20, width: 100, height: 100, borderRadius: 50, backgroundColor: '#fff', opacity: 0.05 }} />
-            <View style={{ position: 'absolute', left: -30, bottom: -30, width: 120, height: 120, borderRadius: 60, backgroundColor: '#000', opacity: 0.08 }} />
+            {user?.cover_url ? (
+               <Image source={{ uri: user.cover_url }} style={{ width: '100%', height: '100%', position: 'absolute' }} />
+            ) : (
+              <>
+                <View style={{ position: 'absolute', right: -40, top: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: '#fff', opacity: 0.06 }} />
+                <View style={{ position: 'absolute', right: 40, top: -20, width: 100, height: 100, borderRadius: 50, backgroundColor: '#fff', opacity: 0.05 }} />
+                <View style={{ position: 'absolute', left: -30, bottom: -30, width: 120, height: 120, borderRadius: 60, backgroundColor: '#000', opacity: 0.08 }} />
+              </>
+            )}
             {/* Top-right action buttons */}
             <View style={{ position: 'absolute', top: insets.top + 12, right: 16, flexDirection: 'row', gap: 8 }}>
               <TouchableOpacity
@@ -337,11 +342,15 @@ export default function ProfileTab() {
 
           {/* Avatar overlapping cover */}
           <View style={{ position: 'absolute', bottom: -44, left: 20 }}>
-            <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: C.gold + '30', borderWidth: 4, borderColor: C.bg, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 }}>
-              <Text style={{ fontSize: 30, fontWeight: '800', color: C.gold, fontFamily: 'CormorantGaramond-Bold' }}>
-                {initials || 'CL'}
-              </Text>
-            </View>
+            {user?.avatar_url || user?.avatar ? (
+              <Image source={{ uri: user.avatar_url || user.avatar }} style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: C.bg }} />
+            ) : (
+              <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: C.gold + '30', borderWidth: 4, borderColor: C.bg, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 }}>
+                <Text style={{ fontSize: 30, fontWeight: '800', color: C.gold, fontFamily: 'CormorantGaramond-Bold' }}>
+                  {initials || 'CL'}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -515,9 +524,12 @@ export default function ProfileTab() {
 
           {/* ══ SETTINGS SECTION ══ */}
           <View style={{ marginTop: 32, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 16, overflow: 'hidden' }}>
-            <Text style={{ ...serif, color: C.text, fontSize: 16, fontWeight: '700', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              ⚙️ {isRTL ? 'الإعدادات' : 'Settings'}
-            </Text>
+            <TouchableOpacity onPress={() => router.push('/account-settings' as any)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+              <Text style={{ ...serif, color: C.text, fontSize: 16, fontWeight: '700' }}>
+                ⚙️ {isRTL ? 'الإعدادات' : 'Settings'}
+              </Text>
+              <Text style={{ color: C.muted }}>›</Text>
+            </TouchableOpacity>
             {/* Dark mode */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -526,6 +538,24 @@ export default function ProfileTab() {
               </View>
               <Switch value={dark} onValueChange={() => { toggleTheme(); setDark(!dark); hapticSelect(); }} trackColor={{ true: C.gold }} thumbColor="#fff" />
             </View>
+            {/* Account Settings */}
+            <TouchableOpacity onPress={() => router.push('/account-settings' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+              <Text style={{ fontSize: 22 }}>🛡️</Text>
+              <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{isRTL ? 'إعدادات الحساب' : 'Account Settings'}</Text>
+              <Text style={{ color: C.muted }}>›</Text>
+            </TouchableOpacity>
+            {/* Notification Settings */}
+            <TouchableOpacity onPress={() => router.push('/notification-settings' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+              <Text style={{ fontSize: 22 }}>🔔</Text>
+              <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{isRTL ? 'إعدادات الإشعارات' : 'Notification Settings'}</Text>
+              <Text style={{ color: C.muted }}>›</Text>
+            </TouchableOpacity>
+            {/* Edit Profile */}
+            <TouchableOpacity onPress={() => router.push('/edit-profile' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+              <Text style={{ fontSize: 22 }}>✏️</Text>
+              <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{isRTL ? 'تعديل الملف الشخصي' : 'Edit Profile'}</Text>
+              <Text style={{ color: C.muted }}>›</Text>
+            </TouchableOpacity>
             {/* Referral */}
             <TouchableOpacity onPress={() => router.push('/referral' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
               <Text style={{ fontSize: 22 }}>🎁</Text>
