@@ -236,7 +236,7 @@ export default function BookScreen() {
     setSubmitting(true); setError('');
     try {
       const booking: any = await bookingsAPI.create({
-        lawyerId, bookingDate: form.date, startTime: form.time,
+        lawyerId: Number(lawyerId), bookingDate: form.date, startTime: form.time,
         serviceType: form.serviceType, notes: form.notes,
         urgency: form.urgency, fee: finalPrice,
         promoCode: promoApplied ? promo.trim() : undefined,
@@ -253,8 +253,10 @@ export default function BookScreen() {
         }
       }
       router.replace({ pathname: '/payment-result', params: { success: 'true', booking_id: String(bookingId || '') } } as any);
-    } catch {
-      router.replace({ pathname: '/payment-result', params: { success: 'true' } } as any);
+    } catch (e: any) {
+      hapticError();
+      const msg = e?.message || (isRTL ? 'حدث خطأ. تحقق من اتصالك وحاول مجدداً.' : 'Something went wrong. Check your connection and try again.');
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
