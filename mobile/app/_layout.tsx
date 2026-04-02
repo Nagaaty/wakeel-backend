@@ -27,6 +27,7 @@ import { ErrorBoundary } from './error-boundary';
 import { initDeepLinks } from '../src/utils/deepLinks';
 import { initSessionTimeout, resetSessionTimer } from '../src/utils/sessionTimeout';
 import { checkForUpdate } from '../src/utils/otaUpdate';
+import { wakeServer } from '../src/services/api';
 import { UpdateBanner } from './update-banner';
 import { SecurityWarningScreen, useSecurityCheck } from './security-warning';
 import { SessionWarningBanner } from './session-warning';
@@ -112,6 +113,8 @@ function RootLayoutNav() {
 
   useEffect(() => {
     initTheme();
+    // Wake the Render server immediately so it's warm by the time user hits login
+    wakeServer();
     // Check onboarding first — before auth
     hasOnboarded().then(done => {
       if (!done) {

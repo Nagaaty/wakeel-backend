@@ -3,7 +3,18 @@ import { storage } from '../utils/storage';
 
 const BASE_URL = 'https://wakeel-api.onrender.com';
 
-const api = axios.create({ baseURL: `${BASE_URL}/api`, timeout: 60000 });
+// Standard API — 90s timeout to survive Render free-tier cold starts
+const api = axios.create({ baseURL: `${BASE_URL}/api`, timeout: 90000 });
+
+// Wake-up ping — lightweight call to /health so the server is warm before login
+// Call this on app mount; resolve silently on any response (even error means server is alive)
+export async function wakeServer(): Promise<void> {
+  try {
+    await axios.get(`${BASE_URL}/health`, { timeout: 90000 });
+  } catch {
+    // Ignore — even a non-200 means the server responded (cold start done)
+  }
+}
 
 // Reset session timer on every API call (proves user is active)
 let _resetFn: (() => void) | null = null;
@@ -22,12 +33,23 @@ api.interceptors.response.use(
     if (err.response?.status === 401) {
       storage.multiRemove(['wakeel_token', 'wakeel_user']);
     }
-    // Tag network errors so screens can detect offline
+
+    // True offline — no network at all (no internet connection)
     if (!err.response && (err.code === 'ERR_NETWORK' || err.message === 'Network Error')) {
       const offlineErr = new Error('offline');
       (offlineErr as any).isOffline = true;
       return Promise.reject(offlineErr);
     }
+
+    // Server cold-start (Render free tier) or timeout — not the user's network
+    if (!err.response && err.code === 'ECONNABORTED') {
+      const warmingErr = new Error(
+        'The server is warming up (cold start). Please wait a moment and try again.'
+      );
+      (warmingErr as any).isWarming = true;
+      return Promise.reject(warmingErr);
+    }
+
     return Promise.reject(err.response?.data || err);
   }
 );

@@ -12,7 +12,11 @@ export const login = createAsyncThunk('auth/login', async (creds: any, { rejectW
     const d: any = await authAPI.login(creds);
     await persist(d.token, d.user);
     return d;
-  } catch (e: any) { return rejectWithValue(e.message || 'خطأ في تسجيل الدخول'); }
+  } catch (e: any) {
+    if (e?.isWarming) return rejectWithValue('⏳ Server is starting up — please wait a moment and try again.');
+    if (e?.isOffline) return rejectWithValue('📵 No internet connection. Please check your network.');
+    return rejectWithValue(e.message || 'خطأ في تسجيل الدخول');
+  }
 });
 
 export const register = createAsyncThunk('auth/register', async (data: any, { rejectWithValue }) => {
@@ -20,7 +24,11 @@ export const register = createAsyncThunk('auth/register', async (data: any, { re
     const d: any = await authAPI.register(data);
     await persist(d.token, d.user);
     return d;
-  } catch (e: any) { return rejectWithValue(e.message || 'خطأ في التسجيل'); }
+  } catch (e: any) {
+    if (e?.isWarming) return rejectWithValue('⏳ Server is starting up — please wait a moment and try again.');
+    if (e?.isOffline) return rejectWithValue('📵 No internet connection. Please check your network.');
+    return rejectWithValue(e.message || 'خطأ في التسجيل');
+  }
 });
 
 export const fetchMe = createAsyncThunk('auth/me', async (_, { rejectWithValue }) => {
