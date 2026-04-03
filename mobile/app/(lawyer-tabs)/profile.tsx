@@ -6,6 +6,7 @@ import { Avatar, Card, Badge, Btn, Empty } from '../../src/components/ui';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/hooks/useAuth';
+import { useI18n } from '../../src/i18n';
 
 // ─── Animated Stat Chip ───────────────────────────────────────────────────────
 function StatChip({ value, label, color, icon, delay }: any) {
@@ -47,8 +48,10 @@ function ToolCard({ icon, label, sublabel, onPress, C, color }: any) {
 }
 
 // ─── Availability Calendar ────────────────────────────────────────────────────
-function AvailabilityCalendar({ C, onBack }: any) {
-  const DAYS  = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+function AvailabilityCalendar({ C, onBack, isRTL }: any) {
+  const DAYS_AR  = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const DAYS_EN  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const DAYS = isRTL ? DAYS_AR : DAYS_EN;
   const SLOTS = ['8:00','9:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00'];
   const [sched, setSched] = useState<Record<number,string[]>>({
     0:[], 1:['9:00','10:00','11:00','14:00','15:00'],
@@ -58,16 +61,20 @@ function AvailabilityCalendar({ C, onBack }: any) {
   const [saved, setSaved] = useState(false);
   const toggle = (d: number, s: string) =>
     setSched(p => { const a=[...(p[d]||[])]; const i=a.indexOf(s); if(i>=0)a.splice(i,1);else a.push(s); setSaved(false); return {...p,[d]:a}; });
-  const save = () => { setSaved(true); Alert.alert('✅','تم حفظ جدول العمل!'); };
+  const save = () => { setSaved(true); Alert.alert('✅', isRTL ? 'تم حفظ جدول العمل!' : 'Schedule saved!'); };
   return (
     <View style={{ flex:1, backgroundColor:C.bg }}>
       <View style={{ backgroundColor:C.surface, paddingHorizontal:16, paddingVertical:14, borderBottomWidth:1, borderBottomColor:C.border, flexDirection:'row', alignItems:'center', gap:12 }}>
         <TouchableOpacity onPress={onBack}><Text style={{ color:C.text, fontSize:22 }}>‹</Text></TouchableOpacity>
         <View style={{ flex:1 }}>
-          <Text style={{ color:C.text, fontWeight:'700', fontSize:17 }}>تقويم التوفر</Text>
-          <Text style={{ color:C.muted, fontSize:12 }}>حدد أوقات عملك الأسبوعية</Text>
+          <Text style={{ color:C.text, fontWeight:'700', fontSize:17 }}>
+            {isRTL ? 'تقويم التوفر' : 'Availability Calendar'}
+          </Text>
+          <Text style={{ color:C.muted, fontSize:12 }}>
+            {isRTL ? 'حدد أوقات عملك الأسبوعية' : 'Set your weekly working hours'}
+          </Text>
         </View>
-        {saved && <Text style={{ color:C.green, fontSize:12, fontWeight:'600' }}>✅ محفوظ</Text>}
+        {saved && <Text style={{ color:C.green, fontSize:12, fontWeight:'600' }}>✅ {isRTL ? 'محفوظ' : 'Saved'}</Text>}
       </View>
       <ScrollView contentContainerStyle={{ padding:16, paddingBottom:100 }}>
         {DAYS.map((day, d) => {
@@ -77,7 +84,7 @@ function AvailabilityCalendar({ C, onBack }: any) {
               <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:isOff?0:12 }}>
                 <Text style={{ color:C.text, fontWeight:'700', fontSize:14 }}>{day}</Text>
                 <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
-                  {isOff && <Text style={{ color:C.muted, fontSize:12 }}>إجازة</Text>}
+                  {isOff && <Text style={{ color:C.muted, fontSize:12 }}>{isRTL ? 'إجازة' : 'Off'}</Text>}
                   <TouchableOpacity onPress={()=>{setSched(p=>({...p,[d]:p[d]?.length?[]:['9:00','10:00','11:00','14:00','15:00']}));setSaved(false);}}
                     style={{ width:44, height:26, borderRadius:13, backgroundColor:isOff?C.border:C.gold, justifyContent:'center', alignItems:isOff?'flex-start':'flex-end', paddingHorizontal:3 }}>
                     <View style={{ width:20, height:20, borderRadius:10, backgroundColor:'#fff' }} />
@@ -95,37 +102,49 @@ function AvailabilityCalendar({ C, onBack }: any) {
             </View>
           );
         })}
-        <Btn C={C} full onPress={save}>💾 حفظ جدول العمل</Btn>
+        <Btn C={C} full onPress={save}>
+          💾 {isRTL ? 'حفظ جدول العمل' : 'Save Schedule'}
+        </Btn>
       </ScrollView>
     </View>
   );
 }
 
 // ─── Client CRM ───────────────────────────────────────────────────────────────
-function ClientCRMPage({ C, onBack }: any) {
+function ClientCRMPage({ C, onBack, isRTL }: any) {
   const CLIENTS = [
-    {id:1,name:'محمد أحمد علي',phone:'01012345678',cases:3,lastContact:'2025-03-05',totalPaid:2400,notes:'عميل منتظم',urgency:'urgent'},
-    {id:2,name:'فاطمة محمود',phone:'01098765432',cases:1,lastContact:'2025-02-20',totalPaid:650,notes:'قضية حضانة',urgency:'normal'},
-    {id:3,name:'خالد إبراهيم',phone:'01155667788',cases:2,lastContact:'2025-01-15',totalPaid:1200,notes:'قضية إيجار',urgency:'low'},
+    { id:1, name:'Mohammed Ahmed', nameAr:'\u0645\u062d\u0645\u062f \u0623\u062d\u0645\u062f \u0639\u0644\u064a', phone:'01012345678', cases:3, lastContact:'2025-03-05', totalPaid:2400, urgency:'urgent' },
+    { id:2, name:'Fatima Mahmoud', nameAr:'\u0641\u0627\u0637\u0645\u0629 \u0645\u062d\u0645\u0648\u062f', phone:'01098765432', cases:1, lastContact:'2025-02-20', totalPaid:650,  urgency:'normal' },
+    { id:3, name:'Khaled Ibrahim', nameAr:'\u062e\u0627\u0644\u062f \u0625\u0628\u0631\u0627\u0647\u064a\u0645', phone:'01155667788', cases:2, lastContact:'2025-01-15', totalPaid:1200, urgency:'low'    },
   ];
   const [selected,setSelected]=useState<any>(null);
   const UC:Record<string,string>={urgent:C.red,normal:C.gold,low:C.green};
+  const urgencyLabel = (u: string) => {
+    if (u === 'urgent') return isRTL ? '\ud83d\udd34 \u0639\u0627\u062c\u0644'   : '\ud83d\udd34 Urgent';
+    if (u === 'normal') return isRTL ? '\ud83d\udfe1 \u0639\u0627\u062f\u064a'   : '\ud83d\udfe1 Normal';
+    return isRTL ? '\ud83d\udfe2 \u0645\u0631\u0646' : '\ud83d\udfe2 Flexible';
+  };
   if (selected) return (
     <View style={{ flex:1, backgroundColor:C.bg }}>
       <View style={{ backgroundColor:C.surface, paddingHorizontal:16, paddingVertical:14, borderBottomWidth:1, borderBottomColor:C.border, flexDirection:'row', alignItems:'center', gap:12 }}>
-        <TouchableOpacity onPress={()=>setSelected(null)}><Text style={{ color:C.text, fontSize:22 }}>‹</Text></TouchableOpacity>
-        <Text style={{ color:C.text, fontWeight:'700', fontSize:17 }}>ملف العميل</Text>
+        <TouchableOpacity onPress={()=>setSelected(null)}><Text style={{ color:C.text, fontSize:22 }}>\u2039</Text></TouchableOpacity>
+        <Text style={{ color:C.text, fontWeight:'700', fontSize:17 }}>{isRTL ? '\u0645\u0644\u0641 \u0627\u0644\u0639\u0645\u064a\u0644' : 'Client Profile'}</Text>
       </View>
       <ScrollView contentContainerStyle={{ padding:16, paddingBottom:100 }}>
         <Card C={C} style={{ marginBottom:14 }}>
           <View style={{ flexDirection:'row', alignItems:'center', gap:12, marginBottom:14 }}>
-            <Avatar C={C} initials={selected.name[0]} size={52} />
+            <Avatar C={C} initials={(isRTL ? selected.nameAr : selected.name)[0]} size={52} />
             <View>
-              <Text style={{ color:C.text, fontWeight:'700', fontSize:16 }}>{selected.name}</Text>
-              <Text style={{ color:UC[selected.urgency], fontSize:12, fontWeight:'600', marginTop:2 }}>{selected.urgency==='urgent'?'🔴 عاجل':selected.urgency==='normal'?'🟡 عادي':'🟢 مرن'}</Text>
+              <Text style={{ color:C.text, fontWeight:'700', fontSize:16 }}>{isRTL ? selected.nameAr : selected.name}</Text>
+              <Text style={{ color:UC[selected.urgency], fontSize:12, fontWeight:'600', marginTop:2 }}>{urgencyLabel(selected.urgency)}</Text>
             </View>
           </View>
-          {[['📱 الهاتف',selected.phone],['⚖️ القضايا',`${selected.cases} قضية`],['💰 المدفوعات',`${selected.totalPaid} جنيه`],['📅 آخر تواصل',selected.lastContact]].map(([k,v])=>(
+          {[
+            [isRTL ? '\ud83d\udcf1 \u0627\u0644\u0647\u0627\u062a\u0641' : '\ud83d\udcf1 Phone',       selected.phone],
+            [isRTL ? '\u2696\ufe0f \u0627\u0644\u0642\u0636\u0627\u064a\u0627' : '\u2696\ufe0f Cases',    `${selected.cases}`],
+            [isRTL ? '\ud83d\udcb0 \u0627\u0644\u0645\u062f\u0641\u0648\u0639\u0627\u062a' : '\ud83d\udcb0 Paid',      `${selected.totalPaid} EGP`],
+            [isRTL ? '\ud83d\udcc5 \u0622\u062e\u0631 \u062a\u0648\u0627\u0635\u0644' : '\ud83d\udcc5 Last Contact', selected.lastContact],
+          ].map(([k,v])=>(
             <View key={k as string} style={{ flexDirection:'row', justifyContent:'space-between', paddingVertical:8, borderBottomWidth:1, borderBottomColor:C.border }}>
               <Text style={{ color:C.muted, fontSize:13 }}>{k as string}</Text>
               <Text style={{ color:C.text, fontWeight:'600', fontSize:13 }}>{v as string}</Text>
@@ -138,16 +157,16 @@ function ClientCRMPage({ C, onBack }: any) {
   return (
     <View style={{ flex:1, backgroundColor:C.bg }}>
       <View style={{ backgroundColor:C.surface, paddingHorizontal:16, paddingVertical:14, borderBottomWidth:1, borderBottomColor:C.border, flexDirection:'row', alignItems:'center', gap:10 }}>
-        <TouchableOpacity onPress={onBack}><Text style={{ color:C.text, fontSize:22 }}>‹</Text></TouchableOpacity>
-        <Text style={{ color:C.text, fontWeight:'700', fontSize:17 }}>إدارة العملاء CRM</Text>
+        <TouchableOpacity onPress={onBack}><Text style={{ color:C.text, fontSize:22 }}>\u2039</Text></TouchableOpacity>
+        <Text style={{ color:C.text, fontWeight:'700', fontSize:17 }}>{isRTL ? '\u0625\u062f\u0627\u0631\u0629 \u0627\u0644\u0639\u0645\u0644\u0627\u0621' : 'Client CRM'}</Text>
       </View>
       <FlatList data={CLIENTS} keyExtractor={item=>String(item.id)} contentContainerStyle={{ padding:16, paddingBottom:100 }}
         renderItem={({item:cl})=>(
           <TouchableOpacity onPress={()=>setSelected(cl)} style={{ flexDirection:'row', gap:12, alignItems:'center', backgroundColor:C.card, borderWidth:1, borderColor:C.border, borderRadius:14, padding:14, marginBottom:10 }}>
-            <Avatar C={C} initials={cl.name[0]} size={46} />
+            <Avatar C={C} initials={(isRTL ? cl.nameAr : cl.name)[0]} size={46} />
             <View style={{ flex:1 }}>
-              <Text style={{ color:C.text, fontWeight:'700', fontSize:14 }}>{cl.name}</Text>
-              <Text style={{ color:C.muted, fontSize:12, marginTop:2 }}>{cl.cases} قضايا • {cl.totalPaid} جنيه</Text>
+              <Text style={{ color:C.text, fontWeight:'700', fontSize:14 }}>{isRTL ? cl.nameAr : cl.name}</Text>
+              <Text style={{ color:C.muted, fontSize:12, marginTop:2 }}>{cl.cases} {isRTL ? '\u0642\u0636\u0627\u064a\u0627' : 'cases'} \u2022 {cl.totalPaid} EGP</Text>
             </View>
             <View style={{ width:8, height:8, borderRadius:4, backgroundColor:UC[cl.urgency] }} />
           </TouchableOpacity>
@@ -156,6 +175,7 @@ function ClientCRMPage({ C, onBack }: any) {
     </View>
   );
 }
+
 
 // ─── Outcome Tracker ─────────────────────────────────────────────────────────
 function OutcomeTrackerPage({ C, onBack }: any) {
@@ -199,6 +219,7 @@ export default function LawyerProfileTab() {
   const serif = { fontFamily: 'CormorantGaramond-Bold' };
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const { isRTL } = useI18n();
   const [dark, setDark] = React.useState(isDark());
   const [online, setOnline] = useState(true);
   const [tab, setTab] = useState<'overview' | 'tools' | 'earnings'>('overview');
@@ -220,9 +241,9 @@ export default function LawyerProfileTab() {
     { text: 'Sign Out', style: 'destructive', onPress: logout },
   ]);
 
-  if (subPage === 'calendar') return <AvailabilityCalendar C={C} onBack={() => setSubPage(null)} />;
-  if (subPage === 'crm')      return <ClientCRMPage        C={C} onBack={() => setSubPage(null)} />;
-  if (subPage === 'outcomes') return <OutcomeTrackerPage   C={C} onBack={() => setSubPage(null)} />;
+  if (subPage === 'calendar') return <AvailabilityCalendar C={C} isRTL={isRTL} onBack={() => setSubPage(null)} />;
+  if (subPage === 'crm')      return <ClientCRMPage        C={C} isRTL={isRTL} onBack={() => setSubPage(null)} />;
+  if (subPage === 'outcomes') return <OutcomeTrackerPage   C={C} isRTL={isRTL} onBack={() => setSubPage(null)} />;
 
   const initials = (user?.name || 'LA').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
 

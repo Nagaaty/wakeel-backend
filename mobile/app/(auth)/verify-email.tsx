@@ -11,6 +11,7 @@ import { useI18n } from '../../src/i18n';
 export default function VerifyEmailScreen() {
   const C    = useTheme();
   const user = useSelector(selUser);
+  const { isRTL } = useI18n();
 
   const [otp,      setOtp]      = useState(['','','','','','']);
   const [loading,  setLoading]  = useState(false);
@@ -22,25 +23,23 @@ export default function VerifyEmailScreen() {
     if (!/^\d?$/.test(val)) return;
     const next = [...otp]; next[i] = val; setOtp(next);
     setError('');
-    if (val && i < 5) {
-      setTimeout(() => inputs.current[i + 1]?.focus(), 50);
-    }
+    if (val && i < 5) setTimeout(() => inputs.current[i + 1]?.focus(), 50);
   };
 
   const handleKeyDown = (i: number, key: string) => {
-    if (key === 'Backspace' && !otp[i] && i > 0) {
-      setTimeout(() => inputs.current[i - 1]?.focus(), 50);
-    }
+    if (key === 'Backspace' && !otp[i] && i > 0) setTimeout(() => inputs.current[i - 1]?.focus(), 50);
   };
 
   const verify = async () => {
     const code = otp.join('');
-    if (code.length < 6) { setError('أدخل الكود كاملاً (6 أرقام)'); return; }
+    if (code.length < 6) { setError(isRTL ? 'أدخل الكود كاملاً (6 أرقام)' : 'Enter the full 6-digit code'); return; }
     setLoading(true); setError('');
     try {
       await authAPI.verifyOtp({ code, purpose: 'verify' });
-      Alert.alert('✅', 'تم التحقق من بريدك!', [{ text: 'متابعة', onPress: () => router.replace('/(tabs)' as any) }]);
-    } catch (e: any) { setError(e?.message || 'كود غير صحيح أو منتهي الصلاحية'); }
+      Alert.alert('✅', isRTL ? 'تم التحقق من بريدك!' : 'Email verified!', [
+        { text: isRTL ? 'متابعة' : 'Continue', onPress: () => router.replace('/(tabs)' as any) },
+      ]);
+    } catch (e: any) { setError(e?.message || (isRTL ? 'كود غير صحيح أو منتهي الصلاحية' : 'Invalid or expired code')); }
     finally { setLoading(false); }
   };
 
@@ -50,16 +49,18 @@ export default function VerifyEmailScreen() {
       await authAPI.sendOtp({ purpose: 'verify' });
       setResent(true);
       setTimeout(() => setResent(false), 30000);
-      Alert.alert('✅', 'تم إرسال كود جديد!');
-    } catch (e: any) { Alert.alert('خطأ', e?.message); }
+      Alert.alert('✅', isRTL ? 'تم إرسال كود جديد!' : 'New code sent!');
+    } catch (e: any) { Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message); }
   };
 
   return (
     <View style={{ flex:1, backgroundColor:C.bg, justifyContent:'center', alignItems:'center', padding:24 }}>
       <Text style={{ fontSize:52, marginBottom:14 }}>📧</Text>
-      <Text style={{ color:C.text, fontWeight:'700', fontSize:24, fontFamily:'CormorantGaramond-Bold', marginBottom:8, textAlign:'center' }}>تحقق من بريدك</Text>
+      <Text style={{ color:C.text, fontWeight:'700', fontSize:24, fontFamily:'CormorantGaramond-Bold', marginBottom:8, textAlign:'center' }}>
+        {isRTL ? 'تحقق من بريدك' : 'Check your email'}
+      </Text>
       <Text style={{ color:C.muted, fontSize:14, marginBottom:30, textAlign:'center', lineHeight:22 }}>
-        أرسلنا كود تحقق من 6 أرقام إلى{" "}
+        {isRTL ? 'أرسلنا كود تحقق من 6 أرقام إلى' : 'We sent a 6-digit code to'}{' '}
         <Text style={{ color:C.gold, fontWeight:'600' }}>{user?.email}</Text>
       </Text>
 
@@ -88,14 +89,20 @@ export default function VerifyEmailScreen() {
         </View>
 
         <Btn C={C} full disabled={loading} onPress={verify}>
-          {loading?'⏳ جاري التحقق...':'✅ تحقق'}
+          {loading
+            ? (isRTL ? '⏳ جاري التحقق...' : '⏳ Verifying...')
+            : (isRTL ? '✅ تحقق' : '✅ Verify')}
         </Btn>
 
         <View style={{ marginTop:16, flexDirection:'row', justifyContent:'center', alignItems:'center', gap:6 }}>
-          <Text style={{ color:C.muted, fontSize:13 }}>لم يصلك الكود؟</Text>
+          <Text style={{ color:C.muted, fontSize:13 }}>
+            {isRTL ? 'لم يصلك الكود؟' : "Didn't receive it?"}
+          </Text>
           <TouchableOpacity onPress={resend} disabled={resent}>
             <Text style={{ color:resent?C.muted:C.gold, fontWeight:'700', fontSize:13 }}>
-              {resent?'✅ تم الإرسال':'أرسل مجدداً'}
+              {resent
+                ? (isRTL ? '✅ تم الإرسال' : '✅ Sent!')
+                : (isRTL ? 'أرسل مجدداً' : 'Resend code')}
             </Text>
           </TouchableOpacity>
         </View>
