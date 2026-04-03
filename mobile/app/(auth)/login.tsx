@@ -10,7 +10,7 @@ import { login, fetchMe, selLoading, selError, clearError } from "../../src/stor
 import { useTheme } from "../../src/theme";
 import { Btn, Inp } from "../../src/components/ui";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useI18n } from "../../src/i18n";
+import { useI18n, LangToggle } from "../../src/i18n";
 import {
   getBiometricCapability, authenticateWithBiometrics,
   isBiometricEnabled, setBiometricEnabled,
@@ -187,6 +187,11 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Language Picker ── */}
+        <View style={{ alignItems: "flex-end", marginBottom: 8 }}>
+          <LangToggle C={C} />
+        </View>
+
         {/* Logo */}
         <View style={{ alignItems: "center", marginBottom: 36 }}>
           <View style={{ width: 76, height: 76, borderRadius: 22, backgroundColor: C.gold, alignItems: "center", justifyContent: "center", marginBottom: 16, shadowColor: C.gold, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 20, elevation: 8 }}>

@@ -57,11 +57,11 @@ function resolve(
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>('ar');
 
-  // Load persisted locale on mount
+  // Load persisted locale on mount — respects user's saved choice
   useEffect(() => {
-    // FORCE CACHE CLEAR FOR TESTING: Wiping any stuck "en" state so the Arabic default is mathematically guaranteed on next boot.
-    AsyncStorage.removeItem(LOCALE_KEY).then(() => {
-      applyLocale('ar', false);
+    AsyncStorage.getItem(LOCALE_KEY).then((saved) => {
+      const locale: Locale = saved === 'en' ? 'en' : 'ar';
+      applyLocale(locale, false);
     }).catch(() => applyLocale('ar', false));
   }, []);
 
