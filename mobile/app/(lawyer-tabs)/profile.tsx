@@ -449,9 +449,20 @@ export default function LawyerProfileTab() {
                   </View>
                   <Switch value={dark} onValueChange={() => { toggleTheme(); setDark(!dark); }} trackColor={{ true: '#C8A84B' }} thumbColor="#fff" />
                 </View>
-                <TouchableOpacity onPress={handleLogout} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
+                <TouchableOpacity onPress={() => router.push('/account-settings' as any)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                  <Text style={{ fontSize: 22 }}>⚙️</Text>
+                  <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', flex: 1 }}>
+                    {isRTL ? 'إعدادات الحساب' : 'Account Settings'}
+                  </Text>
+                  <Text style={{ color: C.muted, fontSize: 16 }}>›</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleLogout}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
                   <Text style={{ fontSize: 22 }}>🚪</Text>
-                  <Text style={{ color: C.red, fontSize: 14, fontWeight: '700', flex: 1 }}>Sign Out</Text>
+                  <Text style={{ color: C.red, fontSize: 14, fontWeight: '700', flex: 1 }}>
+                    {isRTL ? 'تسجيل الخروج' : 'Sign Out'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Image, TextInput, Modal, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Image, TextInput, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/hooks/useTheme';
 import { Avatar, Spinner, Btn } from '../../src/components/ui';
 import { useI18n } from '../../src/i18n';
-import { forumAPI } from '../../src/services/api';
+import { forumAPI, uploadAPI } from '../../src/services/api';
 import { useAuth } from '../../src/hooks/useAuth';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 
 export default function ForumTab() {
   const C = useTheme();
@@ -30,7 +32,57 @@ export default function ForumTab() {
   const [repostPost, setRepostPost]     = useState<any | null>(null);
   const [repostText, setRepostText]     = useState('');
   const [postingRepost, setPostingRepost] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [attachedFile, setAttachedFile]   = useState<string | null>(null);
+  const [uploading, setUploading]         = useState(false);
   const { user } = useAuth();
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('', 'Photo library access required');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+      if (!result.canceled) {
+        setUploading(true);
+        const asset = result.assets[0];
+        const formData = new FormData();
+        formData.append('file', { uri: asset.uri, name: 'forum_media.jpg', type: asset.mimeType || 'image/jpeg' } as any);
+        formData.append('folder', 'forum');
+        try {
+          const res: any = await uploadAPI.upload(formData);
+          if (res?.url) setAttachedImage(res.url);
+        } catch (e: any) { Alert.alert('Error', e?.message || 'Upload failed'); }
+        finally { setUploading(false); }
+        setModalOpen(true);
+      }
+    } catch (e: any) { Alert.alert('Error', e?.message); }
+  };
+
+  const pickFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+      if (!result.canceled) {
+        setUploading(true);
+        const file = result.assets[0];
+        const formData = new FormData();
+        formData.append('file', { uri: file.uri, name: file.name, type: file.mimeType || 'application/octet-stream' } as any);
+        formData.append('folder', 'forum_files');
+        try {
+          const res: any = await uploadAPI.upload(formData);
+          if (res?.url) { setAttachedFile(file.name); setAttachedImage(res.url); }
+        } catch (e: any) { Alert.alert('Error', e?.message || 'Upload failed'); }
+        finally { setUploading(false); }
+        setModalOpen(true);
+      }
+    } catch (e: any) { Alert.alert('Error', e?.message); }
+  };
 
   useEffect(() => {
     loadPosts();
@@ -68,11 +120,14 @@ export default function ForumTab() {
     try {
       setPosting(true);
       await forumAPI.createQuestion({ 
-        question: newPostText, 
+        question: newPostText,
         category: 'الكل',
-        anonymous: false 
+        anonymous: false,
+        ...(attachedImage ? { image_url: attachedImage } : {}),
       });
       setNewPostText('');
+      setAttachedImage(null);
+      setAttachedFile(null);
       setModalOpen(false);
       loadPosts();
     } catch (e) {
@@ -163,15 +218,18 @@ export default function ForumTab() {
               </View>
               {/* Quick Actions */}
               <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderColor: feedBg }}>
-                {(isRTL
-                ? [['صورة/فيديو', '📸'], ['ملف/مستند', '📎'], ['استشارة حية', '⚖️']]
-                : [['Photo/Video', '📸'], ['File/Doc', '📎'], ['Live Consult', '⚖️']]
-              ).map(([label, icon], i) => (
-                <TouchableOpacity key={i} style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  <Text style={{ fontSize: 18 }}>{icon}</Text>
-                  <Text style={{ color: '#65676B', fontWeight: '600', fontSize: 13 }}>{label}</Text>
+                <TouchableOpacity onPress={pickImage} style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 18 }}>📸</Text>
+                  <Text style={{ color: '#65676B', fontWeight: '600', fontSize: 13 }}>{isRTL ? 'صورة/فيديو' : 'Photo/Video'}</Text>
                 </TouchableOpacity>
-              ))}
+                <TouchableOpacity onPress={pickFile} style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 18 }}>📎</Text>
+                  <Text style={{ color: '#65676B', fontWeight: '600', fontSize: 13 }}>{isRTL ? 'ملف/مستند' : 'File/Doc'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setModalOpen(true)} style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 18 }}>⚖️</Text>
+                  <Text style={{ color: '#65676B', fontWeight: '600', fontSize: 13 }}>{isRTL ? 'استشارة حية' : 'Live Consult'}</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </>
@@ -402,10 +460,28 @@ export default function ForumTab() {
             style={{ flex: 1, paddingHorizontal: 20, fontSize: 18, textAlign: isRTL ? 'right' : 'left', color: C.text, textAlignVertical: 'top' }}
           />
 
+          {/* Attached image preview */}
+          {uploading && (
+            <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+              <ActivityIndicator color={C.gold} />
+              <Text style={{ color: C.muted, fontSize: 12, marginTop: 6 }}>{isRTL ? 'جاري رفع الملف...' : 'Uploading...'}</Text>
+            </View>
+          )}
+          {attachedImage && !uploading && (
+            <View style={{ marginHorizontal: 20, marginBottom: 12, position: 'relative' }}>
+              <Image source={{ uri: attachedImage }} style={{ width: '100%', height: 180, borderRadius: 12 }} resizeMode="cover" />
+              {attachedFile && <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>📎 {attachedFile}</Text>}
+              <TouchableOpacity onPress={() => { setAttachedImage(null); setAttachedFile(null); }}
+                style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 14, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#fff', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Bottom Toolbar */}
           <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: C.border, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 20 }}>
-            <TouchableOpacity><Text style={{ fontSize: 24 }}>📸</Text></TouchableOpacity>
-            <TouchableOpacity><Text style={{ fontSize: 24 }}>📎</Text></TouchableOpacity>
+            <TouchableOpacity onPress={pickImage}><Text style={{ fontSize: 24 }}>📸</Text></TouchableOpacity>
+            <TouchableOpacity onPress={pickFile}><Text style={{ fontSize: 24 }}>📎</Text></TouchableOpacity>
             <TouchableOpacity><Text style={{ fontSize: 24 }}>👤</Text></TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

@@ -37,11 +37,22 @@ export default function VideoScreen() {
 
   // Load room
   useEffect(() => {
-    if (!bookingId) { setError('لا يوجد رقم حجز'); setLoading(false); return; }
+    if (!bookingId) { setError(isRTL ? 'لا يوجد رقم حجز' : 'No booking ID'); setLoading(false); return; }
     videoAPI.createRoom(bookingId)
-      .then((d: any) => setRoomUrl(d.roomUrl))
-      .catch((e: any) => setError(e?.message || 'تعذر إنشاء غرفة الفيديو'))
+      .then((d: any) => {
+        if (d?.roomUrl) {
+          setRoomUrl(d.roomUrl);
+        } else {
+          // Fallback to Jitsi Meet (free, no API key required)
+          setRoomUrl(`https://meet.jit.si/wakeel-consultation-${bookingId}`);
+        }
+      })
+      .catch(() => {
+        // Daily.co failed — use Jitsi Meet as fallback
+        setRoomUrl(`https://meet.jit.si/wakeel-consultation-${bookingId}`);
+      })
       .finally(() => setLoading(false));
+
 
     // Load conversation for in-call chat
     messagesAPI.getConversations()

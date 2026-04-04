@@ -57,6 +57,16 @@ router.post('/register', async (req, res, next) => {
       [name.trim(), email.toLowerCase().trim(), phone || null, hash, role]
     );
 
+    // ── Auto-create lawyer_profiles so they appear in client search immediately ──
+    if (role === 'lawyer') {
+      await pool.query(
+        `INSERT INTO lawyer_profiles (user_id, is_visible, is_verified, avg_rating, total_reviews, wins, losses, consultation_fee)
+         VALUES ($1, true, false, 0, 0, 0, 0, 400)
+         ON CONFLICT (user_id) DO NOTHING`,
+        [user.id]
+      );
+    }
+
     // Apply referral code
     if (referralCode) {
       const { rows: [referrer] } = await pool.query('SELECT id FROM users WHERE referral_code=$1', [referralCode]);
@@ -80,6 +90,7 @@ router.post('/register', async (req, res, next) => {
     res.status(201).json({ token, user: safeUser(user) });
   } catch (err) { next(err); }
 });
+
 
 // POST /api/auth/login
 router.post('/login', loginLimiter, async (req, res, next) => {
