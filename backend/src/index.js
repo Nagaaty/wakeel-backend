@@ -115,11 +115,44 @@ server.listen(PORT, '0.0.0.0', () => {
     startScheduler();
   } catch (err) { console.warn('Scheduler not started:', err.message); }
 
-  // Temporarily force hotfix schema update on boot
-  require('./config/db').query('ALTER TABLE otp_codes ALTER COLUMN phone TYPE VARCHAR(255)').catch(() => {});
-  require('./config/db').query('ALTER TABLE users ADD COLUMN cover_url TEXT').catch(() => {});
-  // Fix ghost lawyers — set is_visible=true for all profiles where it's NULL
-  require('./config/db').query("UPDATE lawyer_profiles SET is_visible=true WHERE is_visible IS NULL").catch(() => {});
+  // ── Boot-time schema hotfixes (idempotent) ──────────────────────────────
+  const db = require('./config/db');
+
+  // Core auth/profile columns
+  db.query('ALTER TABLE otp_codes ALTER COLUMN phone TYPE VARCHAR(255)').catch(() => {});
+  db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_url TEXT').catch(() => {});
+  db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT').catch(() => {});
+  db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT').catch(() => {});
+  db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ').catch(() => {});
+  db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT false').catch(() => {});
+  db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ').catch(() => {});
+
+  // Lawyer profile column aliases (backend route uses new names, schema has old names)
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS consultation_fee INTEGER DEFAULT 400').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS avg_rating NUMERIC(3,2) DEFAULT 0').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS total_reviews INTEGER DEFAULT 0').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS experience_years INTEGER DEFAULT 0').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS losses INTEGER DEFAULT 0').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS bar_number VARCHAR(50)').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS response_time_hours INTEGER').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT true').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS subscription_plan VARCHAR(20) DEFAULT \'basic\'').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS service_prices JSONB').catch(() => {});
+
+  // Forum social columns (needed by like button + image posts)
+  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS likes_count INTEGER DEFAULT 0').catch(() => {});
+  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS shares_count INTEGER DEFAULT 0').catch(() => {});
+  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)').catch(() => {});
+  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS liked_by JSONB DEFAULT \'[]\'').catch(() => {});
+
+  // Reviews table improvements
+  db.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS outcome VARCHAR(50)').catch(() => {});
+  db.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT true').catch(() => {});
+
+  // Fix ghost lawyers — set is_visible=true for all profiles where it\'s NULL
+  db.query("UPDATE lawyer_profiles SET is_visible=true WHERE is_visible IS NULL").catch(() => {});
 });
 
 module.exports = { app, server };
