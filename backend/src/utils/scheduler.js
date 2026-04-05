@@ -32,7 +32,9 @@ function startScheduler() {
         JOIN users lu ON lu.id = b.lawyer_id
         WHERE b.status = 'confirmed'
           AND b.reminder_sent = false
-          AND (b.booking_date::date + b.start_time::time) BETWEEN NOW() + INTERVAL '29 minutes' AND NOW() + INTERVAL '31 minutes'
+          AND (
+            COALESCE(b.scheduled_at, b.booking_date::timestamptz)
+          ) BETWEEN NOW() + INTERVAL '29 minutes' AND NOW() + INTERVAL '31 minutes'
       `);
 
       for (const booking of rows) {

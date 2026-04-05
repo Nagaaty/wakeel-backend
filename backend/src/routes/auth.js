@@ -46,8 +46,11 @@ router.post('/register', async (req, res, next) => {
     if (!name || !email || !password) return res.status(400).json({ message: 'name, email and password required' });
     if (password.length < 8) return res.status(400).json({ message: 'Password must be at least 8 characters' });
 
-    // Check duplicate
-    const { rows: [existing] } = await pool.query('SELECT id FROM users WHERE email=$1', [email.toLowerCase()]);
+    // Check duplicate (ignore soft-deleted accounts)
+    const { rows: [existing] } = await pool.query(
+      'SELECT id FROM users WHERE email=$1 AND deleted_at IS NULL',
+      [email.toLowerCase()]
+    );
     if (existing) return res.status(409).json({ message: 'Email already registered' });
 
     const hash = await bcrypt.hash(password, 12);

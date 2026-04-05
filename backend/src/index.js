@@ -10,6 +10,9 @@ const errorHandler = require('./middleware/errorHandler');
 const app    = express();
 const server = http.createServer(app);
 
+// Trust Render's proxy (fixes rate-limit X-Forwarded-For warning)
+app.set('trust proxy', 1);
+
 // ── Security middleware ────────────────────────────────────────────────────────
 app.use(helmet({ crossOriginEmbedderPolicy: false }));
 app.use(cors({
