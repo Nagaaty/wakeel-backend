@@ -18,21 +18,22 @@ let transporter = null;
 function getTransporter() {
   if (transporter) return transporter;
 
+  const timeouts = { connectionTimeout: 5000, socketTimeout: 8000, greetingTimeout: 5000 };
+
   if (process.env.EMAIL_SENDGRID_KEY) {
     transporter = nodemailer.createTransport({
       host: 'smtp.sendgrid.net',
       port: 587,
       auth: { user: 'apikey', pass: process.env.EMAIL_SENDGRID_KEY },
+      ...timeouts,
     });
   } else if (process.env.EMAIL_HOST) {
     transporter = nodemailer.createTransport({
       host:   process.env.EMAIL_HOST,
       port:   parseInt(process.env.EMAIL_PORT || '587'),
       secure: process.env.EMAIL_SECURE === 'true',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+      ...timeouts,
     });
   } else {
     return null; // Email not configured — log and skip
@@ -66,7 +67,8 @@ async function sendEmail({ to, subject, html, text }) {
     return { sent: true, messageId: info.messageId };
   } catch (err) {
     console.error('[EMAIL ERROR]', err.message);
-    return { error: err.message };
+    transporter = null; // Reset so next call retries fresh
+    return { error: err.message, skipped: true }; // Treat as skipped to unblock signup
   }
 }
 
