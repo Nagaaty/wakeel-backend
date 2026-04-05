@@ -27,8 +27,8 @@ async function sendPhoneOTP(phone, userId, purpose = 'verify') {
     [phone, userId || null, code, purpose, expiresAt]
   );
 
-  await sendOTPSMS({ phone, otp: code, purpose });
-  return { sent: true };
+  const smsResult = await sendOTPSMS({ phone, otp: code, purpose });
+  return smsResult?.skipped ? { skipped: true, code } : { sent: true };
 }
 
 // Send OTP to email
@@ -46,8 +46,8 @@ async function sendEmailOTP(email, name, userId, purpose = 'verify') {
     [email, userId || null, code, purpose, expiresAt]
   );
 
-  await sendOTPEmail({ to: email, name, otp: code, purpose });
-  return { sent: true };
+  const emailResult = await sendOTPEmail({ to: email, name, otp: code, purpose });
+  return (emailResult?.skipped || emailResult?.error) ? { skipped: true, code } : { sent: true };
 }
 
 // Verify OTP
