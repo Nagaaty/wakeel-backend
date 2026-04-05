@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,9 +36,16 @@ export function TopNav() {
               alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <Text style={{ fontWeight: '800', fontSize: 13, color: C.gold }}>
-              {(user?.name || 'U').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
-            </Text>
+            {user?.avatar_url ? (
+              <Image
+                source={{ uri: user.avatar_url }}
+                style={{ width: 36, height: 36, borderRadius: 18 }}
+              />
+            ) : (
+              <Text style={{ fontWeight: '800', fontSize: 13, color: C.gold }}>
+                {(user?.name || 'U').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
+              </Text>
+            )}
           </TouchableOpacity>
 
           {/* Hamburger */}

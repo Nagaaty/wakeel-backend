@@ -93,7 +93,7 @@ router.get('/:id', async (req, res, next) => {
     const { rows: [lawyer] } = await pool.query(
       `SELECT u.id, u.name, u.avatar_url, u.is_online, u.last_active_at, u.created_at,
               lp.*,
-              (SELECT json_agg(r ORDER BY r.created_at DESC) FROM reviews r WHERE r.lawyer_id=u.id AND r.is_visible=true LIMIT 20) AS reviews
+              (SELECT json_agg(r ORDER BY r.created_at DESC) FROM reviews r WHERE r.lawyer_id=u.id LIMIT 20) AS reviews
        FROM users u
        JOIN lawyer_profiles lp ON lp.user_id=u.id
        WHERE u.id=$1 AND u.deleted_at IS NULL`,
@@ -123,7 +123,7 @@ router.get('/:id/availability', async (req, res, next) => {
     // Get already-booked slots
     const { rows: booked } = await pool.query(
       `SELECT start_time FROM bookings
-       WHERE lawyer_id=$1 AND booking_date=$2 AND status NOT IN ('cancelled','rejected')`,
+       WHERE lawyer_id=$1 AND scheduled_at::date=$2 AND status NOT IN ('cancelled','rejected')`,
       [req.params.id, date]
     );
     const bookedTimes = new Set(booked.map(b => b.start_time?.slice(0,5)));
