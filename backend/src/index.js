@@ -87,15 +87,6 @@ app.use('/api/referral',    require('./routes/referral'));
 app.use('/api/content',     require('./routes/content'));
 app.use('/api/vault',       require('./routes/document_vault'));
 
-// ── TEMP: Reset users for testing (remove after use) ──────────────────────────
-app.delete('/reset-users-wakeel2026', async (req, res) => {
-  const db = require('./config/db');
-  try {
-    await db.query('TRUNCATE users CASCADE');
-    res.json({ ok: true, message: 'All users deleted' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 // ── 404 ────────────────────────────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ message: `Route not found: ${req.method} ${req.path}` }));
 
