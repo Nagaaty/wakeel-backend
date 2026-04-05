@@ -56,7 +56,8 @@ async function uploadFile({ buffer, originalName, mimeType, userId, folder = 'ge
   // Local fallback
   const localPath = path.join(LOCAL_UPLOAD_DIR, storedKey.replace(/\//g, '_'));
   fs.writeFileSync(localPath, buffer);
-  const url = `/uploads/${path.basename(localPath)}`;
+  const base = process.env.BASE_URL || process.env.FRONTEND_URL?.replace(':3000', ':5000') || 'https://wakeel-api.onrender.com';
+  const url = `${base}/uploads/${path.basename(localPath)}`;
   return { url, key: storedKey, bucket: 'local', provider: 'local' };
 }
 
@@ -91,13 +92,18 @@ async function deleteFile(key) {
 function multerMiddleware(options = {}) {
   const multer = require('multer');
   const MAX_SIZE = options.maxSize || 10 * 1024 * 1024; // 10MB default
-  const ALLOWED  = options.allowedTypes || ['image/jpeg','image/png','image/webp','application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+  const ALLOWED  = options.allowedTypes || [
+    'image/jpeg','image/png','image/webp','image/gif',
+    'video/mp4','video/quicktime','video/x-msvideo','video/webm',
+    'application/pdf','application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ];
 
   return multer({
     storage: multer.memoryStorage(),
     limits:  { fileSize: MAX_SIZE },
     fileFilter: (req, file, cb) => {
-      if (ALLOWED.includes(file.mimetype)) cb(null, true);
+      if (ALLOWED.includes(file.mimetype) || file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) cb(null, true);
       else cb(new Error(`File type not allowed: ${file.mimetype}`));
     },
   });

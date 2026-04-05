@@ -48,7 +48,17 @@ const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 async function sendEmail({ to, subject, html, text }) {
   const t = getTransporter();
   if (!t) {
-    console.log(`[EMAIL SKIPPED — not configured] To: ${to} | Subject: ${subject}`);
+    // Extract OTP from subject if present (pattern: starts with 6 digits)
+    const otpMatch = subject && subject.match(/^(\d{6})/);
+    if (otpMatch) {
+      console.log(`\n${'='.repeat(50)}`);
+      console.log(`📧 OTP CODE (email not configured)`);
+      console.log(`   To:   ${to}`);
+      console.log(`   Code: ${otpMatch[1]}`);
+      console.log(`${'='.repeat(50)}\n`);
+    } else {
+      console.log(`[EMAIL SKIPPED] To: ${to} | Subject: ${subject}`);
+    }
     return { skipped: true };
   }
   try {

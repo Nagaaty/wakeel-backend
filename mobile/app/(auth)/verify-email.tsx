@@ -46,10 +46,14 @@ export default function VerifyEmailScreen() {
   const resend = async () => {
     if (resent) return;
     try {
-      await authAPI.sendOtp({ purpose: 'verify' });
+      const res: any = await authAPI.sendOtp({ purpose: 'verify' });
       setResent(true);
       setTimeout(() => setResent(false), 30000);
-      Alert.alert('✅', isRTL ? 'تم إرسال كود جديد!' : 'New code sent!');
+      if (res?.devOtp) {
+        Alert.alert('🔐 Dev OTP', `Email not configured.\nYour code: ${res.devOtp}`, [{ text: 'OK' }]);
+      } else {
+        Alert.alert('✅', isRTL ? 'تم إرسال كود جديد!' : 'New code sent!');
+      }
     } catch (e: any) { Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message); }
   };
 

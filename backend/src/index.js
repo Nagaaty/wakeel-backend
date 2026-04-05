@@ -12,18 +12,15 @@ const server = http.createServer(app);
 
 // ── Security middleware ────────────────────────────────────────────────────────
 app.use(helmet({ crossOriginEmbedderPolicy: false }));
-// React Native clients don't send Origin header, so allow all in dev
-// In production, lock this down to your domain
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (React Native, mobile apps, Postman)
     if (!origin) return callback(null, true);
     const allowed = [
       process.env.FRONTEND_URL || 'http://localhost:3000',
       /^http:\/\/localhost:\d+$/,
-      /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,   // Android emulator host
-      /^http:\/\/192\.168\.\d+\.\d+:\d+$/,    // Local network
-      /^exp:\/\//,                                   // Expo dev client
+      /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,
+      /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
+      /^exp:\/\//,
     ];
     const ok = allowed.some(a => typeof a === 'string' ? a === origin : a.test(origin));
     callback(null, ok || process.env.NODE_ENV !== 'production');
@@ -76,15 +73,14 @@ app.use('/api/promos',      require('./routes/promos'));
 app.use('/api/verification',require('./routes/verification'));
 app.use('/api/subscriptions',require('./routes/subscriptions'));
 app.use('/api/payouts',     require('./routes/payouts'));
-
 app.use('/api/upload',      require('./routes/upload'));
 app.use('/api/push',        require('./routes/push'));
 app.use('/api/invoices',    require('./routes/invoices'));
 app.use('/api/installments',require('./routes/installments'));
 app.use('/api/analytics',   require('./routes/analytics'));
-app.use('/api/jobs', require('./routes/jobs'));
-app.use('/api/broadcast', require('./routes/broadcast'));
-app.use('/api/users',     require('./routes/users'));
+app.use('/api/jobs',        require('./routes/jobs'));
+app.use('/api/broadcast',   require('./routes/broadcast'));
+app.use('/api/users',       require('./routes/users'));
 app.use('/api/court-dates', require('./routes/court_dates'));
 app.use('/api/forum',       require('./routes/forum'));
 app.use('/api/referral',    require('./routes/referral'));
@@ -109,13 +105,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`📲 Firebase: ${process.env.FIREBASE_PROJECT_ID ? '✅ configured' : '⚠️  not configured'}`);
   console.log(`☁️  R2 Storage: ${process.env.R2_ACCOUNT_ID ? '✅ configured' : '⚠️  local storage'}`);
 
-  // Start cron scheduler
-  try {
-    const { startScheduler } = require('./utils/scheduler');
-    startScheduler();
-  } catch (err) { console.warn('Scheduler not started:', err.message); }
-
-  // ── Boot-time schema hotfixes (idempotent) ──────────────────────────────
   const db = require('./config/db');
 
   // Core auth/profile columns
@@ -127,7 +116,7 @@ server.listen(PORT, '0.0.0.0', () => {
   db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT false').catch(() => {});
   db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ').catch(() => {});
 
-  // Lawyer profile column aliases (backend route uses new names, schema has old names)
+  // Lawyer profile columns
   db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS consultation_fee INTEGER DEFAULT 400').catch(() => {});
   db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS avg_rating NUMERIC(3,2) DEFAULT 0').catch(() => {});
   db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS total_reviews INTEGER DEFAULT 0').catch(() => {});
@@ -141,18 +130,38 @@ server.listen(PORT, '0.0.0.0', () => {
   db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS subscription_plan VARCHAR(20) DEFAULT \'basic\'').catch(() => {});
   db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS service_prices JSONB').catch(() => {});
 
-  // Forum social columns (needed by like button + image posts)
+  // Forum social columns
   db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS likes_count INTEGER DEFAULT 0').catch(() => {});
   db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS shares_count INTEGER DEFAULT 0').catch(() => {});
   db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)').catch(() => {});
   db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS liked_by JSONB DEFAULT \'[]\'').catch(() => {});
 
-  // Reviews table improvements
+  // Reviews
   db.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS outcome VARCHAR(50)').catch(() => {});
   db.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT true').catch(() => {});
 
-  // Fix ghost lawyers — set is_visible=true for all profiles where it\'s NULL
+  // Fix ghost lawyers
   db.query("UPDATE lawyer_profiles SET is_visible=true WHERE is_visible IS NULL").catch(() => {});
+
+  // Ensure consultation_rooms table exists for video conferencing
+  db.query(`CREATE TABLE IF NOT EXISTS consultation_rooms (
+    id           SERIAL PRIMARY KEY,
+    booking_id   INTEGER UNIQUE NOT NULL,
+    provider     VARCHAR(20) DEFAULT 'daily',
+    room_name    VARCHAR(200),
+    room_url     TEXT,
+    token_client TEXT,
+    token_lawyer TEXT,
+    ended_at     TIMESTAMPTZ,
+    duration_min INTEGER,
+    created_at   TIMESTAMPTZ DEFAULT NOW()
+  )`).catch(() => {});
+
+  // Start cron scheduler
+  try {
+    const { startScheduler } = require('./utils/scheduler');
+    startScheduler();
+  } catch (err) { console.warn('Scheduler not started:', err.message); }
 });
 
 module.exports = { app, server };

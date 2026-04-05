@@ -28,7 +28,7 @@ export default function HomeTab() {
   useEffect(() => {
     // Attempt to fetch top rated lawyers for the horizontal list
     lawyersAPI.list({ sort: 'rating', limit: 5 })
-      .then((d: any) => setTopLawyers(Array.isArray(d) ? d.slice(0, 5) : (d?.data || []).slice(0, 5)))
+      .then((d: any) => setTopLawyers(Array.isArray(d) ? d.slice(0, 5) : (d?.lawyers || d?.data || []).slice(0, 5)))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

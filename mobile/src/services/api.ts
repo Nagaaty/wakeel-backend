@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { storage } from '../utils/storage';
+import { getConnectivityStatus } from '../utils/network';
 
 const BASE_URL = 'https://wakeel-api.onrender.com';
 
@@ -29,19 +30,30 @@ api.interceptors.request.use(async cfg => {
 
 api.interceptors.response.use(
   res  => res.data,
-  err  => {
+  async err => {
     if (err.response?.status === 401) {
       storage.multiRemove(['wakeel_token', 'wakeel_user']);
     }
 
-    // True offline — no network at all (no internet connection)
+    // ERR_NETWORK can mean: (a) truly offline, or (b) Render server refusing connection (cold start)
+    // Distinguish using NetInfo: if device has internet, it's a server issue (cold-start), not offline.
     if (!err.response && (err.code === 'ERR_NETWORK' || err.message === 'Network Error')) {
+      try {
+        const status = await getConnectivityStatus();
+        if (status !== 'offline') {
+          // Device has internet — server is down/cold-starting
+          const warmingErr = new Error('The server is warming up. Please wait a moment and try again.');
+          (warmingErr as any).isWarming = true;
+          return Promise.reject(warmingErr);
+        }
+      } catch {}
+      // Fall through: truly offline
       const offlineErr = new Error('offline');
       (offlineErr as any).isOffline = true;
       return Promise.reject(offlineErr);
     }
 
-    // Server cold-start (Render free tier) or timeout — not the user's network
+    // Server cold-start timeout (Render free tier)
     if (!err.response && err.code === 'ECONNABORTED') {
       const warmingErr = new Error(
         'The server is warming up (cold start). Please wait a moment and try again.'

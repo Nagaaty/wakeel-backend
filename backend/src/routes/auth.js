@@ -83,11 +83,21 @@ router.post('/register', async (req, res, next) => {
     // Send welcome email (non-blocking)
     sendWelcomeEmail({ to: user.email, name: user.name, role: user.role }).catch(console.error);
 
-    // Send email OTP for verification
-    sendEmailOTP(user.email, user.name, user.id, 'verify').catch(console.error);
+    // Send email OTP for verification — await so we can return devOtp if email not configured
+    let devOtp = null;
+    try {
+      const otpResult = await sendEmailOTP(user.email, user.name, user.id, 'verify');
+      if (otpResult?.skipped) {
+        const { rows: [otpRow] } = await pool.query(
+          `SELECT code FROM otp_codes WHERE phone=$1 AND purpose='verify' AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+          [user.email]
+        );
+        devOtp = otpRow?.code;
+      }
+    } catch {}
 
     const token = makeToken(user);
-    res.status(201).json({ token, user: safeUser(user) });
+    res.status(201).json({ token, user: safeUser(user), ...(devOtp ? { devOtp } : {}) });
   } catch (err) { next(err); }
 });
 
@@ -220,12 +230,25 @@ router.post('/reset-password', async (req, res, next) => {
 router.post('/send-otp', requireAuth, async (req, res, next) => {
   try {
     const { phone, purpose = 'verify' } = req.body;
-    const target = phone || req.user.phone;
+    const target = phone || req.user.phone || req.user.email;
     if (!target) return res.status(400).json({ message: 'phone required' });
-    await sendPhoneOTP(target, req.user.id, purpose);
+    let result;
+    if (!phone && req.user.email) {
+      result = await sendEmailOTP(req.user.email, req.user.name || 'User', req.user.id, purpose);
+    } else {
+      result = await sendPhoneOTP(target, req.user.id, purpose);
+    }
+    if (result?.skipped) {
+      const { rows: [otp] } = await pool.query(
+        `SELECT code FROM otp_codes WHERE phone=$1 AND purpose=$2 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+        [target, purpose]
+      );
+      return res.json({ ok: true, message: 'OTP sent (dev mode)', devOtp: otp?.code });
+    }
     res.json({ ok: true, message: 'OTP sent' });
   } catch (err) { next(err); }
 });
+
 
 // POST /api/auth/send-otp-public  — send OTP without login
 router.post('/send-otp-public', async (req, res, next) => {
@@ -233,10 +256,19 @@ router.post('/send-otp-public', async (req, res, next) => {
     const { phone, email, purpose = 'verify' } = req.body;
     const target = email || phone;
     if (!target) return res.status(400).json({ message: 'phone or email required' });
+    let result;
     if (email) {
-      await sendEmailOTP(email, 'Wakeel User', null, purpose);
+      result = await sendEmailOTP(email, 'Wakeel User', null, purpose);
     } else {
-      await sendPhoneOTP(target, null, purpose);
+      result = await sendPhoneOTP(target, null, purpose);
+    }
+    // Dev fallback: if email not configured, return OTP in response so app can display it
+    if (result?.skipped) {
+      const { rows: [otp] } = await pool.query(
+        `SELECT code FROM otp_codes WHERE phone=$1 AND purpose=$2 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+        [target, purpose]
+      );
+      return res.json({ ok: true, message: 'OTP sent (dev: check Render logs)', devOtp: otp?.code });
     }
     res.json({ ok: true, message: 'OTP sent' });
   } catch (err) { next(err); }

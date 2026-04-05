@@ -55,8 +55,12 @@ export default function RegisterLawyerScreen() {
   const handleSendUnauthOtp = async () => {
     setLoading(true);
     try {
-      await authAPI.sendOtpPublic({ phone: form.phone, email: form.email, purpose: 'verify' });
+      const res: any = await authAPI.sendOtpPublic({ phone: form.phone, email: form.email, purpose: 'verify' });
       setStep(3);
+      // Dev mode: if email not configured, show OTP in alert
+      if (res?.devOtp) {
+        Alert.alert('🔐 Dev OTP', `Email not configured on server.\nYour code is: ${res.devOtp}`, [{ text: 'OK' }]);
+      }
     } catch(e: any) {
       Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'تعذر إرسال الرمز' : 'Could not send OTP'));
     } finally { setLoading(false); }

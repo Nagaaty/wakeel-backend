@@ -39,7 +39,7 @@ export default function EditProfileScreen() {
           const uploadRes: any = await uploadAPI.upload(formData);
           if (uploadRes?.url) {
             const updated: any = await authAPI.update({ avatar_url: uploadRes.url });
-            dispatch(setUser({ ...user, ...updated }));
+            dispatch(setUser(updated));
             Alert.alert('✅', isRTL ? 'تم تحديث الصورة الشخصية!' : 'Profile photo updated!');
           }
         } catch (e: any) { Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'فشل الرفع' : 'Upload failed')); }
@@ -68,7 +68,7 @@ export default function EditProfileScreen() {
           const uploadRes: any = await uploadAPI.upload(formData);
           if (uploadRes?.url) {
             const updated: any = await authAPI.update({ cover_url: uploadRes.url });
-            dispatch(setUser({ ...user, ...updated }));
+            dispatch(setUser(updated));
             Alert.alert('✅', isRTL ? 'تم تحديث صورة الغلاف!' : 'Cover photo updated!');
           }
         } catch (e: any) { Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'فشل الرفع' : 'Upload failed')); }
