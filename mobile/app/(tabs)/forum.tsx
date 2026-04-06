@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Image, TextInput, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Image, TextInput, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Share, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/hooks/useTheme';
 import { Avatar, Spinner, Btn } from '../../src/components/ui';
@@ -35,6 +35,7 @@ export default function ForumTab() {
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [attachedFile, setAttachedFile]   = useState<string | null>(null);
   const [uploading, setUploading]         = useState(false);
+  const [lightboxUri, setLightboxUri]     = useState<string | null>(null); // fullscreen image viewer
   const { user } = useAuth();
 
   const pickImage = async () => {
@@ -159,10 +160,25 @@ export default function ForumTab() {
     } catch {} finally { setPostingAnswer(false); }
   }, [answerText, commentPost]);
 
-  const handleShare = useCallback((post: any) => {
-    setRepostPost(post);
-    setRepostText('');
-  }, []);
+  // Native share — opens Android/iOS share sheet (WhatsApp, Telegram, etc.)
+  const handleShare = useCallback(async (post: any) => {
+    try {
+      const author = post.asked_by || (isRTL ? 'مستخدم' : 'User');
+      const body   = post.question || '';
+      const link   = `https://wakeel.eg/forum/${post.id}`;
+      // Build share text
+      const shareText = isRTL
+        ? `${author} كتب في مجتمع وكيل:\n\n"${body}"\n\n🔗 ${link}`
+        : `${author} posted on Wakeel Community:\n\n"${body}"\n\n🔗 ${link}`;
+      await Share.share({
+        message: post.image_url ? `${shareText}\n\n📷 ${post.image_url}` : shareText,
+        title: isRTL ? 'منشور من مجتمع وكيل ⚖️' : 'Post from Wakeel Community ⚖️',
+        url: link,  // iOS only
+      });
+      // Track share count
+      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, shares_count: (p.shares_count || 0) + 1 } : p));
+    } catch {}
+  }, [isRTL]);
 
   const submitRepost = useCallback(async () => {
     if (!repostPost) return;
@@ -263,13 +279,15 @@ export default function ForumTab() {
               {p.question}
             </Text>
 
-            {/* Optional Media (Edge to Edge) */}
+            {/* Optional Media (Edge to Edge) — tap to open fullscreen */}
             {p.image_url && (
-              <Image 
-                source={{ uri: p.image_url }} 
-                style={{ width: '100%', height: 250, backgroundColor: '#E5E5E5' }} 
-                resizeMode="cover" 
-              />
+              <TouchableOpacity onPress={() => setLightboxUri(p.image_url)} activeOpacity={0.9}>
+                <Image 
+                  source={{ uri: p.image_url }} 
+                  style={{ width: '100%', height: 250, backgroundColor: '#E5E5E5' }} 
+                  resizeMode="cover" 
+                />
+              </TouchableOpacity>
             )}
 
             {/* Metrics Row (Likes, Comments counts) */}
@@ -302,8 +320,8 @@ export default function ForumTab() {
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => handleShare(p)} style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 8 }}>
-                <Text style={{ fontSize: 20, color: '#65676B' }}>🔁</Text>
-                <Text style={{ color: '#65676B', fontSize: 14, fontWeight: '600' }}>{isRTL ? 'إعادة نشر' : 'Repost'}</Text>
+                <Text style={{ fontSize: 20, color: '#65676B' }}>📤</Text>
+                <Text style={{ color: '#65676B', fontSize: 14, fontWeight: '600' }}>{isRTL ? 'مشاركة' : 'Share'}</Text>
               </TouchableOpacity>
 
             </View>
@@ -530,6 +548,32 @@ export default function ForumTab() {
             )}
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ─── Fullscreen Image Lightbox ─────────────────────────────────── */}
+      <Modal visible={!!lightboxUri} transparent animationType="fade" onRequestClose={() => setLightboxUri(null)}>
+        <TouchableOpacity
+          onPress={() => setLightboxUri(null)}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' }}
+          activeOpacity={1}
+        >
+          {/* Close button */}
+          <View style={{ position: 'absolute', top: 50, right: 20, zIndex: 10,
+            backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, width: 40, height: 40,
+            alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 22, fontWeight: '300' }}>✕</Text>
+          </View>
+          {lightboxUri && (
+            <Image
+              source={{ uri: lightboxUri }}
+              style={{ width: Dimensions.get('window').width, height: Dimensions.get('window').height * 0.8 }}
+              resizeMode="contain"
+            />
+          )}
+          <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 16 }}>
+            {isRTL ? 'اضغط في أي مكان للإغلاق' : 'Tap anywhere to close'}
+          </Text>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

@@ -1,15 +1,44 @@
 const router  = require('express').Router();
 
-// ─── AI Provider: Google Gemini (free) → Anthropic Claude (fallback) ─────────
+// ─── AI Providers (tried in order) ────────────────────────────────────────────
 //
-// Primary (FREE, no credit card):
-//   Get key at: https://aistudio.google.com/app/apikey
-//   Add to Render: GEMINI_API_KEY=AIza...
+// 1. Groq (FASTEST + FREE) — best for chatbot, instant responses
+//    Get key at: https://console.groq.com  (free, no credit card)
+//    Add to Render: GROQ_API_KEY=gsk_...
 //
-// Fallback (paid, $5 free credit on signup):
-//   Get key at: https://console.anthropic.com
-//   Add to Render: ANTHROPIC_API_KEY=sk-ant-...
+// 2. Google Gemini (FREE fallback)
+//    Get key at: https://aistudio.google.com/app/apikey
+//    Add to Render: GEMINI_API_KEY=AIza...
+//
+// 3. Anthropic Claude (paid fallback, $5 free credit)
+//    Add to Render: ANTHROPIC_API_KEY=sk-ant-...
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── Groq (FASTEST — tries first) ────────────────────────────────────────────
+async function callGroq(messages, systemText, maxTokens = 1000) {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return null; // Not configured
+
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',   // best quality on Groq, free
+      messages: [
+        { role: 'system', content: systemText },
+        ...messages,
+      ],
+      max_tokens: maxTokens,
+      temperature: 0.7,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || 'Groq API error');
+  return { reply: data.choices?.[0]?.message?.content || 'No response.' };
+}
 
 // ── Google Gemini ─────────────────────────────────────────────────────────────
 async function callGemini(messages, systemText, maxTokens = 1000) {
@@ -65,17 +94,21 @@ async function callClaude(messages, systemText, maxTokens = 1000) {
   return { reply: data.content?.[0]?.text || 'No response.' };
 }
 
-// ── Main dispatcher — tries Gemini first, then Claude ─────────────────────────
+// ── Main dispatcher — tries Groq → Gemini → Claude ───────────────────────────
 async function callAI(messages, systemText, maxTokens = 1000) {
-  // Try Gemini first (free)
+  // Try Groq first (fastest + free)
+  const groqResult = await callGroq(messages, systemText, maxTokens).catch(() => null);
+  if (groqResult) return groqResult;
+
+  // Try Gemini second (free)
   const geminiResult = await callGemini(messages, systemText, maxTokens).catch(() => null);
   if (geminiResult) return geminiResult;
 
-  // Try Claude fallback
+  // Try Claude fallback (paid)
   const claudeResult = await callClaude(messages, systemText, maxTokens).catch(() => null);
   if (claudeResult) return claudeResult;
 
-  // Neither configured
+  // Nothing configured
   throw new Error('AI_NOT_CONFIGURED');
 }
 

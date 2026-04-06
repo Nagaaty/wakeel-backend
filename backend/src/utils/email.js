@@ -1,75 +1,105 @@
 const nodemailer = require('nodemailer');
 
-// ─── Email Service ─────────────────────────────────────────────────────────
-// Supports: Gmail (free), SendGrid, any SMTP
+// ─── Email Service ──────────────────────────────────────────────────────────
 //
-// For Gmail: enable 2FA → create App Password → set in .env:
-//   EMAIL_HOST=smtp.gmail.com
-//   EMAIL_PORT=587
-//   EMAIL_USER=your@gmail.com
-//   EMAIL_PASS=your-app-password
-//   EMAIL_FROM=Wakeel Legal <your@gmail.com>
+// Priority order (first configured wins):
 //
-// For SendGrid: set EMAIL_SENDGRID_KEY=SG.xxxxx
+// 1. Resend (EASIEST — just one API key, free 3,000/month)
+//    Sign up at: https://resend.com → Create API Key
+//    Render env:  RESEND_API_KEY=re_xxxx
+//    Render env:  RESEND_FROM=Wakeel <onboarding@resend.dev>  ← use this for testing
+//
+// 2. Gmail SMTP (requires App Password)
+//    Google account → Security → 2-Step Verification → App Passwords
+//    Render env: EMAIL_HOST=smtp.gmail.com
+//    Render env: EMAIL_PORT=587
+//    Render env: EMAIL_USER=your@gmail.com
+//    Render env: EMAIL_PASS=your-16-char-app-password
 // ─────────────────────────────────────────────────────────────────────────────
 
 let transporter = null;
 
 function getTransporter() {
   if (transporter) return transporter;
-
   const timeouts = { connectionTimeout: 5000, socketTimeout: 8000, greetingTimeout: 5000 };
-
   if (process.env.EMAIL_SENDGRID_KEY) {
     transporter = nodemailer.createTransport({
-      host: 'smtp.sendgrid.net',
-      port: 587,
+      host: 'smtp.sendgrid.net', port: 587,
       auth: { user: 'apikey', pass: process.env.EMAIL_SENDGRID_KEY },
       ...timeouts,
     });
   } else if (process.env.EMAIL_HOST) {
     transporter = nodemailer.createTransport({
-      host:   process.env.EMAIL_HOST,
-      port:   parseInt(process.env.EMAIL_PORT || '587'),
+      host: process.env.EMAIL_HOST, port: parseInt(process.env.EMAIL_PORT || '587'),
       secure: process.env.EMAIL_SECURE === 'true',
       auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
       ...timeouts,
     });
   } else {
-    return null; // Email not configured — log and skip
+    return null;
   }
-
   return transporter;
 }
 
-const FROM = process.env.EMAIL_FROM || 'Wakeel Legal Platform <no-reply@wakeel.eg>';
+const FROM = process.env.EMAIL_FROM || process.env.RESEND_FROM || 'Wakeel Legal <onboarding@resend.dev>';
 const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-// ─── Core send function ────────────────────────────────────────────────────
+// ─── Resend (primary — easiest setup) ──────────────────────────────────────
+async function sendViaResend({ to, subject, html }) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return null; // not configured
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      from: FROM,
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Resend error');
+  return { sent: true, messageId: data.id };
+}
+
+// ─── Core send function ─────────────────────────────────────────────────────
 async function sendEmail({ to, subject, html, text }) {
-  const t = getTransporter();
-  if (!t) {
-    // Extract OTP from subject if present (pattern: starts with 6 digits)
-    const otpMatch = subject && subject.match(/^(\d{6})/);
-    if (otpMatch) {
-      console.log(`\n${'='.repeat(50)}`);
-      console.log(`📧 OTP CODE (email not configured)`);
-      console.log(`   To:   ${to}`);
-      console.log(`   Code: ${otpMatch[1]}`);
-      console.log(`${'='.repeat(50)}\n`);
-    } else {
-      console.log(`[EMAIL SKIPPED] To: ${to} | Subject: ${subject}`);
+  // 1. Try Resend first (easiest, most reliable)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      return await sendViaResend({ to, subject, html });
+    } catch (err) {
+      console.error('[RESEND ERROR]', err.message);
+      // Fall through to SMTP
     }
-    return { skipped: true };
   }
-  try {
-    const info = await t.sendMail({ from: FROM, to, subject, html, text });
-    return { sent: true, messageId: info.messageId };
-  } catch (err) {
-    console.error('[EMAIL ERROR]', err.message);
-    transporter = null; // Reset so next call retries fresh
-    return { error: err.message, skipped: true }; // Treat as skipped to unblock signup
+
+  // 2. Try SMTP (Gmail, SendGrid, etc.)
+  const t = getTransporter();
+  if (t) {
+    try {
+      const info = await t.sendMail({ from: FROM, to, subject, html, text });
+      return { sent: true, messageId: info.messageId };
+    } catch (err) {
+      console.error('[EMAIL ERROR]', err.message);
+      transporter = null;
+    }
   }
+
+  // 3. Nothing configured — log OTP to console so dev can still test
+  const otpMatch = subject && subject.match(/^(\d{6})/);
+  if (otpMatch) {
+    console.log(`\n${'='.repeat(50)}`);
+    console.log(`📧 OTP CODE (email not configured — add RESEND_API_KEY to Render)`);
+    console.log(`   To:   ${to}`);
+    console.log(`   Code: ${otpMatch[1]}`);
+    console.log(`${'='.repeat(50)}\n`);
+  } else {
+    console.log(`[EMAIL SKIPPED] To: ${to} | Subject: ${subject}`);
+  }
+  return { skipped: true };
 }
 
 // ─── Email Templates ───────────────────────────────────────────────────────
