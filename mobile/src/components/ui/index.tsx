@@ -3,8 +3,11 @@ import {
   TouchableOpacity, Text, View, ActivityIndicator,
   TextInput, Platform, ViewStyle,
 } from 'react-native';
-import { Theme } from '../../theme';
+import { Theme, useTheme, LIGHT_C } from '../../theme';
 import { Gradient, GRADIENTS } from '../Gradient';
+
+// Safe theme fallback — prevents crashes when C prop is not passed
+function safeC(C: any): Theme { return C || LIGHT_C; }
 
 // ─── Btn — matches el-adl-app-43 exactly ─────────────────────────────────────
 // Reference: gold text color is #000, not #fff
@@ -64,7 +67,8 @@ export function Tag({ C, children, color, style }: any) {
 }
 
 // ─── Stars — matches reference ────────────────────────────────────────────────
-export function Stars({ rating, C, size = 13 }: any) {
+export function Stars({ rating, C: Cprop, size = 13 }: any) {
+  const C = safeC(Cprop);
   const r = parseFloat(rating) || 0;
   const full = Math.floor(r);
   const empty = 5 - full;
@@ -102,7 +106,8 @@ export function WinBar({ wins, losses, C }: any) {
 }
 
 // ─── Avatar — serif initials, gold gradient, matches reference ────────────────
-export function Avatar({ C, initials, size = 48, color }: any) {
+export function Avatar({ C: Cprop, initials, size = 48, color }: any) {
+  const C = safeC(Cprop);
   if (!color) {
     return (
       <Gradient colors={[C.gold, C.goldD]} style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
