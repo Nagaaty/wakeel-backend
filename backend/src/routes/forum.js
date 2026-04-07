@@ -6,7 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 router.get('/questions', async (req, res, next) => {
   try {
     const { cat, search } = req.query;
-    let q = `SELECT fq.*, u.name as asked_by,
+    let q = `SELECT fq.*, u.name as asked_by, u.avatar_url as user_avatar_url,
               (SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id) as answer_count
               FROM forum_questions fq
               LEFT JOIN users u ON u.id=fq.user_id

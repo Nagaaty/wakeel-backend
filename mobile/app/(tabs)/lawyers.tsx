@@ -81,8 +81,8 @@ const LawyerCardGrid = memo(function LawyerCardGrid({ lawyer, C, onBook, onProfi
 
       {/* Action buttons */}
       <View style={{ width: '100%', gap: 6 }}>
-        <Btn C={C} onPress={()=>onBook?.(lawyer)} disabled={!lawyer.is_online} size="sm">
-          {lawyer.is_online ? '📅 Book' : '⏳ Busy'}
+        <Btn C={C} onPress={()=>onBook?.(lawyer)} size="sm">
+          {'📅 Book / حجز'}
         </Btn>
         <View style={{ flexDirection: 'row', gap: 6 }}>
           <Btn C={C} variant="ghost" size="sm" style={{ flex: 1 }} onPress={() => Alert.alert('Retain Request', 'We have notified the lawyer of your interest to retain them. They will contact you shortly.')}>
@@ -165,8 +165,8 @@ const LawyerCardList = memo(function LawyerCardList({ lawyer, C, onBook, onProfi
 
       {/* Action buttons */}
       <View style={{ flexDirection:'row', gap:6 }}>
-        <Btn C={C} onPress={()=>onBook?.(lawyer)} disabled={!lawyer.is_online} size="sm" style={{ flex:1 }}>
-          {lawyer.is_online ? '📅 Book' : '⏳ Busy'}
+        <Btn C={C} onPress={()=>onBook?.(lawyer)} size="sm" style={{ flex:1 }}>
+          {'📅 Book / حجز'}
         </Btn>
         <Btn C={C} variant="ghost" size="sm" style={{ flex:1 }} onPress={() => Alert.alert('Retain Request', 'We have notified the lawyer of your interest to retain them. They will contact you shortly.')}>
           Retain

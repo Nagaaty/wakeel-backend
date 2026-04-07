@@ -160,25 +160,10 @@ export default function ForumTab() {
     } catch {} finally { setPostingAnswer(false); }
   }, [answerText, commentPost]);
 
-  // Native share — opens Android/iOS share sheet (WhatsApp, Telegram, etc.)
-  const handleShare = useCallback(async (post: any) => {
-    try {
-      const author = post.asked_by || (isRTL ? 'مستخدم' : 'User');
-      const body   = post.question || '';
-      const link   = `https://wakeel.eg/forum/${post.id}`;
-      // Build share text
-      const shareText = isRTL
-        ? `${author} كتب في مجتمع وكيل:\n\n"${body}"\n\n🔗 ${link}`
-        : `${author} posted on Wakeel Community:\n\n"${body}"\n\n🔗 ${link}`;
-      await Share.share({
-        message: post.image_url ? `${shareText}\n\n📷 ${post.image_url}` : shareText,
-        title: isRTL ? 'منشور من مجتمع وكيل ⚖️' : 'Post from Wakeel Community ⚖️',
-        url: link,  // iOS only
-      });
-      // Track share count
-      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, shares_count: (p.shares_count || 0) + 1 } : p));
-    } catch {}
-  }, [isRTL]);
+  const handleShare = useCallback((post: any) => {
+    setRepostPost(post);
+    setRepostText('');
+  }, []);
 
   const submitRepost = useCallback(async () => {
     if (!repostPost) return;
@@ -256,7 +241,7 @@ export default function ForumTab() {
             
             {/* Author Header */}
             <View style={{ padding: 16, paddingBottom: 10, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}>
-              <Avatar C={C} initials={p.asked_by ? p.asked_by.substring(0, 2).toUpperCase() : '؟'} size={48} />
+              <Avatar C={C} url={p.user_avatar_url} initials={p.asked_by ? p.asked_by.substring(0, 2).toUpperCase() : '؟'} size={48} />
               <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 4 }}>
                   <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>{p.asked_by || 'مستخدم'}</Text>
