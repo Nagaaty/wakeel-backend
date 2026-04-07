@@ -66,17 +66,7 @@ async function sendViaResend({ to, subject, html }) {
 
 // ─── Core send function ─────────────────────────────────────────────────────
 async function sendEmail({ to, subject, html, text }) {
-  // 1. Try Resend first (easiest, most reliable)
-  if (process.env.RESEND_API_KEY) {
-    try {
-      return await sendViaResend({ to, subject, html });
-    } catch (err) {
-      console.error('[RESEND ERROR]', err.message);
-      // Fall through to SMTP
-    }
-  }
-
-  // 2. Try SMTP (Gmail, SendGrid, etc.)
+  // 1. Try SMTP (Gmail, SendGrid, etc.) FIRST (since this was previously working for the user)
   const t = getTransporter();
   if (t) {
     try {
@@ -85,6 +75,15 @@ async function sendEmail({ to, subject, html, text }) {
     } catch (err) {
       console.error('[EMAIL ERROR]', err.message);
       transporter = null;
+    }
+  }
+
+  // 2. Try Resend if SMTP failed or is unconfigured
+  if (process.env.RESEND_API_KEY) {
+    try {
+      return await sendViaResend({ to, subject, html });
+    } catch (err) {
+      console.error('[RESEND ERROR]', err.message);
     }
   }
 
