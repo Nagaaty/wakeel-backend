@@ -10,7 +10,8 @@ const { notifyNewBooking, notifyBookingConfirmed }          = require('../utils/
 router.post('/', requireAuth, async (req, res, next) => {
   try {
     const { lawyerId, bookingDate, startTime, endTime, serviceType, notes, fee, urgency } = req.body;
-    if (!lawyerId || !bookingDate || !startTime || !fee) {
+    if (!lawyerId || !bookingDate || !startTime || fee === undefined || fee === null) {
+      console.log('Booking Validation Error:', { body: req.body });
       return res.status(400).json({ message: 'lawyerId, bookingDate, startTime and fee required' });
     }
 

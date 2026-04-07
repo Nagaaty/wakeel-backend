@@ -106,8 +106,18 @@ export function WinBar({ wins, losses, C }: any) {
 }
 
 // ─── Avatar — serif initials, gold gradient, matches reference ────────────────
-export function Avatar({ C: Cprop, initials, size = 48, color }: any) {
+import { Image } from 'react-native';
+
+export function Avatar({ C: Cprop, initials, size = 48, color, url }: any) {
   const C = safeC(Cprop);
+  if (url) {
+    return (
+      <Image
+        source={{ uri: url }}
+        style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 1, borderColor: C.gold }}
+      />
+    );
+  }
   if (!color) {
     return (
       <Gradient colors={[C.gold, C.goldD]} style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -126,7 +136,7 @@ export function Avatar({ C: Cprop, initials, size = 48, color }: any) {
       <Text style={{
         color: '#000', fontWeight: '700',
         fontSize: Math.round(size * 0.34),
-        fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+        fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'CormorantGaramond-Bold',
       }}>{initials}</Text>
     </View>
   );
