@@ -262,9 +262,9 @@ export default function LawyerPublicProfile() {
           <SectionHeader title={isRTL ? `تقييمات العملاء (${totalReviews})` : `Client Reviews (${totalReviews})`} C={C} />
           {/* Rating summary */}
           <View style={{ flexDirection:'row', alignItems:'center', gap:14, backgroundColor: C.card, borderRadius:14, padding:14, marginBottom:16, borderWidth:1, borderColor: C.border }}>
-            <Text style={{ fontSize:46, fontWeight:'900', color: GOLD, fontFamily:'CormorantGaramond-Bold' }}>{avgRating.toFixed(1)}</Text>
+            <Text style={{ fontSize:46, fontWeight:'900', color: GOLD, fontFamily:'CormorantGaramond-Bold' }}>{Number(avgRating).toFixed(1)}</Text>
             <View>
-              <Stars rating={avgRating} size={18} />
+              <Stars rating={Number(avgRating)} size={18} />
               <Text style={{ color: C.muted, fontSize:12, marginTop:4 }}>{isRTL ? `من ${totalReviews} تقييم` : `From ${totalReviews} reviews`}</Text>
             </View>
           </View>
