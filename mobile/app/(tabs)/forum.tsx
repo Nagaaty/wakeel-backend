@@ -240,7 +240,7 @@ export default function ForumTab() {
                 } else if (p.user_role === 'lawyer') {
                   router.push({ pathname: '/lawyer/[id]', params: { id: p.user_id } } as any);
                 } else if (p.user_role === 'client') {
-                  Alert.alert(isRTL ? 'معلومات المستخدم' : 'User Info', isRTL ? 'هذا حساب عميل خاص.' : 'This is a private client account.');
+                  router.push({ pathname: '/user/[id]', params: { id: p.user_id } } as any);
                 }
               }}>
                 <Avatar C={C} url={p.user_avatar_url} initials={p.asked_by ? p.asked_by.substring(0, 2).toUpperCase() : '؟'} size={48} />

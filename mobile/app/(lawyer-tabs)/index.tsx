@@ -174,27 +174,27 @@ export default function LawyerDashboardIndex() {
           );
         })}
 
-        {/* Quick shortcuts / Navigation Tabs */}
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+        {/* 2x2 Grid Shortcuts */}
+        <Text style={{ color: C.text, fontSize: 16, fontWeight: '700', marginBottom: 14, marginTop: 12 }}>
+          {isRTL ? 'لوحة التحكم' : 'Dashboard'}
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           {[
-            { label: 'Earnings 💰', route: '/installments' },
-            { label: 'Bookings 📅',  route: '/bookings' },
-            { label: 'Overview 📊',  route: '/analytics' },
-          ].map((tab, i) => (
-            <TouchableOpacity 
-              key={i} 
-              onPress={() => router.push(tab.route as any)}
+            { icon: '💰', label: isRTL ? 'المدفوعات' : 'Earnings',     href: '/installments' },
+            { icon: '📅', label: isRTL ? 'الحجوزات' : 'Bookings',      href: '/bookings' },
+            { icon: '📊', label: isRTL ? 'نظرة عامة (CRM)' : 'Overview (CRM)', href: '/analytics' },
+            { icon: '📝', label: isRTL ? 'وظائف قانونية' : 'Post a Job', href: '/jobs' },
+          ].map((item, i) => (
+            <TouchableOpacity
+              key={i}
+              onPress={() => router.push(item.href as any)}
               style={{
-                flex: 1, 
-                backgroundColor: C.card, 
-                borderWidth: 1, 
-                borderColor: C.border, 
-                borderRadius: 14, 
-                paddingVertical: 14, 
-                alignItems: 'center'
-              }}
-            >
-              <Text style={{ color: C.muted, fontSize: 13, fontWeight: '700' }}>{tab.label}</Text>
+                flex: 1, minWidth: '44%', backgroundColor: C.card,
+                borderWidth: 1, borderColor: C.border, borderRadius: 14,
+                padding: 20, alignItems: 'center', gap: 10
+              }}>
+              <Text style={{ fontSize: 32 }}>{item.icon}</Text>
+              <Text style={{ color: C.muted, fontSize: 13, fontWeight: '700', textAlign: 'center' }}>{item.label}</Text>
             </TouchableOpacity>
           ))}
         </View>

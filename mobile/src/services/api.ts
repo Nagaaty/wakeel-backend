@@ -195,7 +195,10 @@ export const referralAPI = {
   apply:  (code: string)  => api.post('/referral/apply', { code }),
 };
 
-export const usersAPI   = { online: () => api.get('/users/online') };
+export const usersAPI = { 
+  online: () => api.get('/users/online'),
+  get: (id: string | number) => api.get(`/users/${id}`)
+};
 export const adminAPI = {
   stats:          ()                           => api.get('/admin/stats'),
   users:          (params?: any)               => api.get('/admin/users', { params }),
