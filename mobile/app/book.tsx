@@ -234,9 +234,19 @@ export default function BookScreen() {
   // ── Confirm ──────────────────────────────────────────────────────────────
   const confirm = async () => { hapticMedium();
     setSubmitting(true); setError('');
+    
+    // Safety fallback for Expo Router sometimes dropping useLocalSearchParams
+    const finalLawyerId = Number(lawyer?.id || lawyerId);
+
+    if (!finalLawyerId || !form.date || !form.time) {
+      setError(isRTL ? 'بيانات الحجز غير مكتملة، يرجى المحاولة مرة أخرى.' : 'Incomplete booking data, please try again.');
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const booking: any = await bookingsAPI.create({
-        lawyerId: Number(lawyerId), bookingDate: form.date, startTime: form.time,
+        lawyerId: finalLawyerId, bookingDate: form.date, startTime: form.time,
         serviceType: form.serviceType, notes: form.notes,
         urgency: form.urgency, fee: finalPrice,
         promoCode: promoApplied ? promo.trim() : undefined,

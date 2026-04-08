@@ -25,6 +25,14 @@ export default function RegisterLawyerScreen() {
   const [courtModal, setCourtModal] = useState(false);
   const [specModal, setSpecModal] = useState(false);
   const otpInputs = React.useRef<(TextInput | null)[]>([]);
+  const [timeLeft, setTimeLeft] = useState(60);
+
+  React.useEffect(() => {
+    if (step === 3 && timeLeft > 0) {
+      const timerId = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
+      return () => clearInterval(timerId);
+    }
+  }, [step, timeLeft]);
 
   const COURT_DEGREES = isRTL ? COURT_DEGREES_AR : COURT_DEGREES_EN;
   const SPECIALIZATIONS = isRTL ? SPECIALIZATIONS_AR : SPECIALIZATIONS_EN;
@@ -74,6 +82,19 @@ export default function RegisterLawyerScreen() {
     } catch(e: any) {
       Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'الرمز غير صحيح' : 'Invalid OTP code'));
     } finally { setLoading(false); }
+  };
+
+  const handleResendOtp = async () => {
+    setLoading(true);
+    try {
+      await authAPI.sendOtpPublic({ phone: form.phone, email: form.email, purpose: 'verify' });
+      setTimeLeft(60); // Reset timer
+      Alert.alert(isRTL ? 'نجاح' : 'Success', isRTL ? 'تم إعادة إرسال الرمز بنجاح' : 'OTP resent successfully');
+    } catch(e: any) {
+      Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'تعذر إعادة الإرسال' : 'Could not resend OTP'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -210,9 +231,27 @@ export default function RegisterLawyerScreen() {
             <Btn C={C} onPress={handleVerifyUnauthOtp} full size="lg" disabled={form.otp.some(x => !x) || loading} style={{ marginBottom: 24 }}>
               {loading ? (isRTL ? '⏳ جاري التحقق...' : '⏳ Verifying...') : (isRTL ? 'تحقق وتابع ✓' : 'Verify & Continue ✓')}
             </Btn>
+
+            {/* Resend OTP Button */}
+            <TouchableOpacity 
+              onPress={handleResendOtp} 
+              disabled={timeLeft > 0 || loading}
+              style={{ marginBottom: 24, paddingVertical: 8, alignItems: 'center' }}>
+              <Text style={{ 
+                color: timeLeft > 0 ? C.muted : C.gold, 
+                fontSize: 14, 
+                fontWeight: timeLeft > 0 ? '400' : '700' 
+              }}>
+                {timeLeft > 0 
+                  ? (isRTL ? `إعادة الإرسال بعد ${timeLeft} ثانية` : `Resend in ${timeLeft}s`)
+                  : (isRTL ? 'أعد إرسال الرمز' : 'Resend OTP')
+                }
+              </Text>
+            </TouchableOpacity>
+
             <TouchableOpacity onPress={() => setStep(2)}>
               <Text style={{ color: C.muted, fontSize: 13 }}>
-                {isRTL ? '← تغيير رقم الهاتف' : '← Change Phone Number'}
+                {isRTL ? '← تغيير الهاتف / البريد الإلكتروني' : '← Change email or phone'}
               </Text>
             </TouchableOpacity>
           </View>

@@ -17,7 +17,17 @@ export default function VerifyEmailScreen() {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
   const [resent,   setResent]   = useState(false);
+  const [timeLeft, setTimeLeft] = useState(60);
   const inputs = useRef<(TextInput | null)[]>([]);
+
+  React.useEffect(() => {
+    if (timeLeft > 0) {
+      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      setResent(false);
+    }
+  }, [timeLeft]);
 
   const handleChange = (i: number, val: string) => {
     if (!/^\d?$/.test(val)) return;
@@ -44,11 +54,11 @@ export default function VerifyEmailScreen() {
   };
 
   const resend = async () => {
-    if (resent) return;
+    if (timeLeft > 0 || loading) return;
     try {
       const res: any = await authAPI.sendOtp({ purpose: 'verify' });
       setResent(true);
-      setTimeout(() => setResent(false), 30000);
+      setTimeLeft(60);
       if (res?.devOtp) {
         Alert.alert('🔐 Dev OTP', `Email not configured.\nYour code: ${res.devOtp}`, [{ text: 'OK' }]);
       } else {
@@ -102,10 +112,10 @@ export default function VerifyEmailScreen() {
           <Text style={{ color:C.muted, fontSize:13 }}>
             {isRTL ? 'لم يصلك الكود؟' : "Didn't receive it?"}
           </Text>
-          <TouchableOpacity onPress={resend} disabled={resent}>
-            <Text style={{ color:resent?C.muted:C.gold, fontWeight:'700', fontSize:13 }}>
-              {resent
-                ? (isRTL ? '✅ تم الإرسال' : '✅ Sent!')
+          <TouchableOpacity onPress={resend} disabled={timeLeft > 0}>
+            <Text style={{ color: (timeLeft > 0) ? C.muted : C.gold, fontWeight:'700', fontSize:13 }}>
+              {timeLeft > 0
+                ? (isRTL ? `انتظر ${timeLeft}ث` : `Wait ${timeLeft}s`)
                 : (isRTL ? 'أرسل مجدداً' : 'Resend code')}
             </Text>
           </TouchableOpacity>

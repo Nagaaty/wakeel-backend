@@ -26,8 +26,16 @@ export default function RegisterScreen() {
 
   const [step, setStep] = useState(1);
   const [loadingCode, setLoadingCode] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(60);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const otpInputs = React.useRef<any[]>([]);
+
+  React.useEffect(() => {
+    if (step === 2 && timeLeft > 0) {
+      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [step, timeLeft]);
 
   const handleOtpChange = (i: number, val: string) => {
     if (!/^\d?$/.test(val)) return;
@@ -87,35 +95,39 @@ export default function RegisterScreen() {
           ) : null}
 
           {/* Role selector */}
-          <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>
-            {isRTL ? 'نوع الحساب *' : 'Account type *'}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 18 }}>
-            {(['client', 'lawyer'] as const).map(r => (
-              <TouchableOpacity
-                key={r}
-                onPress={() => setRole(r)}
-                style={{
-                  flex: 1, paddingVertical: 14, borderRadius: 12,
-                  borderWidth: 2, borderColor: role === r ? C.gold : C.border,
-                  backgroundColor: role === r ? C.gold + '15' : 'transparent',
-                  alignItems: 'center',
-                }}
-              >
-                <Text style={{ fontSize: 22, marginBottom: 4 }}>{r === 'client' ? '👤' : '⚖️'}</Text>
-                <Text style={{ color: role === r ? C.gold : C.text, fontWeight: '700', fontSize: 13 }}>
-                  {r === 'client'
-                    ? (isRTL ? 'عميل' : 'Client')
-                    : (isRTL ? 'محامٍ' : 'Lawyer')}
-                </Text>
-                <Text style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>
-                  {r === 'client'
-                    ? (isRTL ? 'أبحث عن محامٍ' : 'I need a lawyer')
-                    : (isRTL ? 'أقدم خدمات قانونية' : 'I offer legal services')}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {step === 1 && (
+            <>
+              <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>
+                {isRTL ? 'نوع الحساب *' : 'Account type *'}
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 18 }}>
+                {(['client', 'lawyer'] as const).map(r => (
+                  <TouchableOpacity
+                    key={r}
+                    onPress={() => setRole(r)}
+                    style={{
+                      flex: 1, paddingVertical: 14, borderRadius: 12,
+                      borderWidth: 2, borderColor: role === r ? C.gold : C.border,
+                      backgroundColor: role === r ? C.gold + '15' : 'transparent',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ fontSize: 22, marginBottom: 4 }}>{r === 'client' ? '👤' : '⚖️'}</Text>
+                    <Text style={{ color: role === r ? C.gold : C.text, fontWeight: '700', fontSize: 13 }}>
+                      {r === 'client'
+                        ? (isRTL ? 'عميل' : 'Client')
+                        : (isRTL ? 'محامٍ' : 'Lawyer')}
+                    </Text>
+                    <Text style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>
+                      {r === 'client'
+                        ? (isRTL ? 'أبحث عن محامٍ' : 'I need a lawyer')
+                        : (isRTL ? 'أقدم خدمات قانونية' : 'I offer legal services')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
 
           {/* Client Specific Inputs */}
           {role === 'client' && step === 1 && (
@@ -202,6 +214,17 @@ export default function RegisterScreen() {
               <Btn C={C} full size="lg" onPress={handleRegister} disabled={otp.join('').length < 6 || loadingCode}>
                 {loadingCode ? (isRTL ? '⏳ جاري التحقق...' : '⏳ Verifying...') : (isRTL ? 'تحقق ومتابعة' : 'Verify & Continue')}
               </Btn>
+
+              {/* Resend button with countdown */}
+              <View style={{ marginTop: 18, alignItems: 'center' }}>
+                <TouchableOpacity onPress={() => { if (timeLeft === 0) { setTimeLeft(60); handleSendOtp(); } }} disabled={timeLeft > 0 || loadingCode}>
+                  <Text style={{ color: timeLeft > 0 ? C.muted : C.gold, fontSize: 13, fontWeight: '700' }}>
+                    {timeLeft > 0
+                      ? (isRTL ? `إعادة الإرسال خلال ${timeLeft}ث` : `Wait ${timeLeft}s to resend`)
+                      : (isRTL ? 'لم يصلك الكود؟ أعد الإرسال' : 'Resend code')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </>
           )}
 
