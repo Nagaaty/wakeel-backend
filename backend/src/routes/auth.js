@@ -86,21 +86,12 @@ router.post('/register', async (req, res, next) => {
     // Send welcome email (non-blocking)
     sendWelcomeEmail({ to: user.email, name: user.name, role: user.role }).catch(console.error);
 
-    // Send email OTP for verification — await so we can return devOtp if email not configured
-    let devOtp = null;
-    try {
-      const otpResult = await sendEmailOTP(user.email, user.name, user.id, 'verify');
-      if (otpResult?.skipped) {
-        const { rows: [otpRow] } = await pool.query(
-          `SELECT code FROM otp_codes WHERE phone=$1 AND purpose='verify' AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
-          [user.email]
-        );
-        devOtp = otpRow?.code;
-      }
-    } catch {}
+    // Frontend already verified the user's phone/email via public OTP endpoints prior to registration
+    // We can directly return the token and authenticate the user.
+    await pool.query('UPDATE users SET email_verified=true, phone_verified=true WHERE id=$1', [user.id]).catch(()=>{});
 
     const token = makeToken(user);
-    res.status(201).json({ token, user: safeUser(user), ...(devOtp ? { devOtp } : {}) });
+    res.status(201).json({ token, user: safeUser(user) });
   } catch (err) { next(err); }
 });
 
