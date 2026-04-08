@@ -2,6 +2,49 @@ const router = require('express').Router();
 const pool   = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 
+const nodemailer = require('nodemailer');
+
+// GET /api/users/email-test — Diagnostics for Google SMTP
+router.get('/email-test', async (req, res, next) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST, 
+      port: parseInt(process.env.EMAIL_PORT || '587'),
+      secure: process.env.EMAIL_SECURE === 'true',
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+    });
+    
+    // Explicitly verify the connection using Nodemailer's built-in verification
+    await transporter.verify();
+    
+    res.json({ 
+      success: true, 
+      message: "SMTP Connection completely successful!",
+      config: {
+        host: process.env.EMAIL_HOST,
+        port: process.env.EMAIL_PORT,
+        user: process.env.EMAIL_USER,
+        secure: process.env.EMAIL_SECURE,
+        passLength: process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0
+      }
+    });
+  } catch (err) {
+    res.json({ 
+      success: false, 
+      error_name: err.name,
+      error_message: err.message, 
+      error_code: err.code,
+      error_command: err.command,
+      config: {
+        host: process.env.EMAIL_HOST,
+        port: process.env.EMAIL_PORT,
+        user: process.env.EMAIL_USER,
+        hasPassword: !!process.env.EMAIL_PASS
+      }
+    });
+  }
+});
+
 // GET /api/users/online — online lawyers for InstantConsult
 router.get('/online', async (req, res, next) => {
   try {

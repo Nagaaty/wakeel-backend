@@ -21,7 +21,7 @@ async function requireAuth(req, res, next) {
 
     // Check user still exists and not banned/deleted
     const { rows: [user] } = await pool.query(
-      'SELECT id, role, name, email, phone, is_banned, deleted_at FROM users WHERE id=$1',
+      'SELECT id, role, name, email, phone, avatar_url, is_banned, deleted_at FROM users WHERE id=$1',
       [decoded.id]
     );
     if (!user)           return res.status(401).json({ message: 'User not found' });

@@ -6,7 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 router.get('/questions', async (req, res, next) => {
   try {
     const { cat, search } = req.query;
-    let q = `SELECT fq.*, u.name as asked_by, u.avatar_url as user_avatar_url,
+    let q = `SELECT fq.*, u.name as asked_by, u.avatar_url as user_avatar_url, u.role as user_role,
               (SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id) as answer_count
               FROM forum_questions fq
               LEFT JOIN users u ON u.id=fq.user_id
@@ -30,7 +30,16 @@ router.post('/questions', requireAuth, async (req, res, next) => {
        VALUES ($1,$2,$3,$4,true,$5) RETURNING *`,
       [req.user.id, question, category, anonymous !== false, image_url || null]
     );
-    res.status(201).json({ question: { ...row, asked_by: anonymous ? 'Anonymous' : req.user.name, answer_count: 0, views: 1 }});
+    res.status(201).json({ 
+      question: { 
+        ...row, 
+        asked_by: anonymous ? 'Anonymous' : req.user.name, 
+        user_avatar_url: anonymous ? null : req.user.avatar_url,
+        user_role: req.user.role,
+        answer_count: 0, 
+        views: 1 
+      }
+    });
   } catch (err) { next(err); }
 });
 

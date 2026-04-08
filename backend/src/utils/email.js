@@ -70,11 +70,13 @@ async function sendEmail({ to, subject, html, text }) {
   const t = getTransporter();
   if (t) {
     try {
-      const info = await t.sendMail({ from: FROM, to, subject, html, text });
+      // Gmail STRICTLY requires the 'from' address to match the authenticated user
+      const smtpFrom = process.env.EMAIL_USER ? `Wakeel <${process.env.EMAIL_USER}>` : FROM;
+      const info = await t.sendMail({ from: smtpFrom, to, subject, html, text });
       return { sent: true, messageId: info.messageId };
     } catch (err) {
       console.error('[EMAIL ERROR]', err.message);
-      transporter = null;
+      transporter = null; // Reset transporter on failure so we try again or fallback
     }
   }
 
