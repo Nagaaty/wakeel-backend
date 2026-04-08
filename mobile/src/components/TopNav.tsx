@@ -28,7 +28,7 @@ export function TopNav() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {/* Avatar button → Profile */}
           <TouchableOpacity
-            onPress={() => router.push(isLawyer ? '/(lawyer-tabs)/' as any : '/(tabs)/profile' as any)}
+            onPress={() => router.push(isLawyer ? '/(lawyer-tabs)/profile' as any : '/(tabs)/profile' as any)}
             style={{
               width: 36, height: 36, borderRadius: 18,
               backgroundColor: C.gold + '20',

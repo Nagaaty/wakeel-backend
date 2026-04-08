@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Image, TextInput, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Share, Dimensions } from 'react-native';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/hooks/useTheme';
 import { Avatar, Spinner, Btn } from '../../src/components/ui';
@@ -160,23 +161,13 @@ export default function ForumTab() {
     } catch {} finally { setPostingAnswer(false); }
   }, [answerText, commentPost]);
 
+  // Internal network repost (Wakeel Feed)
   const handleShare = useCallback((post: any) => {
-    setRepostPost(post);
-    setRepostText('');
-  }, []);
-
-  const submitRepost = useCallback(async () => {
-    if (!repostPost) return;
-    setPostingRepost(true);
-    try {
-      const quote = `🔁 ${isRTL ? 'إعادة نشر' : 'Repost'}: "${repostPost.question.slice(0, 80)}${repostPost.question.length > 80 ? '...' : ''}"\n\n${repostText}`;
-      await forumAPI.createQuestion({ question: quote, category: repostPost.category || 'الكل', anonymous: false });
-      setPosts(prev => prev.map(p => p.id === repostPost.id ? { ...p, shares_count: (p.shares_count || 0) + 1 } : p));
-      setRepostPost(null);
-      loadPosts();
-    } catch {}
-    finally { setPostingRepost(false); }
-  }, [repostPost, repostText, isRTL]);
+    setNewPostText(`[${isRTL ? 'إعادة نشر من' : 'Repost from'} ${post.asked_by || (isRTL ? 'مستخدم' : 'User')}]:\n${post.question || ''}`);
+    if (post.image_url) { setAttachedImage(post.image_url); }
+    setModalOpen(true);
+  }, [isRTL]);
+  // Leftover code removed
 
 
   return (
@@ -210,7 +201,9 @@ export default function ForumTab() {
             {/* ─── Social Composer (Like Facebook/LinkedIn) ────────────────── */}
             <View style={{ backgroundColor: C.surface, padding: 16, marginBottom: 8, borderBottomWidth: 1, borderColor: '#D3D6DB' }}>
               <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}>
-                <Avatar C={C} url={user?.avatar_url} initials={(user?.name || 'U').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()} size={44} />
+                <TouchableOpacity onPress={() => router.push(user?.role === 'lawyer' ? '/(lawyer-tabs)/profile' : '/(tabs)/profile' as any)}>
+                  <Avatar C={C} url={user?.avatar_url} initials={(user?.name || 'U').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()} size={44} />
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => setModalOpen(true)} style={{ flex: 1, backgroundColor: feedBg, borderRadius: 24, paddingHorizontal: 16, paddingVertical: 12 }}>
                   <Text style={{ color: '#65676B', fontSize: 15, textAlign: isRTL ? 'right' : 'left' }}>
                     {isRTL ? 'بم تفكر؟ نصيحة، أو سؤال قانوني...' : 'What\'s on your mind? A legal tip or question...'}
@@ -241,7 +234,17 @@ export default function ForumTab() {
             
             {/* Author Header */}
             <View style={{ padding: 16, paddingBottom: 10, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}>
-              <Avatar C={C} url={p.user_avatar_url} initials={p.asked_by ? p.asked_by.substring(0, 2).toUpperCase() : '؟'} size={48} />
+              <TouchableOpacity onPress={() => {
+                if (p.user_id === user?.id) {
+                  router.push(user?.role === 'lawyer' ? '/(lawyer-tabs)/profile' : '/(tabs)/profile' as any);
+                } else if (p.user_role === 'lawyer') {
+                  router.push({ pathname: '/lawyer/[id]', params: { id: p.user_id } } as any);
+                } else if (p.user_role === 'client') {
+                  Alert.alert(isRTL ? 'معلومات المستخدم' : 'User Info', isRTL ? 'هذا حساب عميل خاص.' : 'This is a private client account.');
+                }
+              }}>
+                <Avatar C={C} url={p.user_avatar_url} initials={p.asked_by ? p.asked_by.substring(0, 2).toUpperCase() : '؟'} size={48} />
+              </TouchableOpacity>
               <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 4 }}>
                   <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>{p.asked_by || 'مستخدم'}</Text>
@@ -490,50 +493,7 @@ export default function ForumTab() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ─── Repost Modal ─────────────────────────────────────────────── */}
-      <Modal visible={!!repostPost} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setRepostPost(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: C.surface }}>
-          <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 4 }}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: C.border }} />
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-            <TouchableOpacity onPress={() => setRepostPost(null)}>
-              <Text style={{ color: C.text, fontSize: 16 }}>{isRTL ? 'إلغاء' : 'Cancel'}</Text>
-            </TouchableOpacity>
-            <Text style={{ color: C.text, fontSize: 18, fontWeight: '800', fontFamily: 'CormorantGaramond-Bold' }}>
-              🔁 {isRTL ? 'إعادة نشر' : 'Repost'}
-            </Text>
-            <TouchableOpacity onPress={submitRepost} disabled={postingRepost}>
-              <Text style={{ color: postingRepost ? C.muted : C.gold, fontSize: 16, fontWeight: '700' }}>
-                {postingRepost ? '⏳' : (isRTL ? 'نشر' : 'Share')}
-              </Text>
-            </TouchableOpacity>
-          </View>
 
-          <View style={{ padding: 16 }}>
-            <TextInput
-              autoFocus={false}
-              multiline
-              placeholder={isRTL ? 'أضف تعليقك (اختياري)...' : 'Add your comment (optional)...'}
-              placeholderTextColor={C.muted}
-              value={repostText}
-              onChangeText={setRepostText}
-              style={{ fontSize: 16, color: C.text, textAlign: isRTL ? 'right' : 'left', minHeight: 60, marginBottom: 16 }}
-            />
-            {/* Quoted post preview */}
-            {repostPost && (
-              <View style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14 }}>
-                <Text style={{ color: C.muted, fontSize: 11, marginBottom: 6, fontWeight: '600' }}>
-                  🔁 {repostPost.asked_by || (isRTL ? 'مستخدم' : 'User')}
-                </Text>
-                <Text style={{ color: C.text, fontSize: 14, lineHeight: 22 }} numberOfLines={4}>
-                  {repostPost.question}
-                </Text>
-              </View>
-            )}
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
 
       {/* ─── Fullscreen Image Lightbox ─────────────────────────────────── */}
       <Modal visible={!!lightboxUri} transparent animationType="fade" onRequestClose={() => setLightboxUri(null)}>

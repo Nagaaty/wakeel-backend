@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, TextInput } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { register, selLoading, selError, clearError } from '../../src/store/slices/authSlice';
+import { authAPI } from '../../src/services/api';
 import { useTheme } from '../../src/theme';
 import { Btn, Inp } from '../../src/components/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,31 +17,50 @@ export default function RegisterScreen() {
   const insets   = useSafeAreaInsets();
   const { isRTL } = useI18n();
 
-  const [name,     setName]     = useState('');
-  const [email,    setEmail]    = useState('');
-  const [phone,    setPhone]    = useState('');
+  const [name, setName]         = useState('');
+  const [email, setEmail]       = useState('');
+  const [phone, setPhone]       = useState('');
   const [password, setPassword] = useState('');
-  const [role,     setRole]     = useState<'client' | 'lawyer'>('client');
-  const [agreed,   setAgreed]   = useState(false);
+  const [role, setRole]         = useState<'client' | 'lawyer'>('client');
+  const [agreed, setAgreed]     = useState(false);
+
+  const [step, setStep] = useState(1);
+  const [loadingCode, setLoadingCode] = useState(false);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const otpInputs = React.useRef<any[]>([]);
+
+  const handleOtpChange = (i: number, val: string) => {
+    if (!/^\d?$/.test(val)) return;
+    const next = [...otp];
+    next[i] = val;
+    setOtp(next);
+    if (val && i < 5) { setTimeout(() => otpInputs.current[i + 1]?.focus(), 10); }
+  };
+
+  const handleOtpKeyDown = (i: number, key: string) => {
+    if (key === 'Backspace' && !otp[i] && i > 0) { setTimeout(() => otpInputs.current[i - 1]?.focus(), 10); }
+  };
+
+  const handleSendOtp = async () => {
+    if (role === 'lawyer') { router.push('/(auth)/register-lawyer' as any); return; }
+    if (!name || !email || !password || !agreed) return;
+    setLoadingCode(true);
+    try {
+      const res: any = await authAPI.sendOtpPublic({ email: email.toLowerCase().trim(), purpose: 'verify' });
+      setStep(2);
+      if (res?.devOtp) Alert.alert('🔐 Dev OTP', `Email not configured on server.\nYour code is: ${res.devOtp}`, [{ text: 'OK' }]);
+    } catch(e: any) { Alert.alert('Error', e?.message || 'Could not send OTP'); }
+    finally { setLoadingCode(false); }
+  };
 
   const handleRegister = async () => {
-    if (role === 'lawyer') {
-      router.push('/(auth)/register-lawyer' as any);
-      return;
-    }
-    if (!name || !email || !password) return;
-    if (!agreed) return;
-    dispatch(clearError());
-    const res = await dispatch(register({
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      phone,
-      password,
-      role,
-    }));
-    if (res.meta.requestStatus === 'fulfilled') {
-      router.replace('/(auth)/verify-email' as any);
-    }
+    setLoadingCode(true);
+    try {
+      await authAPI.verifyOtpPublic({ email: email.toLowerCase().trim(), code: otp.join(''), purpose: 'verify' });
+      dispatch(clearError());
+      await dispatch(register({ name: name.trim(), email: email.toLowerCase().trim(), password, role: 'client' }));
+    } catch(e: any) { Alert.alert('Error', e?.message || 'Invalid OTP code'); }
+    finally { setLoadingCode(false); }
   };
 
   return (
@@ -98,7 +118,7 @@ export default function RegisterScreen() {
           </View>
 
           {/* Client Specific Inputs */}
-          {role === 'client' && (
+          {role === 'client' && step === 1 && (
             <>
               <Inp C={C} label={isRTL ? 'الاسم الكامل *' : 'Full name *'}
                 value={name} onChangeText={setName}
@@ -141,21 +161,59 @@ export default function RegisterScreen() {
                   </Text>
                 </Text>
               </TouchableOpacity>
+              
+              <Btn
+                C={C}
+                onPress={handleSendOtp}
+                disabled={role === 'client' ? (loadingCode || !name || !email || !password || !agreed) : false}
+                full size="lg"
+              >
+                {loadingCode
+                    ? (isRTL ? '⏳ جاري الإرسال...' : '⏳ Sending OTP...')
+                    : (isRTL ? 'إنشاء حساب عميل' : 'Create Client Account')}
+              </Btn>
             </>
           )}
 
-          <Btn
-            C={C}
-            onPress={handleRegister}
-            disabled={role === 'client' ? (loading || !name || !email || !password || !agreed) : false}
-            full size="lg"
-          >
-            {role === 'lawyer'
-              ? (isRTL ? 'متابعة كـ محامٍ ←' : 'Continue as Lawyer →')
-              : loading
-                ? (isRTL ? '⏳ جاري التسجيل...' : '⏳ Creating account...')
-                : (isRTL ? 'إنشاء حساب عميل' : 'Create Client Account')}
-          </Btn>
+          {step === 2 && (
+            <>
+              <Text style={{ color: C.text, fontSize: 15, textAlign: 'center', marginBottom: 20 }}>
+                {isRTL ? 'أدخل الرمز المكون من 6 أرقام المرسل إلى بريدك الإلكتروني' : 'Enter the 6-digit code sent to your email'}
+              </Text>
+              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'center', gap: 8, marginBottom: 24 }}>
+                {otp.map((digit, i) => (
+                  <TextInput
+                    key={i}
+                    ref={el => otpInputs.current[i] = el}
+                    style={{
+                      width: 45, height: 55,
+                      borderWidth: 1, borderColor: digit ? C.gold : C.border,
+                      borderRadius: 12, backgroundColor: C.surface,
+                      color: C.text, fontSize: 24, fontWeight: '700', textAlign: 'center',
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={1}
+                    value={digit}
+                    onChangeText={val => handleOtpChange(i, val)}
+                    onKeyPress={({ nativeEvent }) => handleOtpKeyDown(i, nativeEvent.key)}
+                  />
+                ))}
+              </View>
+              <Btn C={C} full size="lg" onPress={handleRegister} disabled={otp.join('').length < 6 || loadingCode}>
+                {loadingCode ? (isRTL ? '⏳ جاري التحقق...' : '⏳ Verifying...') : (isRTL ? 'تحقق ومتابعة' : 'Verify & Continue')}
+              </Btn>
+            </>
+          )}
+
+          {role === 'lawyer' && (
+            <Btn
+              C={C}
+              onPress={() => router.push('/(auth)/register-lawyer' as any)}
+              full size="lg"
+            >
+              {isRTL ? 'متابعة كـ محامٍ ←' : 'Continue as Lawyer →'}
+            </Btn>
+          )}
         </View>
 
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20, gap: 6 }}>

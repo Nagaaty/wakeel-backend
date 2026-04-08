@@ -174,23 +174,27 @@ export default function LawyerDashboardIndex() {
           );
         })}
 
-        {/* Quick shortcuts */}
-        <Text style={{ color: C.text, fontSize: 16, fontWeight: '700', marginBottom: 14, marginTop: 8 }}>
-          {isRTL ? 'روابط سريعة' : 'Quick Links'}
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+        {/* Quick shortcuts / Navigation Tabs */}
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
           {[
-            { icon: '📅', label: isRTL ? 'حجوزاتي' : 'My Bookings',  href: '/bookings' },
-            { icon: '💬', label: isRTL ? 'الرسائل' : 'Messages',      href: '/messages/list' },
-            { icon: '💰', label: isRTL ? 'المدفوعات' : 'Payouts',     href: '/installments' },
-            { icon: '⚙️', label: isRTL ? 'الإعدادات' : 'Settings',   href: '/account-settings' },
-          ].map((item, i) => (
-            <TouchableOpacity
-              key={i}
-              onPress={() => router.push(item.href as any)}
-              style={{ flex: 1, minWidth: '44%', backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 16, alignItems: 'center', gap: 8 }}>
-              <Text style={{ fontSize: 26 }}>{item.icon}</Text>
-              <Text style={{ color: C.muted, fontSize: 13, fontWeight: '600', textAlign: 'center' }}>{item.label}</Text>
+            { label: 'Earnings 💰', route: '/installments' },
+            { label: 'Bookings 📅',  route: '/bookings' },
+            { label: 'Overview 📊',  route: '/analytics' },
+          ].map((tab, i) => (
+            <TouchableOpacity 
+              key={i} 
+              onPress={() => router.push(tab.route as any)}
+              style={{
+                flex: 1, 
+                backgroundColor: C.card, 
+                borderWidth: 1, 
+                borderColor: C.border, 
+                borderRadius: 14, 
+                paddingVertical: 14, 
+                alignItems: 'center'
+              }}
+            >
+              <Text style={{ color: C.muted, fontSize: 13, fontWeight: '700' }}>{tab.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
