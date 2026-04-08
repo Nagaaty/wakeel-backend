@@ -4,13 +4,16 @@ const nodemailer = require('nodemailer');
 //
 // Priority order (first configured wins):
 //
-// 1. Resend (EASIEST — just one API key, free 3,000/month)
-//    Sign up at: https://resend.com → Create API Key
-//    Render env:  RESEND_API_KEY=re_xxxx
-//    Render env:  RESEND_FROM=Wakeel <onboarding@resend.dev>  ← use this for testing
+// 1. Brevo (EASIEST HTTPS API for free Gmail accounts)
+//    Sign up at: https://brevo.com → API Keys
+//    Render env: BREVO_API_KEY=xkeysib-...
+//    Render env: BREVO_SENDER_EMAIL=wakeel.justice@gmail.com
 //
-// 2. Gmail SMTP (requires App Password)
-//    Google account → Security → 2-Step Verification → App Passwords
+// 2. Resend (Requires domain for production, or testing only)
+//    Sign up at: https://resend.com → Create API Key
+//    Render env: RESEND_API_KEY=re_xxxx
+//
+// 3. Gmail SMTP (Blocked by Render Free Tier!)
 //    Render env: EMAIL_HOST=smtp.gmail.com
 //    Render env: EMAIL_PORT=587
 //    Render env: EMAIL_USER=your@gmail.com
@@ -44,16 +47,47 @@ function getTransporter() {
 const FROM = process.env.EMAIL_FROM || process.env.RESEND_FROM || 'Wakeel Legal <onboarding@resend.dev>';
 const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-// ─── Resend (primary — easiest setup) ──────────────────────────────────────
+// ─── Brevo (HTTPS REST) ──────────────────────────────────────────────────
+async function sendViaBrevo({ to, subject, html, text }) {
+  const key = process.env.BREVO_API_KEY;
+  if (!key) return null;
+
+  const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.EMAIL_USER || 'wakeel.justice@gmail.com';
+  
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'api-key': key,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      sender: { name: 'Wakeel Legal', email: senderEmail },
+      to: [{ email: to }],
+      subject: subject,
+      htmlContent: html,
+      textContent: text
+    })
+  });
+  
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Brevo API error');
+  return { sent: true, messageId: data.messageId };
+}
+
+// ─── Resend (HTTPS REST) ───────────────────────────────────────────────────
 async function sendViaResend({ to, subject, html }) {
   const key = process.env.RESEND_API_KEY;
   if (!key) return null; // not configured
+
+  // Enforce Resend's requirement if no domain is verified
+  const fromAddress = process.env.RESEND_FROM || 'onboarding@resend.dev';
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     body: JSON.stringify({
-      from: FROM,
+      from: `Wakeel <${fromAddress}>`,
       to: [to],
       subject,
       html,
@@ -66,26 +100,34 @@ async function sendViaResend({ to, subject, html }) {
 
 // ─── Core send function ─────────────────────────────────────────────────────
 async function sendEmail({ to, subject, html, text }) {
-  // 1. Try SMTP (Gmail, SendGrid, etc.) FIRST (since this was previously working for the user)
-  const t = getTransporter();
-  if (t) {
+  // 1. Try Brevo FIRST (Best for free Gmail via HTTPS)
+  if (process.env.BREVO_API_KEY) {
     try {
-      // Gmail STRICTLY requires the 'from' address to match the authenticated user
-      const smtpFrom = process.env.EMAIL_USER ? `Wakeel <${process.env.EMAIL_USER}>` : FROM;
-      const info = await t.sendMail({ from: smtpFrom, to, subject, html, text });
-      return { sent: true, messageId: info.messageId };
+      return await sendViaBrevo({ to, subject, html, text });
     } catch (err) {
-      console.error('[EMAIL ERROR]', err.message);
-      transporter = null; // Reset transporter on failure so we try again or fallback
+      console.error('[BREVO ERROR]', err.message);
     }
   }
 
-  // 2. Try Resend if SMTP failed or is unconfigured
+  // 2. Try Resend if Brevo is unconfigured
   if (process.env.RESEND_API_KEY) {
     try {
       return await sendViaResend({ to, subject, html });
     } catch (err) {
       console.error('[RESEND ERROR]', err.message);
+    }
+  }
+
+  // 3. Try SMTP (Will timeout on Render free tier but works locally)
+  const t = getTransporter();
+  if (t) {
+    try {
+      const smtpFrom = process.env.EMAIL_USER ? `Wakeel <${process.env.EMAIL_USER}>` : FROM;
+      const info = await t.sendMail({ from: smtpFrom, to, subject, html, text });
+      return { sent: true, messageId: info.messageId };
+    } catch (err) {
+      console.error('[EMAIL ERROR]', err.message);
+      transporter = null; 
     }
   }
 
