@@ -89,7 +89,10 @@ export const lawyersAPI = {
   getAvailability: (id: number, date: string) => api.get(`/lawyers/${id}/availability`, { params: { date } }),
   getMyProfile:    ()             => api.get('/lawyers/me/profile'),
   saveProfile:     (data: any)    => api.post('/lawyers/me/profile', data),
+  getRawAvailability: ()          => api.get('/lawyers/me/availability'),
   saveAvailability:(schedule: any)=> api.post('/lawyers/me/availability', { schedule }),
+  getMyReviews:    ()             => api.get('/lawyers/me/reviews'),
+  getMyClients:    ()             => api.get('/lawyers/me/clients'),
   review:          (id: number, data: any) => api.post(`/lawyers/${id}/review`, data),
 };
 

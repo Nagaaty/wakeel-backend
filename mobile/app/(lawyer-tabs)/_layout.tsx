@@ -89,6 +89,10 @@ export default function LawyerTabsLayout() {
             tabBarIcon: ({ focused }) => <TabIcon icon="🏠" label={t('nav.home')} focused={focused} C={C} />,
           }}
         />
+        {/* Hidden screens from tabs */}
+        <Tabs.Screen name="schedule" options={{ href: null }} />
+        <Tabs.Screen name="crm" options={{ href: null }} />
+        <Tabs.Screen name="reviews" options={{ href: null }} />
       </Tabs>
     </View>
   );
