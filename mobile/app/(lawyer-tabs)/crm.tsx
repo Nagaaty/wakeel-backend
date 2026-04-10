@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useTheme } from '../../src/theme';
 import { useI18n } from '../../src/i18n';
 import { lawyersAPI } from '../../src/services/api';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function CRMList() {
   const C = useTheme();
@@ -35,11 +36,13 @@ export default function CRMList() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, paddingTop: 50, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-           <TouchableOpacity onPress={() => router.back()}>
-             <Text style={{ fontSize: 24, color: C.text }}>{isRTL ? '>' : '<'}</Text>
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}>
+           <TouchableOpacity 
+             onPress={() => router.push('/(lawyer-tabs)')}
+             style={{ padding: 8, backgroundColor: '#EFECE5', borderRadius: 12, borderWidth: 1, borderColor: C.border }}>
+             <MaterialCommunityIcons name={isRTL ? "arrow-right" : "arrow-left"} size={22} color={C.text} />
            </TouchableOpacity>
-           <Text style={{ fontSize: 18, fontWeight: '700', color: C.text }}>{isRTL ? 'إدارة العملاء (CRM)' : 'Client Management (CRM)'}</Text>
+           <Text style={{ fontSize: 20, fontWeight: '700', color: C.text }}>{isRTL ? 'إدارة العملاء (CRM)' : 'Client Management (CRM)'}</Text>
         </View>
       </View>
 

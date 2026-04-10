@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useTheme } from '../../src/theme';
 import { useI18n } from '../../src/i18n';
 import { lawyersAPI } from '../../src/services/api';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface DaySchedule { active: boolean; slots: string[]; }
 
@@ -93,12 +94,18 @@ export default function Schedule() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       {/* Header */}
-      <View style={{ padding: 16, paddingTop: 50, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border, alignItems: 'center' }}>
-         <Text style={{ fontSize: 20, fontWeight: '700', color: C.text }}>{isRTL ? 'تقويم التوفر' : 'Availability Calendar'}</Text>
-         <Text style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{isRTL ? 'حدد أوقات عملك الأسبوعية' : 'Select your weekly working hours'}</Text>
-         <TouchableOpacity onPress={() => router.back()} style={{ position: 'absolute', right: 16, top: 50 }}>
-             <Text style={{ fontSize: 24, color: C.text }}>{isRTL ? '>' : '<'}</Text>
-         </TouchableOpacity>
+      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, paddingTop: 50, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}>
+           <TouchableOpacity 
+             onPress={() => router.push('/(lawyer-tabs)')}
+             style={{ padding: 8, backgroundColor: '#EFECE5', borderRadius: 12, borderWidth: 1, borderColor: C.border }}>
+             <MaterialCommunityIcons name={isRTL ? "arrow-right" : "arrow-left"} size={22} color={C.text} />
+           </TouchableOpacity>
+           <View style={{ alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+              <Text style={{ fontSize: 20, fontWeight: '700', color: C.text }}>{isRTL ? 'تقويم التوفر' : 'Availability Calendar'}</Text>
+              <Text style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{isRTL ? 'حدد أوقات عملك الأسبوعية' : 'Select your weekly working hours'}</Text>
+           </View>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
