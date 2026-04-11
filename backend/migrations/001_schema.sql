@@ -507,6 +507,7 @@ ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS rejection_reason    TEXT;
 ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS is_visible          BOOLEAN DEFAULT true;
 ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS subscription_plan   VARCHAR(20) DEFAULT 'basic';
 ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS service_prices      JSONB;
+ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS has_set_schedule    BOOLEAN DEFAULT false;
 ALTER TABLE bookings        ADD COLUMN IF NOT EXISTS reminder_sent       BOOLEAN DEFAULT false;
 ALTER TABLE bookings        ADD COLUMN IF NOT EXISTS cancel_reason       TEXT;
 ALTER TABLE bookings        ADD COLUMN IF NOT EXISTS payment_status      VARCHAR(20) DEFAULT 'unpaid';

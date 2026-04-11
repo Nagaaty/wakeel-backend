@@ -110,7 +110,17 @@ router.get('/:id/availability', async (req, res, next) => {
     const { date } = req.query; // YYYY-MM-DD
     if (!date) return res.status(400).json({ message: 'date required' });
 
+    // Ensure column exists gracefully on first run
+    await pool.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS has_set_schedule BOOLEAN DEFAULT false').catch(() => {});
+
     const dayOfWeek = new Date(date).getDay();
+
+    // Check if lawyer has EVER saved a schedule
+    const { rows: [profile] } = await pool.query(
+      `SELECT has_set_schedule FROM lawyer_profiles WHERE user_id=$1`, 
+      [req.params.id]
+    );
+    const hasSetSchedule = profile?.has_set_schedule || false;
 
     // Get lawyer's schedule for this day
     const { rows: slots } = await pool.query(
@@ -129,7 +139,7 @@ router.get('/:id/availability', async (req, res, next) => {
     const bookedTimes = new Set(booked.map(b => b.start_time?.slice(0,5)));
 
     // Generate 30-minute slots from availability windows
-    const available = [];
+    let available = [];
     for (const slot of slots) {
       const [sh, sm] = slot.start_time.split(':').map(Number);
       const [eh, em] = slot.end_time.split(':').map(Number);
@@ -144,10 +154,24 @@ router.get('/:id/availability', async (req, res, next) => {
       }
     }
 
-    // If no schedule set, return default slots
-    if (!available.length) {
+    // Fallback: ONLY if the lawyer has NEVER set a schedule
+    if (!available.length && !hasSetSchedule) {
       const defaults = ['09:00','09:30','10:00','10:30','11:00','11:30','14:00','14:30','15:00','15:30','16:00','16:30'];
       defaults.forEach(time => available.push({ time, available: !bookedTimes.has(time) }));
+    }
+
+    // Lead Time Protection (2-Hour Buffer)
+    const now = new Date();
+    const isToday = now.toISOString().split('T')[0] === date;
+    
+    if (isToday) {
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      available = available.filter(slot => {
+         const [h, m] = slot.time.split(':').map(Number);
+         const slotMinutes = h * 60 + m;
+         // Require at least 120 minutes (2 hours) notice
+         return slotMinutes > currentMinutes + 120;
+      });
     }
 
     res.json({ date, slots: available });
@@ -246,10 +270,65 @@ router.post('/me/availability', requireAuth, async (req, res, next) => {
       }
     }
 
+    // Flag that the lawyer has explicitly saved a schedule
+    await pool.query('UPDATE lawyer_profiles SET has_set_schedule = true WHERE user_id=$1', [req.user.id]).catch(() => {});
+
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
 
+
+// GET /api/lawyers/me/availability — Get raw saved schedule
+router.get('/me/availability', requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT day_of_week, start_time FROM lawyer_availability WHERE lawyer_id=$1`,
+      [req.user.id]
+    );
+    const schedule = {};
+    rows.forEach(r => {
+      const slot = r.start_time.slice(0, 5); // '09:00'
+      if (!schedule[r.day_of_week]) schedule[r.day_of_week] = [];
+      schedule[r.day_of_week].push(slot);
+    });
+    res.json({ schedule });
+  } catch (err) { next(err); }
+});
+
+// GET /api/lawyers/me/reviews — Get all reviews for the lawyer
+router.get('/me/reviews', requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT r.*, u.name as client_name, b.service_type
+       FROM reviews r
+       JOIN users u ON r.client_id = u.id
+       JOIN bookings b ON r.booking_id = b.id
+       WHERE r.lawyer_id=$1
+       ORDER BY r.created_at DESC`,
+      [req.user.id]
+    );
+    res.json({ reviews: rows });
+  } catch (err) { next(err); }
+});
+
+// GET /api/lawyers/me/clients — Get unique clients CRM
+router.get('/me/clients', requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT u.id as client_id, u.name, u.phone, u.email,
+              COUNT(b.id) as total_cases,
+              SUM(b.fee) as total_spent,
+              MAX(b.booking_date) as last_booking_date
+       FROM bookings b
+       JOIN users u ON b.client_id = u.id
+       WHERE b.lawyer_id=$1 AND b.status='completed'
+       GROUP BY u.id, u.name, u.phone, u.email
+       ORDER BY last_booking_date DESC`,
+      [req.user.id]
+    );
+    res.json({ clients: rows });
+  } catch (err) { next(err); }
+});
 
 // GET /api/lawyers/:id/public — public profile for share links (no auth needed)
 router.get('/:id/public', async (req, res, next) => {

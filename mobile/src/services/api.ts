@@ -102,6 +102,7 @@ export const bookingsAPI = {
   get:    (id: string | number)             => api.get(`/bookings/${id}`),
   update: (id: number, data: any)  => api.patch(`/bookings/${id}/status`, data),
   cancel: (id: number, data?: any) => api.post(`/bookings/${id}/cancel`, data),
+  markNoShow: (id: string | number) => api.patch(`/bookings/${id}/no-show`),
 };
 
 export const paymentsAPI = {

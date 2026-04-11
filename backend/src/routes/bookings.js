@@ -9,7 +9,7 @@ const { notifyNewBooking, notifyBookingConfirmed }          = require('../utils/
 // POST /api/bookings — create booking
 router.post('/', requireAuth, async (req, res, next) => {
   try {
-    const { lawyerId, bookingDate, startTime, endTime, serviceType, notes, fee, urgency } = req.body;
+    const { lawyerId, bookingDate, startTime, endTime, serviceType, notes, documents, fee, urgency } = req.body;
     if (!lawyerId || !bookingDate || !startTime || fee === undefined || fee === null) {
       console.log('Booking Validation Error:', { body: req.body });
       return res.status(400).json({ message: 'lawyerId, bookingDate, startTime and fee required' });
@@ -48,10 +48,10 @@ router.post('/', requireAuth, async (req, res, next) => {
     const { rows: [booking] } = await pool.query(
       `INSERT INTO bookings
          (client_id, lawyer_id, conversation_id, booking_date, start_time, end_time,
-          service_type, notes, fee, urgency, status, payment_status, reminder_sent)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending','unpaid',false) RETURNING *`,
+          service_type, notes, documents, fee, urgency, status, payment_status, reminder_sent)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending','unpaid',false) RETURNING *`,
       [req.user.id, lawyerId, conv.id, bookingDate, startTime, endTime||null,
-       serviceType||'consultation', notes||null, fee, urgency||'normal']
+       serviceType||'consultation', notes||null, documents ? JSON.stringify(documents) : '[]', fee, urgency||'normal']
     );
 
     // Get client info
@@ -217,6 +217,22 @@ router.get('/:id', requireAuth, async (req, res, next) => {
     );
     if (!booking) return res.status(404).json({ message: 'Not found' });
     res.json({ booking });
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/bookings/:id/no-show — lawyer marks client as no-show
+router.patch('/:id/no-show', requireAuth, async (req, res, next) => {
+  try {
+    const { rows: [b] } = await pool.query('SELECT * FROM bookings WHERE id=$1', [req.params.id]);
+    if (!b) return res.status(404).json({ message: 'Not found' });
+    if (b.lawyer_id !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only the assigned lawyer can mark a no-show' });
+    }
+    const { rows: [updated] } = await pool.query(
+      `UPDATE bookings SET status='completed', cancel_reason='Client No-Show' WHERE id=$1 RETURNING *`,
+      [req.params.id]
+    );
+    res.json({ ok: true, booking: updated });
   } catch (err) { next(err); }
 });
 

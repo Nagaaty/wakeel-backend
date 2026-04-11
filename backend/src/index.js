@@ -132,6 +132,7 @@ server.listen(PORT, '0.0.0.0', () => {
   db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false').catch(() => {});
   db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS subscription_plan VARCHAR(20) DEFAULT \'basic\'').catch(() => {});
   db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS service_prices JSONB').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS has_set_schedule BOOLEAN DEFAULT false').catch(() => {});
 
   // Forum social columns
   db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS likes_count INTEGER DEFAULT 0').catch(() => {});
@@ -143,8 +144,22 @@ server.listen(PORT, '0.0.0.0', () => {
   db.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS outcome VARCHAR(50)').catch(() => {});
   db.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT true').catch(() => {});
 
+  // Bookings
+  db.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS documents JSONB DEFAULT \'[]\'').catch(() => {});
+
   // Fix ghost lawyers
   db.query("UPDATE lawyer_profiles SET is_visible=true WHERE is_visible IS NULL").catch(() => {});
+
+  // ── Auto-Expiration of Pending Bookings ─────────────────────────────────────
+  // Runs every hour to sweep and reject any pending booking older than 24 hours
+  setInterval(() => {
+    db.query(`
+      UPDATE bookings 
+      SET status = 'rejected', cancel_reason = 'Expired automatically due to lawyer inactivity'
+      WHERE status = 'pending' AND created_at < NOW() - INTERVAL '24 hours'
+      RETURNING id, client_id, lawyer_id
+    `).catch(err => console.error('Booking Expiration Error:', err.message));
+  }, 60 * 60 * 1000);
 
   // Ensure consultation_rooms table exists for video conferencing
   db.query(`CREATE TABLE IF NOT EXISTS consultation_rooms (

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
-  TextInput, Alert, RefreshControl, ActivityIndicator,
+  TextInput, Alert, RefreshControl, ActivityIndicator, Linking
 } from 'react-native';
 import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
@@ -733,7 +733,19 @@ export default function LawyerDashboardScreen() {
                 <Card key={b.id} C={C} style={{ marginBottom:10, borderColor:C.warn+'60' }}>
                   <Text style={{ color:C.text, fontWeight:'700', fontSize:14, marginBottom:4 }}>{b.client_name}</Text>
                   <Text style={{ color:C.muted, fontSize:12, marginBottom:b.notes?8:12 }}>📅 {b.booking_date} · ⏰ {b.start_time?.slice(0,5)} · {b.service_type} · {b.fee} ج</Text>
-                  {b.notes&&<Text style={{ color:C.muted, fontSize:12, marginBottom:10, fontStyle:'italic' }}>"{b.notes}"</Text>}
+                  {b.notes&&<Text style={{ color:C.muted, fontSize:12, marginBottom:4, fontStyle:'italic' }}>"{b.notes}"</Text>}
+                  
+                  {b.documents && Array.isArray(b.documents) && b.documents.length > 0 && (
+                    <View style={{ flexDirection:'column', gap:6, marginBottom:12 }}>
+                      <Text style={{ color:C.text, fontSize:12, fontWeight:'600' }}>📎 المستندات المرفقة للقضية:</Text>
+                      {b.documents.map((doc: string, idx: number) => (
+                        <TouchableOpacity key={idx} onPress={() => Linking.openURL(doc)} style={{ backgroundColor:C.bg, borderWidth:1, borderColor:C.border, borderRadius:8, padding:8, flexDirection:'row', alignItems:'center' }}>
+                          <Text style={{ color:C.gold, fontSize:12 }}>📄 مستند {idx + 1}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
                   <View style={{ flexDirection:'row', gap:8 }}>
                     <Btn C={C} full onPress={()=>changeStatus(b.id,'confirmed')} disabled={acting===b.id}>{acting===b.id?'⏳':'✅ قبول'}</Btn>
                     <Btn C={C} full variant="ghost" onPress={()=>changeStatus(b.id,'rejected')} disabled={acting===b.id}>❌ رفض</Btn>

@@ -152,6 +152,16 @@ router.patch('/me', requireAuth, async (req, res, next) => {
        WHERE id=$6 RETURNING *`,
       [name, phone, bio, avatar_url, cover_url, req.user.id]
     );
+
+    // If this user is a lawyer, ensure their bio syncs to lawyer_profiles 
+    // because the client view search queries lawyer_profiles.bio instead of users.bio
+    if (user.role === 'lawyer' && bio !== undefined) {
+      await pool.query(
+        `UPDATE lawyer_profiles SET bio=$1 WHERE user_id=$2`,
+        [bio, req.user.id]
+      ).catch(err => console.error('Failed to sync bio to lawyer profile', err));
+    }
+
     res.json(safeUser(user));
   } catch (err) { next(err); }
 });

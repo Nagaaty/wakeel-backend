@@ -9,8 +9,9 @@ import { useTheme } from '../src/hooks/useTheme';
 import { useAuth } from '../src/hooks/useAuth';
 import { useI18n } from '../src/i18n';
 import { hapticLight, hapticMedium, hapticSuccess, hapticSelect, hapticError } from '../src/utils/haptics';
+import * as DocumentPicker from 'expo-document-picker';
 import { Btn, Spinner, ErrMsg, Avatar } from '../src/components/ui';
-import { lawyersAPI, bookingsAPI, paymentsAPI, promosAPI } from '../src/services/api';
+import { lawyersAPI, bookingsAPI, paymentsAPI, promosAPI, uploadAPI } from '../src/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ── Service types ─────────────────────────────────────────────────────────────
@@ -163,6 +164,7 @@ export default function BookScreen() {
     time:          '',
     urgency:       'normal',
     notes:         '',
+    documents:     [] as string[],
     paymentMethod: 'card',
   });
 
@@ -247,7 +249,8 @@ export default function BookScreen() {
     try {
       const booking: any = await bookingsAPI.create({
         lawyerId: finalLawyerId, bookingDate: form.date, startTime: form.time,
-        serviceType: form.serviceType, notes: form.notes,
+        serviceType: form.serviceType, notes: form.notes, 
+        documents: form.documents,
         urgency: form.urgency, fee: finalPrice,
         promoCode: promoApplied ? promo.trim() : undefined,
       });
@@ -431,11 +434,50 @@ export default function BookScreen() {
                 onChangeText={v => setForm(f => ({ ...f, notes:v }))}
                 placeholder={isRTL ? 'اشرح قضيتك باختصار...' : 'Briefly describe your case...'}
                 placeholderTextColor={C.muted} multiline numberOfLines={3}
-                style={{ backgroundColor:C.card, borderWidth:1, borderColor:C.border, borderRadius:10, padding:12, color:C.text, fontSize:14, textAlignVertical:'top', minHeight:70, textAlign: isRTL ? 'right' : 'left' }} />
+                style={{ backgroundColor:C.card, borderWidth:1, borderColor:C.border, borderRadius:10, padding:12, color:C.text, fontSize:14, textAlignVertical:'top', minHeight:70, textAlign: isRTL ? 'right' : 'left', marginBottom:12 }} />
+              
+              <Text style={{ color:C.muted, fontSize:12, fontWeight:'600', marginBottom:6 }}>
+                📎 {isRTL ? 'المستندات المرفقة (اختياري)' : 'Attached Documents (Optional)'}
+              </Text>
+              {form.documents.map((doc, i) => (
+                <View key={i} style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', backgroundColor:C.card, borderWidth:1, borderColor:C.border, borderRadius:8, padding:10, marginBottom:8 }}>
+                  <Text style={{ color:C.text, fontSize:12, flex:1 }} numberOfLines={1}>{doc.split('/').pop()}</Text>
+                  <TouchableOpacity onPress={() => setForm(f => ({ ...f, documents: f.documents.filter((_, idx) => idx !== i) }))}>
+                    <Text style={{ color:C.red, fontWeight:'700', fontSize:16, marginLeft:10 }}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    const res = await DocumentPicker.getDocumentAsync({ type: '*/*' });
+                    if (!res.canceled && res.assets && res.assets[0]) {
+                      setSubmitting(true);
+                      const formData = new FormData();
+                      const file = res.assets[0];
+                      formData.append('file', { uri: file.uri, name: file.name || 'document', type: file.mimeType || 'application/octet-stream' } as any);
+                      formData.append('folder', 'booking_docs');
+                      const uploadRes: any = await uploadAPI.upload(formData);
+                      if (uploadRes?.url) {
+                        setForm(f => ({ ...f, documents: [...f.documents, uploadRes.url] }));
+                      }
+                    }
+                  } catch (e: any) {
+                    Alert.alert(isRTL ? 'خطأ في الرفع' : 'Upload error', e.message);
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                style={{ flexDirection:'row', alignItems:'center', justifyContent:'center', padding:12, borderRadius:10, borderWidth:1, borderColor:C.gold, borderStyle:'dashed', backgroundColor:C.gold+'10' }}
+              >
+                <Text style={{ color:C.gold, fontWeight:'700', fontSize:13 }}>
+                  {isRTL ? '+ أضف مستند أو صورة' : '+ Add Document/Photo'}
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            <Btn C={C} full size="lg" disabled={!form.date || !form.time} onPress={() => { hapticLight(); setStep(3); }}>
-              {t('app.continue')} →
+            <Btn C={C} full size="lg" disabled={!form.date || !form.time || submitting} onPress={() => { hapticLight(); setStep(3); }}>
+              {submitting ? '⏳...' : `${t('app.continue')} →`}
             </Btn>
           </>
         )}

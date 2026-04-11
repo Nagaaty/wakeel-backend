@@ -10,7 +10,7 @@ import { Audio } from 'expo-av';
 import { useTheme } from '../src/hooks/useTheme';
 import { useAuth } from '../src/hooks/useAuth';
 import { Spinner } from '../src/components/ui';
-import { videoAPI, messagesAPI } from '../src/services/api';
+import { videoAPI, messagesAPI, bookingsAPI } from '../src/services/api';
 import { getSocket } from '../src/utils/socket';
 import { useI18n } from '../src/i18n';
 
@@ -116,6 +116,25 @@ export default function VideoScreen() {
       { text: isRTL ? 'إنهاء' : 'End', style: 'destructive', onPress: async () => {
         if (bookingId) await videoAPI.endRoom(parseInt(bookingId, 10), Math.floor(duration/60)).catch(() => {});
         router.replace('/bookings' as any);
+      }},
+    ]);
+  };
+
+  const markNoShow = () => {
+    Alert.alert(isRTL ? 'تغيب العميل' : 'Client No-Show', 
+      isRTL ? 'العميل لم يحضر لمدة تزيد عن 5 دقائق. هل تريد إنهاء الجلسة خصماً كـ تغيب؟' : 'The client has been missing for over 5 minutes. Mark as no-show?', [
+      { text: 'إلغاء', style: 'cancel' },
+      { text: isRTL ? 'تأكيد الغياب' : 'Mark No-Show', style: 'destructive', onPress: async () => {
+        if (bookingId) {
+          try {
+            await bookingsAPI.markNoShow(parseInt(bookingId, 10));
+            await videoAPI.endRoom(parseInt(bookingId, 10), Math.floor(duration/60)).catch(() => {});
+            Alert.alert('✅', isRTL ? 'تم تسجيل تغيب العميل بنجاح وتم تأكيد أتعابك.' : 'Client marked as no-show. Fee secured.');
+            router.replace('/bookings' as any);
+          } catch (e: any) {
+            Alert.alert('خطأ', e?.message || 'تعذر تسجيل التغيب');
+          }
+        }
       }},
     ]);
   };
@@ -244,7 +263,7 @@ export default function VideoScreen() {
       </View>
 
       {/* Controls */}
-      <View style={{ backgroundColor:'#111', paddingVertical:14, paddingHorizontal:20, flexDirection:'row', justifyContent:'center', borderTopWidth:1, borderTopColor:'#222' }}>
+      <View style={{ backgroundColor:'#111', paddingVertical:14, paddingHorizontal:20, flexDirection:'row', justifyContent:'center', borderTopWidth:1, borderTopColor:'#222', gap: 24 }}>
         <View style={{ alignItems:'center', gap:6 }}>
           <TouchableOpacity onPress={endCall}
             style={{ width:52, height:52, borderRadius:26, backgroundColor:'#EF4444', alignItems:'center', justifyContent:'center' }}>
@@ -252,6 +271,16 @@ export default function VideoScreen() {
           </TouchableOpacity>
           <Text style={{ color:'#555', fontSize:11 }}>{isRTL ? 'إنهاء المكالمة' : 'End Call'}</Text>
         </View>
+
+        {user?.role === 'lawyer' && duration > 300 && (
+          <View style={{ alignItems:'center', gap:6 }}>
+            <TouchableOpacity onPress={markNoShow}
+              style={{ width:52, height:52, borderRadius:26, backgroundColor:'#C8A84B', alignItems:'center', justifyContent:'center' }}>
+              <Text style={{ fontSize:22 }}>🚫</Text>
+            </TouchableOpacity>
+            <Text style={{ color:'#C8A84B', fontSize:11, fontWeight:'800' }}>{isRTL ? 'تغيب العميل' : 'No Show'}</Text>
+          </View>
+        )}
       </View>
     </View>
   );

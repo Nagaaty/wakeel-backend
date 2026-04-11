@@ -13,6 +13,95 @@ import { useI18n } from '../../src/i18n';
 import { shareLawyerProfile, copyProfileLink, shareToWhatsApp } from '../../src/utils/shareProfile';
 import { hapticLight, hapticMedium } from '../../src/utils/haptics';
 
+// ── Calendar helpers ──────────────────────────────────────────────────────────
+function getDatesForMonth(year: number, month: number) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const first = new Date(year, month, 1);
+  const last  = new Date(year, month + 1, 0);
+  const days: Array<{ date: Date; disabled: boolean }> = [];
+  for (let i = 0; i < first.getDay(); i++) days.push({ date: new Date(0), disabled: true });
+  for (let d = 1; d <= last.getDate(); d++) {
+    const date = new Date(year, month, d);
+    days.push({ date, disabled: date < today });
+  }
+  return days;
+}
+
+function toISO(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+const AR_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const EN_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const AR_DAYS   = ['أح','إث','ث','أر','خ','ج','س'];
+const EN_DAYS   = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function CalendarPicker({ C, selectedDate, onSelect, isRTL }: any) {
+  const today = new Date();
+  const [viewYear,  setViewYear]  = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+
+  const days = getDatesForMonth(viewYear, viewMonth);
+  const selISO = selectedDate;
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
+    else setViewMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
+    else setViewMonth(m => m + 1);
+  };
+  const canGoPrev = !(viewYear === today.getFullYear() && viewMonth === today.getMonth());
+
+  return (
+    <View style={{ backgroundColor: C.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <TouchableOpacity onPress={prevMonth} disabled={!canGoPrev} style={{ padding: 8, opacity: canGoPrev ? 1 : 0.3 }}>
+          <Text style={{ color: C.gold, fontSize: 20, fontWeight: '700' }}>‹</Text>
+        </TouchableOpacity>
+        <Text style={{ color: C.text, fontWeight: '700', fontSize: 16, fontFamily: 'CormorantGaramond-Bold' }}>
+          {isRTL ? AR_MONTHS[viewMonth] : EN_MONTHS[viewMonth]} {viewYear}
+        </Text>
+        <TouchableOpacity onPress={nextMonth} style={{ padding: 8 }}>
+          <Text style={{ color: C.gold, fontSize: 20, fontWeight: '700' }}>›</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+        {(isRTL ? AR_DAYS : EN_DAYS).map(d => (
+          <View key={d} style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ color: C.muted, fontSize: 11, fontWeight: '600' }}>{d}</Text>
+          </View>
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+        {days.map((item, i) => {
+          if (item.disabled && item.date.getTime() === 0) {
+            return <View key={`empty-${i}`} style={{ width: '14.28%', aspectRatio: 1 }} />;
+          }
+          const iso = toISO(item.date);
+          const isSel = iso === selISO;
+          const isToday = iso === toISO(new Date());
+          return (
+            <TouchableOpacity key={iso} disabled={item.disabled} onPress={() => onSelect(iso)}
+              style={{ width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{
+                width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: isSel ? C.gold : isToday ? C.gold + '20' : 'transparent',
+                borderWidth: isToday && !isSel ? 1 : 0, borderColor: C.gold,
+              }}>
+                <Text style={{ fontSize: 13, fontWeight: isSel || isToday ? '700' : '400', color: isSel ? '#fff' : item.disabled ? C.dim : C.text }}>
+                  {item.date.getDate()}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 
 const EXPERIENCES = [
   { title:'محامٍ أول', firm:'مكتب الشرقاوي للمحاماة', period:'2019 — الآن', years:'5 سنوات', desc:'تخصص في القضايا التجارية والعقود الدولية.', logo:'🏢' },
@@ -42,6 +131,19 @@ export default function LawyerProfileScreen() {
   const [reviewComment,setReviewComment]= useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [showShareSheet, setShowShareSheet] = useState(false);
+
+  const [selectedDate, setSelectedDate] = useState(toISO(new Date()));
+  const [slots, setSlots] = useState<{time: string; available: boolean}[]>([]);
+  const [slotsLoad, setSlotsLoad] = useState(false);
+
+  useEffect(() => {
+    if (!selectedDate || !id) return;
+    setSlotsLoad(true);
+    lawyersAPI.getAvailability(Number(id), selectedDate)
+      .then((d: any) => setSlots(d.slots || []))
+      .catch(() => setSlots([]))
+      .finally(() => setSlotsLoad(false));
+  }, [selectedDate, id]);
 
   useEffect(() => {
     if (!id) return;
@@ -307,9 +409,42 @@ export default function LawyerProfileScreen() {
           )}
 
                     {tab === 'availability' && (
-            <View style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 16 }}>
-              <Text style={{ color: C.text, fontWeight: '700', fontSize: 14, marginBottom: 12 }}>📅 للحجز اضغط الزر أدناه</Text>
-              <Text style={{ color: C.muted, fontSize: 13 }}>يمكنك اختيار الوقت المناسب عند الحجز</Text>
+            <View>
+              <Text style={{ color: C.text, fontWeight: '700', fontSize: 14, marginBottom: 12 }}>📅 مواعيد المحامي المتاحة</Text>
+              
+              <CalendarPicker C={C} selectedDate={selectedDate} onSelect={setSelectedDate} isRTL={isRTL} />
+
+              <View style={{ backgroundColor: C.surface, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: C.border }}>
+                <Text style={{ color: C.text, fontWeight: '700', fontSize: 14, marginBottom: 16 }}>
+                  {isRTL ? 'الأوقات المتاحة ليوم' : 'Available times for'} {selectedDate}
+                </Text>
+
+                {slotsLoad ? (
+                  <View style={{ padding: 20, alignItems: 'center' }}><Spinner C={C} /></View>
+                ) : slots.length === 0 ? (
+                  <Empty C={C} icon="🏖️" title={isRTL ? 'لا توجد مواعيد' : 'No available slots'} subtitle={isRTL ? 'المحامي غير متاح في هذا التاريخ. جرب يوماً آخر.' : 'Try selecting another day.'} />
+                ) : (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                    {slots.map(s => {
+                      const [h, m] = s.time.split(':');
+                      const ampm = +h >= 12 ? 'PM' : 'AM';
+                      const hh = +h % 12 || 12;
+                      const timeStr = `${hh}:${m} ${ampm}`;
+                      return (
+                        <TouchableOpacity key={s.time} disabled={!s.available} onPress={() => router.push({ pathname: '/book', params: { lawyer: id, preDate: selectedDate, preTime: s.time } })}
+                          style={{
+                            width: '30%', paddingVertical: 12, alignItems: 'center', borderRadius: 10,
+                            backgroundColor: s.available ? C.gold + '15' : C.bg,
+                            borderWidth: 1, borderColor: s.available ? C.gold + '50' : C.border,
+                            opacity: s.available ? 1 : 0.4
+                          }}>
+                          <Text style={{ color: s.available ? C.gold : C.muted, fontWeight: '700', fontSize: 14 }}>{timeStr}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
             </View>
           )}
         </View>
