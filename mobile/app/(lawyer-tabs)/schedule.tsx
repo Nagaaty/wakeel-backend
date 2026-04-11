@@ -17,18 +17,19 @@ export default function Schedule() {
 
   const [schedule, setSchedule] = useState<Record<string, DaySchedule>>({
     '0': { active: false, slots: [] }, // Sunday
-    '1': { active: true, slots: ['09:00', '10:00', '11:00', '12:00'] }, // Monday
-    '2': { active: true, slots: ['09:00', '10:00', '11:00', '12:00'] }, // Tuesday
-    '3': { active: true, slots: ['09:00', '10:00', '11:00', '12:00'] }, // Wednesday
-    '4': { active: true, slots: ['09:00', '10:00', '11:00', '14:00', '15:00'] }, // Thursday
+    '1': { active: false, slots: [] }, // Monday
+    '2': { active: false, slots: [] }, // Tuesday
+    '3': { active: false, slots: [] }, // Wednesday
+    '4': { active: false, slots: [] }, // Thursday
     '5': { active: false, slots: [] }, // Friday
     '6': { active: false, slots: [] }, // Saturday
   });
 
-  const availableSlots = [
-    '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
-    '14:00', '15:00', '16:00', '17:00', '18:00', '19:00'
-  ];
+  const availableSlots = Array.from({ length: 48 }, (_, i) => {
+    const h = Math.floor(i / 2).toString().padStart(2, '0');
+    const m = (i % 2 === 0) ? '00' : '30';
+    return `${h}:${m}`;
+  });
 
   const mapDayName = (idx: string) => {
       const map: any = {
@@ -129,7 +130,7 @@ export default function Schedule() {
                 {!data.active ? (
                     <Text style={{ color: C.muted, textAlign: 'right', marginTop: -20, marginRight: 60 }}>{isRTL ? 'إجازة' : 'Off'}</Text>
                 ) : (
-                    <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 }}>
+                    <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
                         {availableSlots.map(slot => {
                             const isSelected = data.slots.includes(slot);
                             return (
@@ -137,15 +138,16 @@ export default function Schedule() {
                                     key={slot}
                                     onPress={() => handleToggleSlot(day, slot)}
                                     style={{ 
-                                        width: '22%', 
-                                        paddingVertical: 12, 
-                                        borderRadius: 8, 
+                                        minWidth: 44, 
+                                        paddingVertical: 6, 
+                                        paddingHorizontal: 8,
+                                        borderRadius: 6, 
                                         borderWidth: 1, 
                                         borderColor: isSelected ? '#A16A2F' : '#D4D4D8',
                                         backgroundColor: isSelected ? '#A16A2F' : 'transparent',
                                         alignItems: 'center'
                                     }}>
-                                    <Text style={{ color: isSelected ? '#FFF' : C.text, fontSize: 13 }}>{slot}</Text>
+                                    <Text style={{ color: isSelected ? '#FFF' : C.text, fontSize: 11, fontWeight: isSelected?'bold':'normal' }}>{slot}</Text>
                                 </TouchableOpacity>
                             )
                         })}
