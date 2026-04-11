@@ -17,16 +17,25 @@ import { useI18n } from '../../src/i18n';
 type SubPage = 'calendar' | 'crm' | 'earnings' | 'notes' | 'outcomes' | 'folder' | null;
 
 const DAYS  = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-const SLOTS = ['8:00','9:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00'];
+const SLOTS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2).toString().padStart(2, '0');
+  const m = (i % 2 === 0) ? '00' : '30';
+  return `${h}:${m}`;
+});
 
 function AvailabilityCalendar({ C, onBack }: any) {
   const [sched, setSched] = useState<Record<number,string[]>>({
-    0:[], 1:['9:00','10:00','11:00','14:00','15:00'],
-    2:['9:00','10:00','11:00','14:00','15:00'], 3:['9:00','10:00','11:00'],
-    4:['9:00','10:00','11:00','14:00','15:00'], 5:[], 6:[],
+    0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[],
   });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    lawyersAPI.getRawAvailability().then((res: any) => {
+      setSched({ ...{ 0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] }, ...res.schedule });
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
 
   const toggle = (d: number, s: string) =>
     setSched(p => { const a=[...(p[d]||[])]; const i=a.indexOf(s); if(i>=0)a.splice(i,1);else a.push(s); setSaved(false); return {...p,[d]:a}; });
@@ -45,6 +54,7 @@ function AvailabilityCalendar({ C, onBack }: any) {
         <View style={{ flex:1 }}><Text style={{ color:C.text, fontWeight:'700', fontSize:17 }}>تقويم التوفر</Text><Text style={{ color:C.muted, fontSize:12 }}>حدد أوقات عملك الأسبوعية</Text></View>
         {saved && <Text style={{ color:C.green, fontSize:12, fontWeight:'600' }}>✅ محفوظ</Text>}
       </View>
+      {loading ? <Spinner C={C as any} /> :
       <ScrollView contentContainerStyle={{ padding:16, paddingBottom:100 }}>
         {DAYS.map((day, d) => {
           const daySlots = sched[d]||[]; const isOff = daySlots.length===0;
@@ -54,17 +64,17 @@ function AvailabilityCalendar({ C, onBack }: any) {
                 <Text style={{ color:C.text, fontWeight:'700', fontSize:14 }}>{day}</Text>
                 <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
                   {isOff && <Text style={{ color:C.muted, fontSize:12 }}>إجازة</Text>}
-                  <TouchableOpacity onPress={()=>{setSched(p=>({...p,[d]:p[d]?.length?[]:['9:00','10:00','11:00','14:00','15:00']}));setSaved(false);}}
+                  <TouchableOpacity onPress={()=>{setSched(p=>({...p,[d]:p[d]?.length?[]:['09:00','09:30','10:00','10:30','11:00','11:30','14:00','14:30','15:00','15:30','16:00','16:30']}));setSaved(false);}}
                     style={{ width:44, height:26, borderRadius:13, backgroundColor:isOff?C.border:C.gold, justifyContent:'center', alignItems:isOff?'flex-start':'flex-end', paddingHorizontal:3 }}>
                     <View style={{ width:20, height:20, borderRadius:10, backgroundColor:'#fff' }} />
                   </TouchableOpacity>
                 </View>
               </View>
-              {!isOff && <View style={{ flexDirection:'row', flexWrap:'wrap', gap:6 }}>
+              {!isOff && <View style={{ flexDirection:'row', flexWrap:'wrap', gap:4, justifyContent: 'center' }}>
                 {SLOTS.map(slot => { const active=daySlots.includes(slot); return (
                   <TouchableOpacity key={slot} onPress={()=>toggle(d,slot)}
-                    style={{ paddingHorizontal:10, paddingVertical:6, borderRadius:8, borderWidth:1, borderColor:active?C.gold:C.border, backgroundColor:active?C.gold:'transparent' }}>
-                    <Text style={{ color:active?'#fff':C.text, fontSize:12 }}>{slot}</Text>
+                    style={{ paddingHorizontal:6, paddingVertical:4, borderRadius:6, borderWidth:1, borderColor:active?C.gold:C.border, backgroundColor:active?C.gold:'transparent', minWidth:42, alignItems:'center' }}>
+                    <Text style={{ color:active?'#000':C.text, fontSize:11, fontWeight:active?'bold':'normal' }}>{slot}</Text>
                   </TouchableOpacity>
                 ); })}
               </View>}
@@ -72,7 +82,7 @@ function AvailabilityCalendar({ C, onBack }: any) {
           );
         })}
         <Btn C={C} full disabled={saving} onPress={save}>{saving?'⏳ جاري الحفظ...':'💾 حفظ جدول العمل'}</Btn>
-      </ScrollView>
+      </ScrollView>}
     </View>
   );
 }

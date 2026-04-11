@@ -125,7 +125,7 @@ router.get('/:id/availability', async (req, res, next) => {
     // Get lawyer's schedule for this day
     const { rows: slots } = await pool.query(
       `SELECT start_time, end_time FROM lawyer_availability
-       WHERE lawyer_id=$1 AND day_of_week=$2 AND is_active=true
+       WHERE lawyer_id=$1 AND day_of_week=$2
        ORDER BY start_time`,
       [req.params.id, dayOfWeek]
     );
@@ -133,7 +133,7 @@ router.get('/:id/availability', async (req, res, next) => {
     // Get already-booked slots
     const { rows: booked } = await pool.query(
       `SELECT start_time FROM bookings
-       WHERE lawyer_id=$1 AND scheduled_at::date=$2 AND status NOT IN ('cancelled','rejected')`,
+       WHERE lawyer_id=$1 AND booking_date=$2 AND status NOT IN ('cancelled','rejected')`,
       [req.params.id, date]
     );
     const bookedTimes = new Set(booked.map(b => b.start_time?.slice(0,5)));
