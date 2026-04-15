@@ -39,16 +39,34 @@ const PAYMENT_METHODS = [
 ];
 
 // ── Calendar helpers ──────────────────────────────────────────────────────────
-function getDatesForMonth(year: number, month: number) {
+function getDatesForMonth(year: number, month: number, availMap: any[], overridesMap: any[]) {
   const today = new Date(); today.setHours(0,0,0,0);
   const first = new Date(year, month, 1);
   const last  = new Date(year, month + 1, 0);
   const days: Array<{ date: Date; disabled: boolean }> = [];
+  
+  const wMap: any = {};
+  (availMap || []).forEach(a => { if(a) wMap[a.day_of_week] = true; });
+  const oMap: any = {};
+  (overridesMap || []).forEach(o => { if(o) oMap[o.override_date.split('T')[0]] = o; });
+
   // Leading empty slots
   for (let i = 0; i < first.getDay(); i++) days.push({ date: new Date(0), disabled: true });
   for (let d = 1; d <= last.getDate(); d++) {
     const date = new Date(year, month, d);
-    days.push({ date, disabled: date < today });
+    let disabled = date < today;
+    
+    if (!disabled) {
+       const iso = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+       const ov = oMap[iso];
+       if (ov) {
+         if (ov.is_off) disabled = true;
+       } else {
+         // Fallback to weekly schedule availability map check
+         if (availMap && availMap.length > 0 && !wMap[date.getDay()]) disabled = true;
+       }
+    }
+    days.push({ date, disabled });
   }
   return days;
 }
@@ -63,12 +81,12 @@ const AR_DAYS   = ['أح','إث','ث','أر','خ','ج','س'];
 const EN_DAYS   = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
 // ── Calendar Component ────────────────────────────────────────────────────────
-function CalendarPicker({ C, selectedDate, onSelect, isRTL }: any) {
+function CalendarPicker({ C, selectedDate, onSelect, isRTL, availMap, overridesMap }: any) {
   const today = new Date();
   const [viewYear,  setViewYear]  = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  const days = getDatesForMonth(viewYear, viewMonth);
+  const days = getDatesForMonth(viewYear, viewMonth, availMap, overridesMap);
   const selISO = selectedDate;
 
   const prevMonth = () => {
@@ -375,6 +393,8 @@ export default function BookScreen() {
               selectedDate={form.date}
               onSelect={(iso: string) => { hapticSelect(); setForm(f => ({ ...f, date: iso, time: '' })); }}
               isRTL={isRTL}
+              availMap={lawyer?.availability_map}
+              overridesMap={lawyer?.schedule_overrides}
             />
 
             {/* Time slots */}
