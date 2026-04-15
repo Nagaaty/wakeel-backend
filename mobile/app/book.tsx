@@ -212,14 +212,7 @@ export default function BookScreen() {
     setSlotsLoad(true);
     lawyersAPI.getAvailability(lawyerId as string, form.date)
       .then((d: any) => setSlots(d.slots || []))
-      .catch(() => setSlots([
-        { time:'09:00', available:true }, { time:'09:30', available:false },
-        { time:'10:00', available:true }, { time:'10:30', available:true  },
-        { time:'11:00', available:true }, { time:'11:30', available:false },
-        { time:'14:00', available:true }, { time:'14:30', available:true  },
-        { time:'15:00', available:true }, { time:'15:30', available:false },
-        { time:'16:00', available:true }, { time:'16:30', available:true  },
-      ]))
+      .catch(() => setSlots([]))
       .finally(() => setSlotsLoad(false));
   }, [form.date, lawyerId]);
 

@@ -114,6 +114,7 @@ router.get('/:id/availability', async (req, res, next) => {
 
     // Ensure column & overrides table exist gracefully on first run
     await pool.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS has_set_schedule BOOLEAN DEFAULT false').catch(() => {});
+    await pool.query('ALTER TABLE lawyer_availability ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)').catch(() => {});
     await pool.query(`
       CREATE TABLE IF NOT EXISTS lawyer_schedule_overrides (
         id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -284,6 +285,7 @@ router.post('/me/availability', requireAuth, async (req, res, next) => {
     if (!schedule) return res.status(400).json({ message: 'schedule required' });
 
     // Delete old schedule
+    await pool.query('ALTER TABLE lawyer_availability ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)').catch(() => {});
     await pool.query('DELETE FROM lawyer_availability WHERE lawyer_id=$1', [req.user.id]);
 
     // Insert new schedule
