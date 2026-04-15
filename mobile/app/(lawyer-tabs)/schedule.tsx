@@ -160,21 +160,21 @@ export default function Schedule() {
         ) : Object.entries(schedule).map(([day, data], i) => (
             <View key={i} style={{ backgroundColor: '#EFECE5', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: C.border }}>
                 {/* Day Header */}
-                <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: data.active ? 16 : 0 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>{mapDayName(day)}</Text>
-                    <TouchableOpacity 
-                        onPress={() => handleToggleDay(day)}
-                        style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: data.active ? '#A16A2F' : '#D4D4D8', justifyContent: 'center', alignItems: data.active ? 'flex-end' : 'flex-start', padding: 2 }}>
-                            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFF' }} />
-                        </View>
-                    </TouchableOpacity>
-                </View>
+                <TouchableOpacity 
+                    onPress={() => handleToggleDay(day)}
+                    style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: data.active ? 16 : 0 }}>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 16 }}>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>{mapDayName(day)}</Text>
+                        {!data.active && <Text style={{ color: C.muted, fontSize: 13 }}>{isRTL ? 'إجازة' : 'Off'}</Text>}
+                    </View>
+                    
+                    <View style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: data.active ? '#A16A2F' : '#D4D4D8', justifyContent: 'center', alignItems: data.active ? 'flex-end' : 'flex-start', padding: 2 }}>
+                        <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFF' }} />
+                    </View>
+                </TouchableOpacity>
 
                 {/* Day Content */}
-                {!data.active ? (
-                    <Text style={{ color: C.muted, textAlign: 'right', marginTop: -20, marginRight: 60 }}>{isRTL ? 'إجازة' : 'Off'}</Text>
-                ) : (
+                {data.active && (
                     <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
                         {availableSlots.map(slot => {
                             const isSelected = data.slots.includes(slot);

@@ -131,17 +131,19 @@ function AvailabilityCalendar({ C, onBack }: any) {
           const isOff = !item.active;
           return (
             <View key={d} style={{ backgroundColor:C.card, borderWidth:1, borderColor:C.border, borderRadius:14, padding:14, marginBottom:10 }}>
-              <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:isOff?0:12 }}>
-                <Text style={{ color:C.text, fontWeight:'700', fontSize:14 }}>{day}</Text>
-                <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
+              <TouchableOpacity 
+                onPress={()=>{setSched(p=>({...p,[d]:{...p[d], active:!p[d].active}}));setSaved(false);}}
+                style={{ flexDirection:'row-reverse', justifyContent:'space-between', alignItems:'center', marginBottom:isOff?0:12 }}>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 16 }}>
+                  <Text style={{ color:C.text, fontWeight:'700', fontSize:14 }}>{day}</Text>
                   {isOff && <Text style={{ color:C.muted, fontSize:12 }}>إجازة</Text>}
-                  <TouchableOpacity onPress={()=>{setSched(p=>({...p,[d]:{...p[d], active:!p[d].active}}));setSaved(false);}}
-                    style={{ width:44, height:26, borderRadius:13, backgroundColor:isOff?C.border:C.gold, justifyContent:'center', alignItems:isOff?'flex-start':'flex-end', paddingHorizontal:3 }}>
-                    <View style={{ width:20, height:20, borderRadius:10, backgroundColor:'#fff' }} />
-                  </TouchableOpacity>
                 </View>
-              </View>
-              {!isOff && <View style={{ flexDirection:'row', flexWrap:'wrap', gap:4, justifyContent: 'center' }}>
+                
+                <View style={{ width:44, height:26, borderRadius:13, backgroundColor:isOff?C.border:C.gold, justifyContent:'center', alignItems:isOff?'flex-start':'flex-end', paddingHorizontal:3 }}>
+                  <View style={{ width:20, height:20, borderRadius:10, backgroundColor:'#fff' }} />
+                </View>
+              </TouchableOpacity>
+              {!isOff && <View style={{ flexDirection:'row-reverse', flexWrap:'wrap', gap:4, justifyContent: 'center' }}>
                 {SLOTS.map(slot => { const active=item.slots.includes(slot); return (
                   <TouchableOpacity key={slot} onPress={()=>toggle(d,slot)}
                     style={{ paddingHorizontal:6, paddingVertical:4, borderRadius:6, borderWidth:1, borderColor:active?C.gold:C.border, backgroundColor:active?C.gold:'transparent', minWidth:42, alignItems:'center' }}>
