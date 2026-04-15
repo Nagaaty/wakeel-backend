@@ -17,35 +17,105 @@ import { useI18n } from '../../src/i18n';
 type SubPage = 'calendar' | 'crm' | 'earnings' | 'notes' | 'outcomes' | 'folder' | null;
 
 const DAYS  = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-const SLOTS = Array.from({ length: 48 }, (_, i) => {
-  const h = Math.floor(i / 2).toString().padStart(2, '0');
+const SLOTS = Array.from({ length: 36 }, (_, i) => {
+  const h = (Math.floor(i / 2) + 6).toString().padStart(2, '0');
   const m = (i % 2 === 0) ? '00' : '30';
   return `${h}:${m}`;
 });
 
 function AvailabilityCalendar({ C, onBack }: any) {
-  const [sched, setSched] = useState<Record<number,string[]>>({
-    0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[],
+  const [sched, setSched] = useState<Record<number,{active:boolean,slots:string[]}>>({
+    0:{active:false,slots:[]}, 1:{active:false,slots:[]}, 2:{active:false,slots:[]}, 
+    3:{active:false,slots:[]}, 4:{active:false,slots:[]}, 5:{active:false,slots:[]}, 6:{active:false,slots:[]}
   });
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // Date Overrides
+  const [viewYear, setViewYear] = useState(new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(new Date().getMonth());
+  const [overrides, setOverrides] = useState<Record<string, { is_off: boolean, slots: string[] }>>({});
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   useEffect(() => {
-    lawyersAPI.getRawAvailability().then((res: any) => {
-      setSched({ ...{ 0:[], 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] }, ...res.schedule });
+    Promise.all([
+      lawyersAPI.getRawAvailability(),
+      lawyersAPI.getOverrides()
+    ]).then(([res, ovRes]: any) => {
+      const data = res.schedule || {};
+      setSched(p => {
+        const nw = { ...p };
+        for (let i=0; i<7; i++) {
+          const s = data[i];
+          if (s && s.length > 0) nw[i] = { active:true, slots:s };
+          else nw[i] = { active:false, slots:[] };
+        }
+        return nw;
+      });
+      const ovMap: any = {};
+      (ovRes || []).forEach((o: any) => {
+         ovMap[o.override_date.split('T')[0]] = { is_off: o.is_off, slots: o.slots || [] };
+      });
+      setOverrides(ovMap);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const toggle = (d: number, s: string) =>
-    setSched(p => { const a=[...(p[d]||[])]; const i=a.indexOf(s); if(i>=0)a.splice(i,1);else a.push(s); setSaved(false); return {...p,[d]:a}; });
+    setSched(p => { 
+       const a = [...p[d].slots]; 
+       const i = a.indexOf(s); 
+       if(i>=0) a.splice(i,1); else a.push(s); 
+       setSaved(false); 
+       return {...p,[d]:{...p[d], slots:a}}; 
+    });
+
+  const toggleOverrideSlot = (date: string, s: string) => {
+    setOverrides(p => {
+       const curr = p[date] ? p[date].slots : [];
+       const a = [...curr];
+       const i = a.indexOf(s);
+       if (i>=0) a.splice(i,1); else a.push(s);
+       return {...p, [date]: { is_off: false, slots: a }};
+    });
+  };
 
   const save = async () => {
     setSaving(true);
-    try { await lawyersAPI.saveAvailability(sched); setSaved(true); Alert.alert('✅','تم حفظ جدول العمل!'); }
+    try { 
+      const payload: any = {};
+      for(let i=0; i<7; i++) payload[i] = sched[i].active ? sched[i].slots : [];
+      await lawyersAPI.saveAvailability(payload); 
+      
+      // Save overrides
+      const ovList = Object.entries(overrides).map(([date, data]) => ({
+         override_date: date,
+         is_off: data.is_off,
+         slots: data.slots
+      }));
+      await lawyersAPI.saveOverrides({ overrides: ovList });
+
+      setSaved(true); 
+      setSelectedDate(null);
+      Alert.alert('✅','تم الحفظ بنجاح!'); 
+    }
     catch (e:any) { Alert.alert('خطأ', e?.message); }
     finally { setSaving(false); }
   };
+
+  // Calendar Helpers for Overrides
+  const getDays = (y: number, m: number) => {
+     const d = new Date(y, m, 1);
+     const days = [];
+     for(let i=0; i<d.getDay(); i++) days.push(null);
+     while(d.getMonth() === m) {
+       days.push(new Date(d));
+       d.setDate(d.getDate() + 1);
+     }
+     return days;
+  };
+  const cDays = getDays(viewYear, viewMonth);
+  const AR_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 
   return (
     <View style={{ flex:1, backgroundColor:C.bg }}>
@@ -57,31 +127,100 @@ function AvailabilityCalendar({ C, onBack }: any) {
       {loading ? <Spinner C={C as any} /> :
       <ScrollView contentContainerStyle={{ padding:16, paddingBottom:100 }}>
         {DAYS.map((day, d) => {
-          const daySlots = sched[d]||[]; const isOff = daySlots.length===0;
+          const item = sched[d] || {active:false, slots:[]}; 
+          const isOff = !item.active;
           return (
             <View key={d} style={{ backgroundColor:C.card, borderWidth:1, borderColor:C.border, borderRadius:14, padding:14, marginBottom:10 }}>
               <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:isOff?0:12 }}>
                 <Text style={{ color:C.text, fontWeight:'700', fontSize:14 }}>{day}</Text>
                 <View style={{ flexDirection:'row', alignItems:'center', gap:8 }}>
                   {isOff && <Text style={{ color:C.muted, fontSize:12 }}>إجازة</Text>}
-                  <TouchableOpacity onPress={()=>{setSched(p=>({...p,[d]:p[d]?.length?[]:['09:00','09:30','10:00','10:30','11:00','11:30','14:00','14:30','15:00','15:30','16:00','16:30']}));setSaved(false);}}
+                  <TouchableOpacity onPress={()=>{setSched(p=>({...p,[d]:{...p[d], active:!p[d].active}}));setSaved(false);}}
                     style={{ width:44, height:26, borderRadius:13, backgroundColor:isOff?C.border:C.gold, justifyContent:'center', alignItems:isOff?'flex-start':'flex-end', paddingHorizontal:3 }}>
                     <View style={{ width:20, height:20, borderRadius:10, backgroundColor:'#fff' }} />
                   </TouchableOpacity>
                 </View>
               </View>
               {!isOff && <View style={{ flexDirection:'row', flexWrap:'wrap', gap:4, justifyContent: 'center' }}>
-                {SLOTS.map(slot => { const active=daySlots.includes(slot); return (
+                {SLOTS.map(slot => { const active=item.slots.includes(slot); return (
                   <TouchableOpacity key={slot} onPress={()=>toggle(d,slot)}
                     style={{ paddingHorizontal:6, paddingVertical:4, borderRadius:6, borderWidth:1, borderColor:active?C.gold:C.border, backgroundColor:active?C.gold:'transparent', minWidth:42, alignItems:'center' }}>
-                    <Text style={{ color:active?'#000':C.text, fontSize:11, fontWeight:active?'bold':'normal' }}>{slot}</Text>
+                    <Text style={{ color:active?'#FFF':C.text, fontSize:11, fontWeight:active?'bold':'normal' }}>{slot}</Text>
                   </TouchableOpacity>
                 ); })}
               </View>}
             </View>
           );
         })}
-        <Btn C={C} full disabled={saving} onPress={save}>{saving?'⏳ جاري الحفظ...':'💾 حفظ جدول العمل'}</Btn>
+
+        {/* --- Date Overrides Calendar --- */}
+        <View style={{ marginTop: 20, marginBottom: 16 }}>
+          <Text style={{ color: C.text, fontSize: 18, fontWeight: '700', marginBottom: 4 }}>استثناءات التواريخ</Text>
+          <Text style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>أضف إجازة أو أوقات مخصصة لتاريخ معين</Text>
+          <View style={{ backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <TouchableOpacity onPress={()=>{ if(viewMonth===0){setViewYear(y=>y-1);setViewMonth(11);}else setViewMonth(m=>m-1); }}><Text style={{fontSize:20,color:C.gold,padding:8}}>‹</Text></TouchableOpacity>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>{AR_MONTHS[viewMonth]} {viewYear}</Text>
+              <TouchableOpacity onPress={()=>{ if(viewMonth===11){setViewYear(y=>y+1);setViewMonth(0);}else setViewMonth(m=>m+1); }}><Text style={{fontSize:20,color:C.gold,padding:8}}>›</Text></TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              {cDays.map((dt, i) => {
+                if(!dt) return <View key={`e-${i}`} style={{ width:'14.28%', aspectRatio:1 }} />;
+                const isod = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+                const isSel = selectedDate === isod;
+                const ov = overrides[isod];
+                const isPast = dt < new Date(new Date().setHours(0,0,0,0));
+                
+                return (
+                  <TouchableOpacity key={isod} onPress={() => !isPast && setSelectedDate(isSel ? null : isod)} disabled={isPast}
+                    style={{ width:'14.28%', aspectRatio:1, alignItems:'center', justifyContent:'center' }}>
+                    <View style={{ width:32, height:32, borderRadius:16, backgroundColor: isSel ? C.gold : (ov?.is_off ? C.red+'20' : ov ? C.gold+'20' : 'transparent'), borderWidth: isSel?0:1, borderColor: ov?.is_off ? C.red: (ov ? C.gold : 'transparent'), alignItems:'center', justifyContent:'center' }}>
+                      <Text style={{ color: isSel ? '#FFF' : (isPast ? C.dim : C.text), fontSize: 13, fontWeight: isSel||ov ? '700' : '400' }}>{dt.getDate()}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
+        {selectedDate && (
+           <View style={{ backgroundColor: C.surface, padding: 16, borderRadius: 14, borderWidth: 1, borderColor: C.border, marginBottom: 20 }}>
+             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>تعديل: {selectedDate}</Text>
+                <TouchableOpacity onPress={() => {
+                  setOverrides(p => {
+                    const nw = {...p};
+                    if (nw[selectedDate]) delete nw[selectedDate];
+                    else nw[selectedDate] = { is_off: true, slots: [] };
+                    return nw;
+                  }); setSaved(false);
+                }}>
+                  <Text style={{ color: overrides[selectedDate]?.is_off ? C.red : C.gold, fontWeight: '600' }}>
+                    {overrides[selectedDate]?.is_off ? 'إلغاء الإجازة' : 'تعيين كإجازة'}
+                  </Text>
+                </TouchableOpacity>
+             </View>
+             
+             {overrides[selectedDate]?.is_off ? (
+               <Text style={{ color: C.muted, textAlign: 'center', marginVertical: 10 }}>هذا اليوم محدد كإجازة. لن يظهر للعملاء.</Text>
+             ) : (
+               <View style={{ flexDirection:'row', flexWrap:'wrap', gap:4, justifyContent: 'center' }}>
+                  {SLOTS.map(slot => { 
+                    const active = overrides[selectedDate]?.slots?.includes(slot); 
+                    return (
+                      <TouchableOpacity key={slot} onPress={()=> { toggleOverrideSlot(selectedDate, slot); setSaved(false); }}
+                        style={{ paddingHorizontal:6, paddingVertical:4, borderRadius:6, borderWidth:1, borderColor:active?C.gold:C.border, backgroundColor:active?C.gold:'transparent', minWidth:42, alignItems:'center' }}>
+                        <Text style={{ color:active?'#FFF':C.text, fontSize:11, fontWeight:active?'bold':'normal' }}>{slot}</Text>
+                      </TouchableOpacity>
+                    ); 
+                  })}
+               </View>
+             )}
+           </View>
+        )}
+
+        <Btn C={C} full disabled={saving} onPress={save}>{saving?'⏳ جاري الحفظ...':'💾 حفظ التقويم'}</Btn>
       </ScrollView>}
     </View>
   );

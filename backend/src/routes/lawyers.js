@@ -110,8 +110,19 @@ router.get('/:id/availability', async (req, res, next) => {
     const { date } = req.query; // YYYY-MM-DD
     if (!date) return res.status(400).json({ message: 'date required' });
 
-    // Ensure column exists gracefully on first run
+    // Ensure column & overrides table exist gracefully on first run
     await pool.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS has_set_schedule BOOLEAN DEFAULT false').catch(() => {});
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS lawyer_schedule_overrides (
+        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        lawyer_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        override_date DATE NOT NULL,
+        is_off        BOOLEAN DEFAULT true,
+        slots         JSONB DEFAULT '[]'::jsonb,
+        created_at    TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(lawyer_id, override_date)
+      )
+    `).catch(() => {});
 
     const dayOfWeek = new Date(date).getDay();
 
@@ -122,12 +133,10 @@ router.get('/:id/availability', async (req, res, next) => {
     );
     const hasSetSchedule = profile?.has_set_schedule || false;
 
-    // Get lawyer's schedule for this day
-    const { rows: slots } = await pool.query(
-      `SELECT start_time, end_time FROM lawyer_availability
-       WHERE lawyer_id=$1 AND day_of_week=$2
-       ORDER BY start_time`,
-      [req.params.id, dayOfWeek]
+    // Check for Date Overrides FIRST
+    const { rows: [override] } = await pool.query(
+      `SELECT is_off, slots FROM lawyer_schedule_overrides WHERE lawyer_id=$1 AND override_date=$2`,
+      [req.params.id, date]
     );
 
     // Get already-booked slots
@@ -138,19 +147,39 @@ router.get('/:id/availability', async (req, res, next) => {
     );
     const bookedTimes = new Set(booked.map(b => b.start_time?.slice(0,5)));
 
-    // Generate 30-minute slots from availability windows
     let available = [];
-    for (const slot of slots) {
-      const [sh, sm] = slot.start_time.split(':').map(Number);
-      const [eh, em] = slot.end_time.split(':').map(Number);
-      let curr = sh * 60 + sm;
-      const end  = eh * 60 + em;
-      while (curr + 30 <= end) {
-        const h   = String(Math.floor(curr / 60)).padStart(2, '0');
-        const m   = String(curr % 60).padStart(2, '0');
-        const time = `${h}:${m}`;
-        available.push({ time, available: !bookedTimes.has(time) });
-        curr += 30;
+    if (override) {
+      // If overridden, use override slots (or empty if off)
+      if (!override.is_off && override.slots) {
+         override.slots.forEach(time => available.push({ time, available: !bookedTimes.has(time) }));
+      }
+    } else {
+      // Fallback: Get lawyer's weekly schedule for this day
+      const { rows: slots } = await pool.query(
+        `SELECT start_time, end_time FROM lawyer_availability
+         WHERE lawyer_id=$1 AND day_of_week=$2
+         ORDER BY start_time`,
+        [req.params.id, dayOfWeek]
+      );
+
+      for (const slot of slots) {
+        const [sh, sm] = slot.start_time.split(':').map(Number);
+        const [eh, em] = slot.end_time.split(':').map(Number);
+        let curr = sh * 60 + sm;
+        const end  = eh * 60 + em;
+        while (curr + 30 <= end) {
+          const h   = String(Math.floor(curr / 60)).padStart(2, '0');
+          const m   = String(curr % 60).padStart(2, '0');
+          const time = `${h}:${m}`;
+          available.push({ time, available: !bookedTimes.has(time) });
+          curr += 30;
+        }
+      }
+
+      // Default Fallback: ONLY if the lawyer has NEVER set a schedule
+      if (!available.length && !hasSetSchedule) {
+        const defaults = ['09:00','09:30','10:00','10:30','11:00','11:30','14:00','14:30','15:00','15:30','16:00','16:30'];
+        defaults.forEach(time => available.push({ time, available: !bookedTimes.has(time) }));
       }
     }
 
@@ -292,6 +321,53 @@ router.get('/me/availability', requireAuth, async (req, res, next) => {
       schedule[r.day_of_week].push(slot);
     });
     res.json({ schedule });
+  } catch (err) { next(err); }
+});
+
+// GET /api/lawyers/me/overrides — Get all date overrides
+router.get('/me/overrides', requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT override_date, is_off, slots FROM lawyer_schedule_overrides WHERE lawyer_id=$1`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// POST /api/lawyers/me/overrides — Save multiple date overrides
+router.post('/me/overrides', requireAuth, async (req, res, next) => {
+  try {
+    const { overrides } = req.body;
+    if (!Array.isArray(overrides)) return res.status(400).json({ message: 'overrides array required' });
+
+    // First delete existing overrides for this lawyer to do a clean sync (optional, but requested here usually full sync based on UI)
+    // Actually the UI only tracks the month being viewed or manipulated, let's UPSERT instead or specific sync.
+    // UI sends ALL Overrides it knows about, so a sync is easiest if we delete and insert.
+    // Wait, the UI uses `Promise.all([rawAvailability, overrides])` and keeps a full map `overrides`.
+    // It sends `overrides: [{ override_date, is_off, slots }]` of ALL overrides ever created.
+    // So wiping and re-inserting is perfect for syncing.
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM lawyer_schedule_overrides WHERE lawyer_id=$1', [req.user.id]);
+      
+      for (const ov of overrides) {
+        await client.query(
+          `INSERT INTO lawyer_schedule_overrides (lawyer_id, override_date, is_off, slots)
+           VALUES ($1, $2, $3, $4::jsonb)`,
+          [req.user.id, ov.override_date, ov.is_off, JSON.stringify(ov.slots || [])]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 

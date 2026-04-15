@@ -17,7 +17,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // ── Service types ─────────────────────────────────────────────────────────────
 const SERVICE_TYPES = [
   { id:'text',     label:'استشارة نصية',  labelEn:'Text Consultation',  icon:'💬', desc:'رد كتابي خلال 4 ساعات',   descEn:'Written reply within 4 hrs', mul:0.5  },
-  { id:'voice',    label:'مكالمة صوتية',  labelEn:'Voice Call',         icon:'📞', desc:'مكالمة مباشرة 30 دقيقة',   descEn:'30-minute live call',         mul:1    },
   { id:'video',    label:'استشارة فيديو', labelEn:'Video Consultation', icon:'📹', desc:'مكالمة فيديو 45 دقيقة',    descEn:'45-minute video call',        mul:1.5  },
   { id:'inperson', label:'لقاء شخصي',     labelEn:'In-Person Meeting',  icon:'🏛️', desc:'في مكتب المحامي',           descEn:"At lawyer's office",          mul:2    },
   { id:'document', label:'مراجعة وثيقة',  labelEn:'Document Review',    icon:'📄', desc:'مراجعة عقد أو وثيقة',       descEn:'Contract / doc review',       mul:1.5  },
@@ -159,7 +158,7 @@ export default function BookScreen() {
   const [discount,     setDiscount]     = useState(0);
 
   const [form, setForm] = useState({
-    serviceType:   'voice',
+    serviceType:   'video',
     date:          '',
     time:          '',
     urgency:       'normal',
@@ -188,7 +187,7 @@ export default function BookScreen() {
   useEffect(() => {
     if (!form.date || !lawyerId) return;
     setSlotsLoad(true);
-    lawyersAPI.getAvailability(Number(lawyerId), form.date)
+    lawyersAPI.getAvailability(lawyerId as string, form.date)
       .then((d: any) => setSlots(d.slots || []))
       .catch(() => setSlots([
         { time:'09:00', available:true }, { time:'09:30', available:false },
@@ -238,7 +237,7 @@ export default function BookScreen() {
     setSubmitting(true); setError('');
     
     // Safety fallback for Expo Router sometimes dropping useLocalSearchParams
-    const finalLawyerId = Number(lawyer?.id || lawyerId);
+    const finalLawyerId = lawyer?.id || lawyerId;
 
     if (!finalLawyerId || !form.date || !form.time) {
       setError(isRTL ? 'بيانات الحجز غير مكتملة، يرجى المحاولة مرة أخرى.' : 'Incomplete booking data, please try again.');
