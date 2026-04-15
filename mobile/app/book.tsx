@@ -39,7 +39,7 @@ const PAYMENT_METHODS = [
 ];
 
 // ── Calendar helpers ──────────────────────────────────────────────────────────
-function getDatesForMonth(year: number, month: number, availMap: any[], overridesMap: any[]) {
+function getDatesForMonth(year: number, month: number, availMap: any[], overridesMap: any[], hasSetSchedule: boolean) {
   const today = new Date(); today.setHours(0,0,0,0);
   const first = new Date(year, month, 1);
   const last  = new Date(year, month + 1, 0);
@@ -63,7 +63,12 @@ function getDatesForMonth(year: number, month: number, availMap: any[], override
          if (ov.is_off) disabled = true;
        } else {
          // Fallback to weekly schedule availability map check
-         if (availMap && availMap.length > 0 && !wMap[date.getDay()]) disabled = true;
+         if (hasSetSchedule) {
+            if (!wMap[date.getDay()]) disabled = true;
+         } else {
+            // New lawyer with no schedule relies on default slots every day
+            disabled = false;
+         }
        }
     }
     days.push({ date, disabled });
@@ -81,12 +86,12 @@ const AR_DAYS   = ['أح','إث','ث','أر','خ','ج','س'];
 const EN_DAYS   = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
 // ── Calendar Component ────────────────────────────────────────────────────────
-function CalendarPicker({ C, selectedDate, onSelect, isRTL, availMap, overridesMap }: any) {
+function CalendarPicker({ C, selectedDate, onSelect, isRTL, availMap, overridesMap, hasSetSchedule }: any) {
   const today = new Date();
   const [viewYear,  setViewYear]  = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  const days = getDatesForMonth(viewYear, viewMonth, availMap, overridesMap);
+  const days = getDatesForMonth(viewYear, viewMonth, availMap, overridesMap, hasSetSchedule);
   const selISO = selectedDate;
 
   const prevMonth = () => {
@@ -395,6 +400,7 @@ export default function BookScreen() {
               isRTL={isRTL}
               availMap={lawyer?.availability_map}
               overridesMap={lawyer?.schedule_overrides}
+              hasSetSchedule={lawyer?.has_set_schedule}
             />
 
             {/* Time slots */}

@@ -90,7 +90,7 @@ function AvailabilityCalendar({ C, onBack }: any) {
       // Save overrides
       const ovList = Object.entries(overrides).map(([date, data]) => ({
          override_date: date,
-         is_off: data.is_off,
+         is_off: data.slots.length === 0,
          slots: data.slots
       }));
       await lawyersAPI.saveOverrides({ overrides: ovList });
@@ -186,37 +186,22 @@ function AvailabilityCalendar({ C, onBack }: any) {
 
         {selectedDate && (
            <View style={{ backgroundColor: C.surface, padding: 16, borderRadius: 14, borderWidth: 1, borderColor: C.border, marginBottom: 20 }}>
-             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+             <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>تعديل: {selectedDate}</Text>
-                <TouchableOpacity onPress={() => {
-                  setOverrides(p => {
-                    const nw = {...p};
-                    if (nw[selectedDate]) delete nw[selectedDate];
-                    else nw[selectedDate] = { is_off: true, slots: [] };
-                    return nw;
-                  }); setSaved(false);
-                }}>
-                  <Text style={{ color: overrides[selectedDate]?.is_off ? C.red : C.gold, fontWeight: '600' }}>
-                    {overrides[selectedDate]?.is_off ? 'إلغاء الإجازة' : 'تعيين كإجازة'}
-                  </Text>
-                </TouchableOpacity>
+                <Text style={{ color: C.muted, fontSize: 12 }}>أزل جميع الأوقات لجعل اليوم إجازة</Text>
              </View>
              
-             {overrides[selectedDate]?.is_off ? (
-               <Text style={{ color: C.muted, textAlign: 'center', marginVertical: 10 }}>هذا اليوم محدد كإجازة. لن يظهر للعملاء.</Text>
-             ) : (
-               <View style={{ flexDirection:'row', flexWrap:'wrap', gap:4, justifyContent: 'center' }}>
-                  {SLOTS.map(slot => { 
-                    const active = overrides[selectedDate]?.slots?.includes(slot); 
-                    return (
-                      <TouchableOpacity key={slot} onPress={()=> { toggleOverrideSlot(selectedDate, slot); setSaved(false); }}
-                        style={{ paddingHorizontal:6, paddingVertical:4, borderRadius:6, borderWidth:1, borderColor:active?C.gold:C.border, backgroundColor:active?C.gold:'transparent', minWidth:42, alignItems:'center' }}>
-                        <Text style={{ color:active?'#FFF':C.text, fontSize:11, fontWeight:active?'bold':'normal' }}>{slot}</Text>
-                      </TouchableOpacity>
-                    ); 
-                  })}
-               </View>
-             )}
+             <View style={{ flexDirection:'row-reverse', flexWrap:'wrap', gap:4, justifyContent: 'center' }}>
+                {SLOTS.map(slot => { 
+                  const active = overrides[selectedDate]?.slots?.includes(slot); 
+                  return (
+                    <TouchableOpacity key={slot} onPress={()=> { toggleOverrideSlot(selectedDate, slot); setSaved(false); }}
+                      style={{ paddingHorizontal:6, paddingVertical:4, borderRadius:6, borderWidth:1, borderColor:active?C.gold:C.border, backgroundColor:active?C.gold:'transparent', minWidth:42, alignItems:'center' }}>
+                      <Text style={{ color:active?'#FFF':C.text, fontSize:11, fontWeight:active?'bold':'normal' }}>{slot}</Text>
+                    </TouchableOpacity>
+                  ); 
+                })}
+             </View>
            </View>
         )}
 
