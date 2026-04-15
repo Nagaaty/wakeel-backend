@@ -285,7 +285,7 @@ router.post('/me/availability', requireAuth, async (req, res, next) => {
     if (!schedule) return res.status(400).json({ message: 'schedule required' });
 
     // Delete old schedule
-    await pool.query('ALTER TABLE lawyer_availability ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)').catch(() => {});
+    await pool.query('ALTER TABLE lawyer_availability ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)').catch(err => console.error("Add end_time constraint Error:", err.message));
     await pool.query('DELETE FROM lawyer_availability WHERE lawyer_id=$1', [req.user.id]);
 
     // Insert new schedule
@@ -297,9 +297,9 @@ router.post('/me/availability', requireAuth, async (req, res, next) => {
         const endM = parseInt(m) === 30 ? '00' : '30';
         await pool.query(
           `INSERT INTO lawyer_availability (lawyer_id, day_of_week, start_time, end_time)
-           VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+           VALUES ($1,$2,$3,$4)`,
           [req.user.id, parseInt(day), slot, `${endH}:${endM}`]
-        ).catch(() => {});
+        ).catch(err => { console.error("Schedule Insert Error:", err.message); throw err; });
       }
     }
 
