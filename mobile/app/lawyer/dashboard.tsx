@@ -190,10 +190,24 @@ function AvailabilityCalendar({ C, onBack }: any) {
            <View style={{ backgroundColor: C.surface, padding: 16, borderRadius: 14, borderWidth: 1, borderColor: C.border, marginBottom: 20 }}>
              <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>تعديل: {selectedDate}</Text>
-                <Text style={{ color: C.muted, fontSize: 12 }}>أزل جميع الأوقات لجعل اليوم إجازة</Text>
+                <TouchableOpacity onPress={() => {
+                  setOverrides(p => {
+                    const nw = {...p};
+                    if (nw[selectedDate]?.slots?.length === 0) delete nw[selectedDate];
+                    else nw[selectedDate] = { is_off: true, slots: [] };
+                    return nw;
+                  }); setSaved(false);
+                }}>
+                  <Text style={{ color: overrides[selectedDate]?.slots?.length === 0 ? C.text : C.red, fontWeight: '600' }}>
+                    {overrides[selectedDate]?.slots?.length === 0 ? 'إلغاء الإجازة' : 'تعيين كإجازة'}
+                  </Text>
+                </TouchableOpacity>
              </View>
              
-             <View style={{ flexDirection:'row-reverse', flexWrap:'wrap', gap:4, justifyContent: 'center' }}>
+             {overrides[selectedDate]?.slots?.length === 0 ? (
+               <Text style={{ color: C.muted, textAlign: 'center', marginVertical: 10 }}>هذا اليوم محدد كإجازة. لن يظهر للعملاء.</Text>
+             ) : (
+               <View style={{ flexDirection:'row-reverse', flexWrap:'wrap', gap:4, justifyContent: 'center' }}>
                 {SLOTS.map(slot => { 
                   const active = overrides[selectedDate]?.slots?.includes(slot); 
                   return (
@@ -203,7 +217,8 @@ function AvailabilityCalendar({ C, onBack }: any) {
                     </TouchableOpacity>
                   ); 
                 })}
-             </View>
+               </View>
+             )}
            </View>
         )}
 
