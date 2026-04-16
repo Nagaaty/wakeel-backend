@@ -1,5 +1,9 @@
 const router = require('express').Router();
 const pool   = require('../config/db');
+
+// Diagnostic Ping to verify deployment
+router.get('/ping-deploy', (req, res) => res.json({ deploy_version: 'auto-heal-v2' }));
+
 const { requireAuth, requireRole } = require('../middleware/auth');
 
 // GET /api/lawyers — search with filters + pagination
