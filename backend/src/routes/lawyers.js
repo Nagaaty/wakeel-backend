@@ -2,7 +2,17 @@ const router = require('express').Router();
 const pool   = require('../config/db');
 
 // Diagnostic Ping to verify deployment
-router.get('/ping-deploy', (req, res) => res.json({ deploy_version: 'auto-heal-v2' }));
+router.get('/ping-deploy', async (req, res) => {
+  let msg = 'Ok';
+  let needsHeal = false;
+  try {
+    await pool.query('SELECT start_time FROM lawyer_availability LIMIT 1');
+  } catch (err) {
+    msg = err.message;
+    if (err.message.includes('start_time')) needsHeal = true;
+  }
+  res.json({ deploy_version: 'auto-heal-v3', needsHeal, msg });
+});
 
 const { requireAuth, requireRole } = require('../middleware/auth');
 
@@ -352,6 +362,28 @@ router.post('/me/availability', requireAuth, async (req, res, next) => {
 // GET /api/lawyers/me/availability — Get raw saved schedule
 router.get('/me/availability', requireAuth, async (req, res, next) => {
   try {
+    let needsHeal = false;
+    try {
+      await pool.query('SELECT start_time FROM lawyer_availability LIMIT 1');
+    } catch (err) {
+      if (err.message.includes('start_time')) needsHeal = true;
+    }
+    if (needsHeal) {
+      await pool.query('DROP TABLE IF EXISTS lawyer_availability CASCADE');
+      await pool.query(`
+        CREATE TABLE lawyer_availability (
+          id          SERIAL PRIMARY KEY,
+          lawyer_id   UUID REFERENCES users(id) ON DELETE CASCADE,
+          day_of_week SMALLINT NOT NULL,
+          start_time  TIME NOT NULL,
+          end_time    TIME NOT NULL,
+          is_active   BOOLEAN DEFAULT true,
+          created_at  TIMESTAMPTZ DEFAULT NOW(),
+          UNIQUE(lawyer_id, day_of_week, start_time)
+        )
+      `);
+    }
+
     const { rows } = await pool.query(
       `SELECT day_of_week, start_time FROM lawyer_availability WHERE lawyer_id=$1`,
       [req.user.id]
