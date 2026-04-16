@@ -287,6 +287,29 @@ router.post('/me/availability', requireAuth, async (req, res, next) => {
 
     const client = await pool.connect();
     try {
+      // Automatic Schema Healing for legacy deployments missing start_time
+      let needsHeal = false;
+      try {
+        await client.query('SELECT start_time FROM lawyer_availability LIMIT 1');
+      } catch (err) {
+        if (err.message.includes('start_time')) needsHeal = true;
+      }
+      if (needsHeal) {
+        await client.query('DROP TABLE IF EXISTS lawyer_availability CASCADE');
+        await client.query(`
+          CREATE TABLE lawyer_availability (
+            id          SERIAL PRIMARY KEY,
+            lawyer_id   UUID REFERENCES users(id) ON DELETE CASCADE,
+            day_of_week SMALLINT NOT NULL,
+            start_time  TIME NOT NULL,
+            end_time    TIME NOT NULL,
+            is_active   BOOLEAN DEFAULT true,
+            created_at  TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(lawyer_id, day_of_week, start_time)
+          )
+        `);
+      }
+
       await client.query('BEGIN');
       await client.query('ALTER TABLE lawyer_availability ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)').catch(() => {});
       await client.query('DELETE FROM lawyer_availability WHERE lawyer_id=$1', [req.user.id]);
