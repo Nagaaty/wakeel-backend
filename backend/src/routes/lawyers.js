@@ -285,27 +285,37 @@ router.post('/me/availability', requireAuth, async (req, res, next) => {
     const { schedule } = req.body; // { 0: ['09:00','10:00'], 1: [...], ... }
     if (!schedule) return res.status(400).json({ message: 'schedule required' });
 
-    // Delete old schedule
-    await pool.query('ALTER TABLE lawyer_availability ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)').catch(err => console.error("Add end_time constraint Error:", err.message));
-    await pool.query('DELETE FROM lawyer_availability WHERE lawyer_id=$1', [req.user.id]);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('ALTER TABLE lawyer_availability ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)').catch(() => {});
+      await client.query('DELETE FROM lawyer_availability WHERE lawyer_id=$1', [req.user.id]);
 
-    // Insert new schedule
-    for (const [day, slots] of Object.entries(schedule)) {
-      if (!slots?.length) continue;
-      for (const slot of slots) {
-        const [h, m] = slot.split(':');
-        const endH = String(parseInt(h) + (parseInt(m) === 30 ? 1 : 0)).padStart(2,'0');
-        const endM = parseInt(m) === 30 ? '00' : '30';
-        await pool.query(
-          `INSERT INTO lawyer_availability (lawyer_id, day_of_week, start_time, end_time)
-           VALUES ($1,$2,$3,$4)`,
-          [req.user.id, parseInt(day), slot, `${endH}:${endM}`]
-        ).catch(err => { console.error("Schedule Insert Error:", err.message); throw err; });
+      for (const [day, slots] of Object.entries(schedule)) {
+        if (!slots?.length) continue;
+        for (const slot of slots) {
+          const [h, m] = slot.split(':');
+          let endH = String(parseInt(h) + (parseInt(m) === 30 ? 1 : 0)).padStart(2,'0');
+          const endM = parseInt(m) === 30 ? '00' : '30';
+          if (endH === '24') endH = '23'; // cap at 23:59 equivalent for postgres TIME support safely
+          
+          await client.query(
+            `INSERT INTO lawyer_availability (lawyer_id, day_of_week, start_time, end_time)
+             VALUES ($1,$2,$3,$4)`,
+            [req.user.id, parseInt(day), slot, `${endH}:${endM}`]
+          );
+        }
       }
-    }
 
-    // Flag that the lawyer has explicitly saved a schedule
-    await pool.query('UPDATE lawyer_profiles SET has_set_schedule = true WHERE user_id=$1', [req.user.id]).catch(() => {});
+      await client.query('UPDATE lawyer_profiles SET has_set_schedule = true WHERE user_id=$1', [req.user.id]).catch(() => {});
+      await client.query('COMMIT');
+    } catch (dbErr) {
+      await client.query('ROLLBACK');
+      console.error("Schedule Insert Transaction Error:", dbErr.message);
+      return res.status(500).json({ message: "Failed to save schedule slots: " + dbErr.message });
+    } finally {
+      client.release();
+    }
 
     res.json({ ok: true });
   } catch (err) { next(err); }
