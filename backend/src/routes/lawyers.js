@@ -127,7 +127,8 @@ router.get('/:id/availability', async (req, res, next) => {
       )
     `).catch(() => {});
 
-    const dayOfWeek = new Date(date).getDay();
+    const [y, m, d] = date.split('-');
+    const dayOfWeek = new Date(Number(y), Number(m) - 1, Number(d)).getDay();
 
     // Check if lawyer has EVER saved a schedule
     const { rows: [profile] } = await pool.query(
