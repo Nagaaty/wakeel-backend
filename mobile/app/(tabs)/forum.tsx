@@ -169,11 +169,6 @@ export default function ForumTab() {
     if (post.image_url) { setAttachedImage(post.image_url); }
     setModalOpen(true);
   }, [isRTL]);
-  // Leftover code removed
-    if (post.image_url) { setAttachedImage(post.image_url); }
-    setModalOpen(true);
-  }, [isRTL]);
-  // Leftover code removed
 
 
   return (
