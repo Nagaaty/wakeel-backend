@@ -17,18 +17,21 @@ router.post('/', requireAuth, async (req, res, next) => {
 
     // Check lawyer exists and is available
     const { rows: [lawyer] } = await pool.query(
-      `SELECT u.*, lp.consultation_fee, lp.is_verified
-       FROM users u JOIN lawyer_profiles lp ON lp.user_id=u.id
-       WHERE u.id=$1 AND u.role='lawyer'`,
+      `SELECT u.*, lp.price AS consultation_fee, lp.is_verified
+       FROM users u LEFT JOIN lawyer_profiles lp ON lp.user_id=u.id
+       WHERE u.id=$1`,
       [lawyerId]
     );
     if (!lawyer) return res.status(404).json({ message: 'Lawyer not found' });
 
+    // Determine Scheduled Timestamp
+    const scheduledAt = `${bookingDate}T${startTime}:00`;
+
     // Check no double-booking
     const { rows: [clash] } = await pool.query(
-      `SELECT id FROM bookings WHERE lawyer_id=$1 AND booking_date=$2 AND start_time=$3
+      `SELECT id FROM bookings WHERE lawyer_id=$1 AND scheduled_at = $2::TIMESTAMP
        AND status NOT IN ('cancelled','rejected')`,
-      [lawyerId, bookingDate, startTime]
+      [lawyerId, scheduledAt]
     );
     if (clash) return res.status(409).json({ message: 'This time slot is already booked' });
 
@@ -47,11 +50,11 @@ router.post('/', requireAuth, async (req, res, next) => {
 
     const { rows: [booking] } = await pool.query(
       `INSERT INTO bookings
-         (client_id, lawyer_id, conversation_id, booking_date, start_time, end_time,
-          service_type, notes, documents, fee, urgency, status, payment_status, reminder_sent)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending','unpaid',false) RETURNING *`,
-      [req.user.id, lawyerId, conv.id, bookingDate, startTime, endTime||null,
-       serviceType||'consultation', notes||null, documents ? JSON.stringify(documents) : '[]', fee, urgency||'normal']
+         (client_id, lawyer_id, scheduled_at,
+          type, status, amount, notes)
+       VALUES ($1,$2,$3::TIMESTAMP,$4,'pending',$5,$6) RETURNING *`,
+      [req.user.id, lawyerId, scheduledAt,
+       (serviceType || 'VIDEO').toUpperCase(), fee, notes||null]
     );
 
     // Get client info

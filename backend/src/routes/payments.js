@@ -23,9 +23,9 @@ router.post('/initiate', requireAuth, async (req, res, next) => {
       [bookingId, req.user.id]
     );
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
-    if (booking.payment_status === 'paid') return res.status(400).json({ message: 'Already paid' });
+    if (booking.status === 'confirmed' || booking.status === 'completed') return res.status(400).json({ message: 'Already paid' });
 
-    let amount = parseFloat(booking.fee || 500);
+    let amount = parseFloat(booking.amount || 500);
 
     // Apply promo code if provided
     if (promoCode) {
@@ -53,9 +53,8 @@ router.post('/initiate', requireAuth, async (req, res, next) => {
       },
     });
 
-    // Save payment record
     const { rows: [pmt] } = await pool.query(
-      `INSERT INTO payments (booking_id, user_id, amount, method, paymob_order_id, status)
+      `INSERT INTO payments (booking_id, user_id, amount, method, ref_id, status)
        VALUES ($1,$2,$3,$4,$5,'pending') RETURNING *`,
       [bookingId, req.user.id, amount, method, orderId || null]
     );
@@ -147,16 +146,16 @@ router.post('/webhook', async (req, res) => {
 
     if (orderId) {
       const { rows: [pmt] } = await pool.query(
-        `SELECT * FROM payments WHERE paymob_order_id=$1`, [orderId]
+        `SELECT * FROM payments WHERE ref_id=$1`, [orderId]
       );
       if (pmt) {
         await pool.query(
-          `UPDATE payments SET status=$1, paymob_transaction_id=$2, paid_at=NOW() WHERE id=$3`,
-          [success ? 'paid' : 'failed', String(obj.id || ''), pmt.id]
+          `UPDATE payments SET status=$1 WHERE id=$2`,
+          [success ? 'paid' : 'failed', pmt.id]
         );
         if (success) {
           await pool.query(
-            `UPDATE bookings SET payment_status='paid', status='confirmed' WHERE id=$1`,
+            `UPDATE bookings SET status='confirmed' WHERE id=$1`,
             [pmt.booking_id]
           );
         }
@@ -173,7 +172,7 @@ router.post('/webhook', async (req, res) => {
 router.get('/history', requireAuth, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT p.*, b.booking_date, lu.name AS lawyer_name, b.service_type
+      `SELECT p.*, b.scheduled_at, lu.name AS lawyer_name, b.type AS service_type
        FROM payments p
        JOIN bookings b ON b.id = p.booking_id
        JOIN users lu ON lu.id = b.lawyer_id
@@ -189,7 +188,7 @@ router.post('/refund', requireAuth, async (req, res, next) => {
   try {
     const { paymentId, reason } = req.body;
     const { rows: [pmt] } = await pool.query(
-      `SELECT p.*, b.client_id, b.booking_date, b.start_time
+      `SELECT p.*, b.client_id, b.scheduled_at
        FROM payments p JOIN bookings b ON b.id=p.booking_id
        WHERE p.id=$1`, [paymentId]
     );
@@ -198,12 +197,12 @@ router.post('/refund', requireAuth, async (req, res, next) => {
     if (pmt.status !== 'paid') return res.status(400).json({ message: 'Not a paid payment' });
 
     // Check 24hr refund window
-    const sessionTime = new Date(`${pmt.booking_date}T${pmt.start_time || '00:00'}`);
+    const sessionTime = new Date(pmt.scheduled_at);
     const hoursUntil  = (sessionTime - new Date()) / 3600000;
     if (hoursUntil < 2) return res.status(400).json({ message: 'Refund window closed (less than 2 hours to session)' });
 
-    await pool.query(`UPDATE payments SET status='refunded', refund_reason=$1 WHERE id=$2`, [reason, paymentId]);
-    await pool.query(`UPDATE bookings SET payment_status='refunded', status='cancelled' WHERE id=$1`, [pmt.booking_id]);
+    await pool.query(`UPDATE payments SET status='refunded' WHERE id=$1`, [paymentId]);
+    await pool.query(`UPDATE bookings SET refund_status='pending', status='cancelled' WHERE id=$1`, [pmt.booking_id]);
 
     res.json({ ok: true, message: 'Refund initiated — will process in 3-5 business days' });
   } catch (err) { next(err); }

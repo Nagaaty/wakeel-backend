@@ -147,7 +147,6 @@ function RootLayoutNav() {
       }}>
         <Stack.Screen name="(auth)"   options={{ animation: 'fade' }} />
         <Stack.Screen name="(tabs)"   options={{ animation: 'fade' }} />
-        <Stack.Screen name="(modals)" options={{ presentation: 'modal' }} />
       </Stack>
       {splash && <SplashScreen onDone={() => setSplash(false)} />}
       {showWarning && <SecurityWarningScreen onDismiss={dismiss} />}

@@ -93,7 +93,7 @@ export default function TabsLayout() {
         {/* Hidden screens from tabs */}
         <Tabs.Screen name="jobs" options={{ href: null }} />
         <Tabs.Screen name="ai" options={{ href: null }} />
-        <Tabs.Screen name="user" options={{ href: null }} />
+        <Tabs.Screen name="user/[id]" options={{ href: null }} />
       </Tabs>
     </View>
   );
