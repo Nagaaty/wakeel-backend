@@ -82,10 +82,11 @@ router.post('/questions/:id/like', requireAuth, async (req, res, next) => {
       });
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, body, link, data)
-         VALUES ($1,'forum_like','👍 أعجب أحدهم بمنشورك',$2,'/forum',$3::jsonb)`,
+         VALUES ($1,'forum_like',$2,$3,'/forum',$4::jsonb)`,
         [
           row.user_id,
-          `${actor.name} أعجبه منشورك: "${snippet}${snippet.length >= 80 ? '…' : ''}"`,
+          `👍 ${actor.name} أعجبه منشورك`,
+          `"${snippet}${snippet.length >= 80 ? '…' : ''}"`,
           notifData,
         ]
       ).catch(console.error);
@@ -152,10 +153,11 @@ router.post('/questions/:id/answers', requireAuth, async (req, res, next) => {
       });
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, body, link, data)
-         VALUES ($1,'forum_comment','💬 علّق أحدهم على منشورك',$2,'/forum',$3::jsonb)`,
+         VALUES ($1,'forum_comment',$2,$3,'/forum',$4::jsonb)`,
         [
           post.user_id,
-          `${actor.name} علّق: "${answerSnippet}${answerSnippet.length >= 60 ? '…' : ''}"`,
+          `💬 ${actor.name} علّق على منشورك`,
+          `"${answerSnippet}${answerSnippet.length >= 60 ? '…' : ''}"`,
           notifData,
         ]
       ).catch(console.error);
@@ -189,10 +191,11 @@ router.post('/questions/:id/share', requireAuth, async (req, res, next) => {
       });
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, body, link, data)
-         VALUES ($1,'forum_share','🔁 شارك أحدهم منشورك',$2,'/forum',$3::jsonb)`,
+         VALUES ($1,'forum_share',$2,$3,'/forum',$4::jsonb)`,
         [
           row.user_id,
-          `${actor.name} أعاد نشر منشورك: "${snippet}${snippet.length >= 80 ? '…' : ''}"`,
+          `🔁 ${actor.name} أعاد نشر منشورك`,
+          `"${snippet}${snippet.length >= 80 ? '…' : ''}"`,
           notifData,
         ]
       ).catch(console.error);

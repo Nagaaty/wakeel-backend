@@ -225,30 +225,30 @@ export default function NotificationsScreen() {
                   </View>
                 </View>
 
-                {/* Content */}
+                {/* Content — LinkedIn layout: title first, body below, time right */}
                 <View style={{ flex: 1 }}>
-                  {/* Sender line */}
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 1 }}>
-                    <Text style={{ color: C.gold, fontWeight: '700', fontSize: 12 }}>
-                      {isSocial && actorData ? actorData.actorName : 'Wakeel'}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    {/* Title IS the main line — already contains actor name from backend */}
+                    <Text style={{ color: C.text, fontWeight: isRead ? '500' : '700', fontSize: 14, flex: 1, lineHeight: 20 }}>
+                      {n.title}
                     </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <Text style={{ color: C.muted, fontSize: 11 }}>{timeAgo(n.created_at)}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8, flexShrink: 0 }}>
                       {!isRead && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.gold }} />}
                     </View>
                   </View>
 
-                  {/* Title */}
-                  <Text style={{ color: C.text, fontWeight: isRead ? '500' : '700', fontSize: 14 }}>{n.title}</Text>
+                  {/* Body preview (collapsed) */}
+                  {!isExpanded && n.body ? (
+                    <Text style={{ color: C.muted, fontSize: 13, marginTop: 3, lineHeight: 18 }} numberOfLines={2}>{n.body}</Text>
+                  ) : null}
 
-                  {/* Preview body (collapsed) */}
-                  {!isExpanded && (
-                    <Text style={{ color: C.muted, fontSize: 13, marginTop: 2 }} numberOfLines={2}>{n.body}</Text>
-                  )}
-
-                  <Text style={{ color: C.gold + '99', fontSize: 11, marginTop: 4 }}>
-                    {isExpanded ? '▲ إخفاء' : '▼ عرض التفاصيل'}
-                  </Text>
+                  {/* Time + expand hint */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                    <Text style={{ color: C.muted, fontSize: 11 }}>{timeAgo(n.created_at)}</Text>
+                    <Text style={{ color: C.gold + '88', fontSize: 11 }}>
+                      {isExpanded ? '▲ إخفاء' : '▼ التفاصيل'}
+                    </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
 
@@ -264,7 +264,7 @@ export default function NotificationsScreen() {
                   shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
                   elevation: 4,
                 }}>
-                  {/* Panel header */}
+                  {/* Panel header: avatar + role */}
                   <View style={{
                     flexDirection: 'row', alignItems: 'center', gap: 10,
                     backgroundColor: C.gold + '12',
@@ -277,12 +277,12 @@ export default function NotificationsScreen() {
                       <WakeelAvatar size={34} gold={C.gold} />
                     )}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: C.gold, fontWeight: '700', fontSize: 13 }}>
+                      <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>
                         {isSocial && actorData ? actorData.actorName : 'Wakeel'}
                       </Text>
-                      <Text style={{ color: C.muted, fontSize: 11 }}>
+                      <Text style={{ color: C.muted, fontSize: 12 }}>
                         {isSocial && actorData
-                          ? (actorData.actorRole === 'lawyer' ? 'محامٍ معتمد' : 'عضو في المنتدى')
+                          ? (actorData.actorRole === 'lawyer' ? '⚖️ محامٍ معتمد' : '👤 عضو في المنتدى')
                           : 'منصة المحامين المعتمدة'
                         }
                       </Text>
