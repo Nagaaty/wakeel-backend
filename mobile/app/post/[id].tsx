@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../src/theme';
-import { useAuth } from '../src/hooks/useAuth';
-import { forumAPI } from '../src/services/api';
+import { useTheme } from '../../src/theme';
+import { useAuth } from '../../src/hooks/useAuth';
+import { forumAPI } from '../../src/services/api';
 
 function Avatar({ url, name, size = 42, gold }: { url?: string | null; name?: string; size?: number; gold: string }) {
   const initials = (name || '?').split(' ').map((w: string) => w[0] || '').join('').slice(0, 2).toUpperCase();
