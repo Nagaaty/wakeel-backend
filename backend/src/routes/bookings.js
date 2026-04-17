@@ -77,12 +77,9 @@ router.post('/', requireAuth, async (req, res, next) => {
       }).catch(console.error);
     }
 
-    // Save DB notification
-    await pool.query(
-      `INSERT INTO notifications (user_id, type, title, body, link)
-       VALUES ($1,'booking','حجز جديد',$2,'/lawyer/dashboard')`,
-      [lawyerId, `${client.name} حجز معك ${bookingDate} الساعة ${startTime}`]
-    ).catch(console.error);
+    // NOTE: DB notification is intentionally NOT sent here.
+    // The lawyer receives their confirmed notification after payment succeeds (payments.js).
+    // Sending one here (pending state) would be a duplicate.
 
     res.status(201).json({ booking, conversationId: conv.id });
   } catch (err) { next(err); }
