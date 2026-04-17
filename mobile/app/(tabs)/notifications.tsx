@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, RefreshControl,
   LayoutAnimation, UIManager, Platform, Image,
@@ -18,36 +18,49 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const SOCIAL_TYPES = new Set(['forum_like', 'forum_comment', 'forum_share']);
+const SOCIAL_TYPES   = new Set(['forum_like', 'forum_comment', 'forum_share']);
+const SYSTEM_TYPES   = new Set(['booking', 'payment', 'reminder', 'broadcast', 'system', 'review']);
 
-const TYPE_ICONS: Record<string, string> = {
-  booking: '📅', payment: '💰', message: '💬',
-  review: '⭐', system: '🔔', reminder: '⏰', broadcast: '📣',
-  forum_like: '👍', forum_comment: '💬', forum_share: '🔁',
+const TYPE_BADGE: Record<string, string> = {
+  booking:       '📅', payment:      '💰', message:    '💬',
+  review:        '⭐', system:        '🔔', reminder:   '⏰', broadcast: '📣',
+  forum_like:    '👍', forum_comment: '💬', forum_share:'🔁',
 };
 
-// — Wakeel "W" system avatar
-function WakeelAvatar({ size = 44, gold }: { size?: number; gold: string }) {
+// ── Parse actor name from notification title e.g. "💬 Omar liked your post"
+function extractActorName(title: string): string {
+  // Title format: "emoji name action" — strip leading emoji + space
+  const cleaned = title.replace(/^[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\s]+/u, '').trim();
+  // First word(s) before action verbs
+  const firstVerb = cleaned.search(/(أعجبه|علّق|أعاد|liked|commented|shared|reacted)/u);
+  return firstVerb > 0 ? cleaned.substring(0, firstVerb).trim() : cleaned.split(' ').slice(0, 2).join(' ');
+}
+
+// ── Avatar component — shows photo if available, else initials ring
+function NotifAvatar({ url, name, size = 48, gold, bg }: {
+  url?: string | null; name?: string; size?: number; gold: string; bg: string;
+}) {
+  const initials = (name || '?').split(' ').map((w: string) => w[0] || '').join('').slice(0, 2).toUpperCase();
+  if (url) {
+    return <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#ddd' }} />;
+  }
   return (
     <View style={{
       width: size, height: size, borderRadius: size / 2,
-      backgroundColor: gold,
+      backgroundColor: gold + '25',
+      borderWidth: 2, borderColor: gold + '80',
       alignItems: 'center', justifyContent: 'center',
     }}>
-      <Text style={{ color: '#1a1a2e', fontWeight: '900', fontSize: size * 0.42 }}>W</Text>
+      <Text style={{ color: gold, fontWeight: '800', fontSize: size * 0.36 }}>{initials}</Text>
     </View>
   );
 }
 
-// — Actor avatar (for social notifications)
-function ActorAvatar({ url, name, size = 44, gold }: { url?: string; name?: string; size?: number; gold: string }) {
-  if (url) {
-    return <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#eee' }} />;
-  }
-  const initials = (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+// ── Wakeel "W" circle for system notifications
+function WakeelAvatar({ size = 48, gold }: { size?: number; gold: string }) {
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: gold + '30', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: gold + '60' }}>
-      <Text style={{ color: gold, fontWeight: '800', fontSize: size * 0.38 }}>{initials}</Text>
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: gold, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: '#1a1a2e', fontWeight: '900', fontSize: size * 0.4 }}>W</Text>
     </View>
   );
 }
@@ -83,11 +96,16 @@ export default function NotificationsScreen() {
     setNotifs(p => p.map(n => ({ ...n, is_read: true })));
   };
 
+  // Social notifications → direct navigate (like LinkedIn)
+  // System notifications → expand inline
   const handleTap = (n: any) => {
+    if (!n.is_read) markRead(n.id);
+    if (SOCIAL_TYPES.has(n.type)) {
+      router.push('/(tabs)/forum' as any);
+      return;
+    }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    const nextId = expandedId === n.id ? null : n.id;
-    setExpandedId(nextId);
-    if (nextId && !n.is_read) markRead(n.id);
+    setExpandedId(prev => prev === n.id ? null : n.id);
   };
 
   const filtered  = filter === 'unread' ? notifs.filter(n => !n.is_read) : notifs;
@@ -98,10 +116,12 @@ export default function NotificationsScreen() {
     const diff = Date.now() - new Date(iso).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1)  return 'الآن';
-    if (mins < 60) return `منذ ${mins} دقيقة`;
+    if (mins < 60) return `${mins}د`;
     const hrs = Math.floor(mins / 60);
-    if (hrs < 24)  return `منذ ${hrs} ساعة`;
-    return `منذ ${Math.floor(hrs / 24)} يوم`;
+    if (hrs < 24)  return `${hrs}س`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7)  return `${days}ي`;
+    return `${Math.floor(days / 7)}أ`;
   };
 
   return (
@@ -111,19 +131,17 @@ export default function NotificationsScreen() {
       <View style={{
         backgroundColor: C.surface,
         paddingTop: insets.top + 4,
-        paddingHorizontal: 16, paddingBottom: 12,
+        paddingHorizontal: 16, paddingBottom: 10,
         borderBottomWidth: 1, borderBottomColor: C.border,
       }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <TouchableOpacity onPress={() => router.back()}>
               <Text style={{ color: C.text, fontSize: 22 }}>‹</Text>
             </TouchableOpacity>
-            <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'CormorantGaramond-Bold' }}>
-              الإشعارات
-            </Text>
+            <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'CormorantGaramond-Bold' }}>الإشعارات</Text>
             {unreadCnt > 0 && (
-              <View style={{ backgroundColor: '#e74c3c', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+              <View style={{ backgroundColor: '#e74c3c', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 }}>
                 <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{unreadCnt}</Text>
               </View>
             )}
@@ -135,13 +153,14 @@ export default function NotificationsScreen() {
           )}
         </View>
 
+        {/* Filter pills */}
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {(['all', 'unread'] as const).map(f => (
             <TouchableOpacity
               key={f}
               onPress={() => setFilter(f)}
               style={{
-                paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+                paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
                 borderWidth: 1,
                 borderColor: filter === f ? C.gold : C.border,
                 backgroundColor: filter === f ? C.gold : 'transparent',
@@ -157,8 +176,7 @@ export default function NotificationsScreen() {
       {/* ── Push permission banner ─────────────────────────────────────── */}
       {permStatus !== 'granted' && permStatus !== 'unavailable' && (
         <View style={{
-          backgroundColor: C.gold + '10',
-          borderBottomWidth: 1, borderBottomColor: C.gold + '25',
+          backgroundColor: C.gold + '10', borderBottomWidth: 1, borderBottomColor: C.gold + '25',
           padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10,
         }}>
           <Text style={{ fontSize: 20 }}>🔔</Text>
@@ -171,7 +189,7 @@ export default function NotificationsScreen() {
         </View>
       )}
 
-      {/* ── Notification list ──────────────────────────────────────────── */}
+      {/* ── List ──────────────────────────────────────────────────────── */}
       <FlatList
         data={filtered}
         keyExtractor={item => String(item.id)}
@@ -180,184 +198,158 @@ export default function NotificationsScreen() {
         ListEmptyComponent={
           !loading
             ? <Empty C={C} icon="🔔" title="لا توجد إشعارات" />
-            : <ListSkeleton C={C} count={6} type="notification" />
+            : <ListSkeleton C={C} count={8} type="notification" />
         }
         renderItem={({ item: n }) => {
           const isRead     = !!n.is_read;
           const isExpanded = expandedId === n.id;
           const isSocial   = SOCIAL_TYPES.has(n.type);
-          const icon       = TYPE_ICONS[n.type] || '🔔';
-          // Parse actor data for social notifications
-          const actorData  = isSocial && n.data ? (typeof n.data === 'string' ? JSON.parse(n.data) : n.data) : null;
+          const badge      = TYPE_BADGE[n.type] || '🔔';
+
+          // Actor data for social — from DB data column or fallback-parsed from title
+          let actorData: any = null;
+          if (isSocial) {
+            if (n.data) {
+              actorData = typeof n.data === 'string' ? JSON.parse(n.data) : n.data;
+            } else {
+              // Fallback: extract name from title when data column not deployed yet
+              actorData = { actorName: extractActorName(n.title), actorAvatar: null, actorRole: null, actorId: null };
+            }
+          }
 
           return (
             <View>
-              {/* ── Row ──────────────────────────────────────────────── */}
+              {/* ── LinkedIn-style row ────────────────────────────── */}
               <TouchableOpacity
                 onPress={() => handleTap(n)}
-                activeOpacity={0.75}
+                activeOpacity={0.7}
                 style={{
-                  flexDirection: 'row', gap: 12,
-                  paddingHorizontal: 16, paddingVertical: 14,
-                  borderBottomWidth: isExpanded ? 0 : 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  borderBottomWidth: 1,
                   borderBottomColor: C.border,
-                  backgroundColor: isRead
-                    ? (isExpanded ? C.card + 'aa' : 'transparent')
-                    : C.gold + '0C',
+                  backgroundColor: isRead ? 'transparent' : C.gold + '08',
                 }}>
 
-                {/* Avatar: actor pic for social, W for system */}
-                <View>
-                  {isSocial && actorData ? (
-                    <ActorAvatar url={actorData.actorAvatar} name={actorData.actorName} size={46} gold={C.gold} />
-                  ) : (
-                    <WakeelAvatar size={46} gold={C.gold} />
+                {/* Unread blue dot — leftmost (LinkedIn style) */}
+                <View style={{ width: 10, alignItems: 'center', marginRight: 6 }}>
+                  {!isRead && (
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#0a66c2' }} />
                   )}
-                  {/* Type icon badge */}
+                </View>
+
+                {/* Avatar + badge overlay */}
+                <View style={{ marginRight: 12 }}>
+                  {isSocial && actorData ? (
+                    <NotifAvatar
+                      url={actorData.actorAvatar}
+                      name={actorData.actorName}
+                      size={52}
+                      gold={C.gold}
+                      bg={C.bg}
+                    />
+                  ) : (
+                    <WakeelAvatar size={52} gold={C.gold} />
+                  )}
+                  {/* Action type badge — bottom right of avatar */}
                   <View style={{
                     position: 'absolute', bottom: -2, right: -2,
-                    width: 20, height: 20, borderRadius: 10,
+                    width: 22, height: 22, borderRadius: 11,
                     backgroundColor: C.surface,
-                    borderWidth: 1.5, borderColor: C.gold + '44',
+                    borderWidth: 2, borderColor: C.bg,
                     alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Text style={{ fontSize: 11 }}>{icon}</Text>
+                    <Text style={{ fontSize: 11 }}>{badge}</Text>
                   </View>
                 </View>
 
-                {/* Content — LinkedIn layout: title first, body below, time right */}
+                {/* Text block */}
                 <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    {/* Title IS the main line — already contains actor name from backend */}
-                    <Text style={{ color: C.text, fontWeight: isRead ? '500' : '700', fontSize: 14, flex: 1, lineHeight: 20 }}>
-                      {n.title}
+                  {/* Primary text: full title (actor name IS the title from backend) */}
+                  <Text
+                    style={{
+                      color: C.text,
+                      fontWeight: isRead ? '400' : '600',
+                      fontSize: 14,
+                      lineHeight: 20,
+                      textAlign: 'right',
+                    }}
+                    numberOfLines={isSocial ? 2 : 3}>
+                    {n.title}
+                  </Text>
+                  {/* Body preview (comment text / post snippet / booking detail) */}
+                  {n.body ? (
+                    <Text
+                      style={{ color: C.muted, fontSize: 13, marginTop: 3, lineHeight: 18, textAlign: 'right' }}
+                      numberOfLines={isSocial ? 1 : 2}>
+                      {n.body}
                     </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8, flexShrink: 0 }}>
-                      {!isRead && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.gold }} />}
-                    </View>
-                  </View>
-
-                  {/* Body preview (collapsed) */}
-                  {!isExpanded && n.body ? (
-                    <Text style={{ color: C.muted, fontSize: 13, marginTop: 3, lineHeight: 18 }} numberOfLines={2}>{n.body}</Text>
                   ) : null}
-
-                  {/* Time + expand hint */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                    <Text style={{ color: C.muted, fontSize: 11 }}>{timeAgo(n.created_at)}</Text>
-                    <Text style={{ color: C.gold + '88', fontSize: 11 }}>
-                      {isExpanded ? '▲ إخفاء' : '▼ التفاصيل'}
+                  {/* Time + expand hint for system */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 5 }}>
+                    <Text style={{ color: isRead ? C.muted : '#0a66c2', fontSize: 12, fontWeight: isRead ? '400' : '600' }}>
+                      {timeAgo(n.created_at)}
                     </Text>
+                    {!isSocial && (
+                      <Text style={{ color: C.gold + '88', fontSize: 11 }}>
+                        {isExpanded ? '▲' : '▼'}
+                      </Text>
+                    )}
+                    {isSocial && (
+                      <Text style={{ color: '#0a66c2', fontSize: 12, fontWeight: '600' }}>
+                        عرض المنشور ›
+                      </Text>
+                    )}
                   </View>
                 </View>
               </TouchableOpacity>
 
-              {/* ── Expanded detail panel ─────────────────────────── */}
-              {isExpanded && (
+              {/* ── System notification expand panel (booking/payment etc.) ── */}
+              {!isSocial && isExpanded && (
                 <View style={{
                   marginHorizontal: 16, marginBottom: 10,
                   backgroundColor: C.card,
-                  borderRadius: 14,
-                  borderWidth: 1, borderColor: C.gold + '33',
+                  borderRadius: 12,
+                  borderWidth: 1, borderColor: C.gold + '30',
                   overflow: 'hidden',
-                  shadowColor: '#000', shadowOpacity: 0.10,
-                  shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
-                  elevation: 4,
+                  elevation: 3,
+                  shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
                 }}>
-                  {/* Panel header: avatar + role */}
+                  {/* Header */}
                   <View style={{
                     flexDirection: 'row', alignItems: 'center', gap: 10,
-                    backgroundColor: C.gold + '12',
+                    backgroundColor: C.gold + '10',
                     paddingHorizontal: 14, paddingVertical: 10,
-                    borderBottomWidth: 1, borderBottomColor: C.gold + '22',
+                    borderBottomWidth: 1, borderBottomColor: C.gold + '20',
                   }}>
-                    {isSocial && actorData ? (
-                      <ActorAvatar url={actorData.actorAvatar} name={actorData.actorName} size={34} gold={C.gold} />
-                    ) : (
-                      <WakeelAvatar size={34} gold={C.gold} />
-                    )}
+                    <WakeelAvatar size={32} gold={C.gold} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>
-                        {isSocial && actorData ? actorData.actorName : 'Wakeel'}
-                      </Text>
-                      <Text style={{ color: C.muted, fontSize: 12 }}>
-                        {isSocial && actorData
-                          ? (actorData.actorRole === 'lawyer' ? '⚖️ محامٍ معتمد' : '👤 عضو في المنتدى')
-                          : 'منصة المحامين المعتمدة'
-                        }
-                      </Text>
+                      <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>Wakeel</Text>
+                      <Text style={{ color: C.muted, fontSize: 11 }}>منصة المحامين المعتمدة</Text>
                     </View>
                     <Text style={{ color: C.muted, fontSize: 11 }}>{timeAgo(n.created_at)}</Text>
                   </View>
-
-                  {/* Full message */}
+                  {/* Full detail */}
                   <View style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
-                    <Text style={{ color: C.text, fontWeight: '700', fontSize: 15, marginBottom: 8 }}>{n.title}</Text>
-                    <Text style={{ color: C.text, fontSize: 14, lineHeight: 22 }}>{n.body}</Text>
-
-                    {/* Post snippet preview for social */}
-                    {isSocial && actorData?.postSnippet && (
-                      <View style={{ marginTop: 12, padding: 10, backgroundColor: C.bg, borderRadius: 8, borderLeftWidth: 3, borderLeftColor: C.gold }}>
-                        <Text style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>📌 المنشور</Text>
-                        <Text style={{ color: C.text, fontSize: 13 }} numberOfLines={3}>
-                          {actorData.postSnippet}{actorData.postSnippet.length >= 80 ? '…' : ''}
-                        </Text>
-                      </View>
-                    )}
+                    <Text style={{ color: C.text, fontWeight: '700', fontSize: 15, marginBottom: 6, textAlign: 'right' }}>{n.title}</Text>
+                    <Text style={{ color: C.text, fontSize: 14, lineHeight: 22, textAlign: 'right' }}>{n.body}</Text>
                   </View>
-
-                  {/* Action buttons */}
-                  <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 14 }}>
-                    {/* Social: View Post + View Profile */}
-                    {isSocial && actorData ? (
-                      <>
-                        <TouchableOpacity
-                          onPress={() => {
-                            setExpandedId(null);
-                            // Navigate to forum tab — the forum will show the feed
-                            router.push('/(tabs)/forum' as any);
-                          }}
-                          style={{ flex: 1, backgroundColor: C.gold, borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}>
-                          <Text style={{ color: '#000', fontWeight: '700', fontSize: 13 }}>عرض المنشور ›</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          onPress={() => {
-                            setExpandedId(null);
-                            if (actorData.actorRole === 'lawyer') {
-                              router.push({ pathname: '/lawyer/[id]', params: { id: actorData.actorId } } as any);
-                            } else {
-                              router.push({ pathname: '/user/[id]', params: { id: actorData.actorId } } as any);
-                            }
-                          }}
-                          style={{ flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1.5, borderColor: C.gold }}>
-                          <Text style={{ color: C.gold, fontWeight: '700', fontSize: 13 }}>عرض الملف ›</Text>
-                        </TouchableOpacity>
-                      </>
-                    ) : (
-                      // System notification: just close
-                      <TouchableOpacity
-                        onPress={() => {
-                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                          setExpandedId(null);
-                        }}
-                        style={{ flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center' }}>
-                        <Text style={{ color: C.muted, fontSize: 13 }}>إغلاق</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  {/* Close row for social too */}
-                  {isSocial && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                        setExpandedId(null);
-                      }}
-                      style={{ marginHorizontal: 16, marginBottom: 14, paddingVertical: 8, alignItems: 'center' }}>
-                      <Text style={{ color: C.muted, fontSize: 12 }}>إغلاق</Text>
-                    </TouchableOpacity>
-                  )}
+                  {/* Close */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                      setExpandedId(null);
+                    }}
+                    style={{
+                      marginHorizontal: 16, marginBottom: 14,
+                      paddingVertical: 9, borderRadius: 10,
+                      borderWidth: 1, borderColor: C.border,
+                      alignItems: 'center',
+                    }}>
+                    <Text style={{ color: C.muted, fontSize: 13 }}>إغلاق</Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </View>
