@@ -49,7 +49,7 @@ router.post('/initiate', requireAuth, async (req, res, next) => {
     // 1. Create a successful payment record instantly
     const { rows: [pmt] } = await pool.query(
       `INSERT INTO payments (booking_id, user_id, amount, method, ref_id, status)
-       VALUES ($1,$2,$3,$4,$5,'paid') RETURNING *`,
+       VALUES ($1,$2,$3,$4,$5,'completed') RETURNING *`,
       [bookingId, req.user.id, amount, method, `fake_txn_${Date.now()}`]
     );
 
@@ -104,7 +104,7 @@ router.post('/confirm', requireAuth, async (req, res, next) => {
     );
     if (!pmt) return res.status(404).json({ message: 'Payment not found' });
 
-    const status = success !== false ? 'paid' : 'failed';
+    const status = success !== false ? 'completed' : 'failed';
 
     await pool.query(
       `UPDATE payments SET status=$1, paymob_transaction_id=$2, paid_at=NOW() WHERE id=$3`,
