@@ -27,16 +27,17 @@ export default function ForumTab() {
   const [commentPost, setCommentPost]   = useState<any | null>(null);
   const [answers, setAnswers]           = useState<any[]>([]);
   const [answersLoading, setAnswersLoading] = useState(false);
-  const [answerText, setAnswerText]     = useState('');
+  const [answerText, setAnswerText]       = useState('');
   const [postingAnswer, setPostingAnswer] = useState(false);
-  // Repost modal state
-  const [repostPost, setRepostPost]     = useState<any | null>(null);
-  const [repostText, setRepostText]     = useState('');
+  // Share modal state
+  const [sharingPost, setSharingPost]     = useState<any | null>(null);
+  const [repostPost, setRepostPost]       = useState<any | null>(null);
+  const [repostText, setRepostText]       = useState('');
   const [postingRepost, setPostingRepost] = useState(false);
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [attachedFile, setAttachedFile]   = useState<string | null>(null);
   const [uploading, setUploading]         = useState(false);
-  const [lightboxUri, setLightboxUri]     = useState<string | null>(null); // fullscreen image viewer
+  const [lightboxUri, setLightboxUri]     = useState<string | null>(null);
   const { user } = useAuth();
 
   const pickImage = async () => {
@@ -118,18 +119,30 @@ export default function ForumTab() {
   };
 
   const handlePost = async () => {
-    if (!newPostText.trim()) return;
+    // In share mode, allow posting even with empty caption
+    const text = newPostText.trim();
+    if (!sharingPost && !text) return;
     try {
       setPosting(true);
-      await forumAPI.createQuestion({ 
-        question: newPostText,
+      const questionText = sharingPost
+        ? (text || `[مشاركة من ${sharingPost.asked_by || 'مستخدم'}]`)
+        : text;
+      await forumAPI.createQuestion({
+        question: questionText,
         category: 'الكل',
         anonymous: false,
         ...(attachedImage ? { image_url: attachedImage } : {}),
       });
+      if (sharingPost) {
+        forumAPI.sharePost(sharingPost.id).catch(console.error);
+        setPosts(prev => prev.map(p =>
+          p.id === sharingPost.id ? { ...p, shares_count: (p.shares_count || 0) + 1 } : p
+        ));
+      }
       setNewPostText('');
       setAttachedImage(null);
       setAttachedFile(null);
+      setSharingPost(null);
       setModalOpen(false);
       loadPosts();
     } catch (e) {
@@ -161,24 +174,13 @@ export default function ForumTab() {
     } catch {} finally { setPostingAnswer(false); }
   }, [answerText, commentPost]);
 
-  // Share — one-tap repost with confirmation (LinkedIn style, no text input needed)
+  // Share — opens compose modal with empty caption + stores the original post as a card
   const handleShare = useCallback((post: any) => {
-    Alert.alert(
-      '🔁 إعادة النشر',
-      `هل تريد مشاركة منشور "${(post.asked_by || 'المستخدم')}" مع متابعيك؟`,
-      [
-        { text: 'إلغاء', style: 'cancel' },
-        {
-          text: 'مشاركة الآن',
-          onPress: () => {
-            forumAPI.sharePost(post.id).catch(console.error);
-            setPosts(prev => prev.map(p =>
-              p.id === post.id ? { ...p, shares_count: (p.shares_count || 0) + 1 } : p
-            ));
-          },
-        },
-      ]
-    );
+    setNewPostText('');        // empty caption — user decides whether to add thoughts
+    setAttachedImage(null);
+    setAttachedFile(null);
+    setSharingPost(post);      // track which post is being shared
+    setModalOpen(true);
   }, []);
 
 
@@ -320,7 +322,7 @@ export default function ForumTab() {
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => handleShare(p)} style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 8 }}>
-                <Text style={{ fontSize: 20, color: '#65676B' }}>📤</Text>
+                <Text style={{ fontSize: 20, color: '#65676B' }}>🔁</Text>
                 <Text style={{ color: '#65676B', fontSize: 14, fontWeight: '600' }}>{isRTL ? 'مشاركة' : 'Share'}</Text>
               </TouchableOpacity>
 
@@ -448,14 +450,15 @@ export default function ForumTab() {
           </View>
           {/* Modal Header */}
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-            <TouchableOpacity onPress={() => setModalOpen(false)}>
+            <TouchableOpacity onPress={() => { setModalOpen(false); setSharingPost(null); setNewPostText(''); }}>
               <Text style={{ color: C.text, fontSize: 16 }}>{isRTL ? 'إلغاء' : 'Cancel'}</Text>
             </TouchableOpacity>
             <Text style={{ color: C.text, fontSize: 18, fontWeight: '700', fontFamily: 'CormorantGaramond-Bold' }}>
-              {isRTL ? 'إنشاء منشور' : 'New Post'}
+              {sharingPost ? (isRTL ? '🔁 مشاركة' : '🔁 Share') : (isRTL ? 'إنشاء منشور' : 'New Post')}
             </Text>
-            <TouchableOpacity onPress={handlePost} disabled={!newPostText.trim() || posting}>
-              <Text style={{ color: !newPostText.trim() || posting ? C.muted : C.gold, fontSize: 16, fontWeight: '700' }}>
+            {/* نشر: always active in share mode, requires text for new post */}
+            <TouchableOpacity onPress={handlePost} disabled={(!sharingPost && !newPostText.trim()) || posting}>
+              <Text style={{ color: ((!sharingPost && !newPostText.trim()) || posting) ? C.muted : C.gold, fontSize: 16, fontWeight: '700' }}>
                 {isRTL ? 'نشر' : 'Post'}
               </Text>
             </TouchableOpacity>
@@ -471,12 +474,45 @@ export default function ForumTab() {
           <TextInput
             autoFocus
             multiline
-            placeholder={isRTL ? 'بم تفكر؟ نصيحة، أو سؤال قانوني...' : 'What\'s on your mind? A legal question or tip...'}
+            placeholder={sharingPost
+              ? (isRTL ? 'أضف تعليقك (اختياري)...' : 'Add a comment (optional)...')
+              : (isRTL ? 'بم تفكر؟ نصيحة، أو سؤال قانوني...' : "What's on your mind? A legal question or tip...")}
             placeholderTextColor={C.muted}
             value={newPostText}
             onChangeText={setNewPostText}
-            style={{ flex: 1, paddingHorizontal: 20, fontSize: 18, textAlign: isRTL ? 'right' : 'left', color: C.text, textAlignVertical: 'top' }}
+            style={{ paddingHorizontal: 20, paddingTop: 12, fontSize: 18, textAlign: isRTL ? 'right' : 'left', color: C.text, textAlignVertical: 'top', minHeight: 80 }}
           />
+
+          {/* Shared post quoted card */}
+          {sharingPost && (
+            <View style={{
+              marginHorizontal: 16, marginTop: 8, marginBottom: 4,
+              borderWidth: 1, borderColor: C.border,
+              borderRadius: 12, overflow: 'hidden',
+            }}>
+              {/* Card header */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: C.card }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.gold + '28', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: C.gold, fontWeight: '800', fontSize: 13 }}>
+                    {(sharingPost.asked_by || 'U').substring(0, 2).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: C.text, fontWeight: '700', fontSize: 13 }}>{sharingPost.asked_by || 'مستخدم'}</Text>
+                  <Text style={{ color: C.muted, fontSize: 11 }}>{sharingPost.category}</Text>
+                </View>
+              </View>
+              {/* Card body */}
+              <View style={{ padding: 12, backgroundColor: C.surface }}>
+                <Text style={{ color: C.text, fontSize: 13, lineHeight: 20, textAlign: 'right' }} numberOfLines={4}>
+                  {sharingPost.question}
+                </Text>
+              </View>
+              {sharingPost.image_url && (
+                <Image source={{ uri: sharingPost.image_url }} style={{ width: '100%', height: 120 }} resizeMode="cover" />
+              )}
+            </View>
+          )}
 
           {/* Attached image preview */}
           {uploading && (
