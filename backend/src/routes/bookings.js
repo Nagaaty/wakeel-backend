@@ -49,13 +49,21 @@ router.post('/', requireAuth, async (req, res, next) => {
       conv = newConv;
     }
 
+    // Map frontend service IDs → DB enum ('VIDEO','CHAT','PHONE')
+    const SVC_MAP = {
+      video:    'VIDEO',
+      text:     'CHAT',
+      inperson: 'PHONE', // closest available; schema only has VIDEO/CHAT/PHONE
+      document: 'CHAT',
+    };
+    const dbType = SVC_MAP[(serviceType || 'video').toLowerCase()] || 'VIDEO';
+
     const { rows: [booking] } = await pool.query(
       `INSERT INTO bookings
          (client_id, lawyer_id, scheduled_at,
           type, status, amount, notes)
        VALUES ($1,$2,$3::TIMESTAMP,$4,'pending',$5,$6) RETURNING *`,
-      [req.user.id, lawyerId, scheduledAt,
-       (serviceType || 'VIDEO').toUpperCase(), fee, notes||null]
+      [req.user.id, lawyerId, scheduledAt, dbType, fee, notes||null]
     );
 
     // Get client info
