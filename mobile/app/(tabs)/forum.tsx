@@ -161,14 +161,25 @@ export default function ForumTab() {
     } catch {} finally { setPostingAnswer(false); }
   }, [answerText, commentPost]);
 
-  // Internal network repost (Wakeel Feed) — calls backend to track + notify author
-  const handleShare = useCallback(async (post: any) => {
-    // Fire-and-forget: notify author of the share
-    forumAPI.sharePost(post.id).catch(console.error);
-    setNewPostText(`[${isRTL ? 'إعادة نشر من' : 'Repost from'} ${post.asked_by || (isRTL ? 'مستخدم' : 'User')}]:\n${post.question || ''}`);
-    if (post.image_url) { setAttachedImage(post.image_url); }
-    setModalOpen(true);
-  }, [isRTL]);
+  // Share — one-tap repost with confirmation (LinkedIn style, no text input needed)
+  const handleShare = useCallback((post: any) => {
+    Alert.alert(
+      '🔁 إعادة النشر',
+      `هل تريد مشاركة منشور "${(post.asked_by || 'المستخدم')}" مع متابعيك؟`,
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'مشاركة الآن',
+          onPress: () => {
+            forumAPI.sharePost(post.id).catch(console.error);
+            setPosts(prev => prev.map(p =>
+              p.id === post.id ? { ...p, shares_count: (p.shares_count || 0) + 1 } : p
+            ));
+          },
+        },
+      ]
+    );
+  }, []);
 
 
   return (
