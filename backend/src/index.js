@@ -147,6 +147,9 @@ server.listen(PORT, '0.0.0.0', () => {
   // Bookings
   db.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS documents JSONB DEFAULT \'[]\'').catch(() => {});
 
+  // Notifications: add link column if missing
+  db.query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link TEXT DEFAULT \'#\'').catch(() => {});
+
   // Fix ghost lawyers
   db.query("UPDATE lawyer_profiles SET is_visible=true WHERE is_visible IS NULL").catch(() => {});
 

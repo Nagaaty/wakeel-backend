@@ -1,0 +1,1 @@
+const pool = require('./backend/src/config/db'); pool.query('SELECT * FROM users WHERE id=\', ['e8eda029-565b-4848-b250-a996d1b62074']).then(res => console.log(res.rows)).catch(console.error).finally(()=>pool.end())

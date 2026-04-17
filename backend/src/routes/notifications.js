@@ -6,7 +6,8 @@ const { requireAuth } = require('../middleware/auth');
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 60`,
+      `SELECT id, user_id, type, title, body, link, is_read, created_at
+       FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 60`,
       [req.user.id]
     );
     res.json({ notifications: rows });
@@ -34,7 +35,7 @@ router.post('/', requireAuth, async (req, res, next) => {
 router.patch('/:id/read', requireAuth, async (req, res, next) => {
   try {
     await pool.query(
-      `UPDATE notifications SET read_at=NOW() WHERE id=$1 AND user_id=$2`,
+      `UPDATE notifications SET is_read=true WHERE id=$1 AND user_id=$2`,
       [req.params.id, req.user.id]
     );
     res.json({ ok: true });
@@ -45,7 +46,7 @@ router.patch('/:id/read', requireAuth, async (req, res, next) => {
 router.patch('/read-all', requireAuth, async (req, res, next) => {
   try {
     await pool.query(
-      `UPDATE notifications SET read_at=NOW() WHERE user_id=$1 AND read_at IS NULL`,
+      `UPDATE notifications SET is_read=true WHERE user_id=$1 AND is_read=false`,
       [req.user.id]
     );
     res.json({ ok: true });
@@ -56,7 +57,7 @@ router.patch('/read-all', requireAuth, async (req, res, next) => {
 router.get('/unread-count', requireAuth, async (req, res, next) => {
   try {
     const { rows: [{ count }] } = await pool.query(
-      `SELECT COUNT(*) FROM notifications WHERE user_id=$1 AND read_at IS NULL`,
+      `SELECT COUNT(*) FROM notifications WHERE user_id=$1 AND is_read=false`,
       [req.user.id]
     );
     res.json({ count: parseInt(count) });

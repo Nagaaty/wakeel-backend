@@ -59,20 +59,38 @@ router.post('/initiate', requireAuth, async (req, res, next) => {
       [bookingId]
     );
 
-    // 3. Fire Email and Push Notifications to Client
+    // 3. Email + DB notification → Client
+    const formattedDate = new Date(booking.scheduled_at).toISOString().split('T')[0];
+    const formattedTime = new Date(booking.scheduled_at).toTimeString().substring(0, 5);
+
     await sendPaymentReceipt({
       to: booking.client_email, clientName: booking.client_name, amount,
       lawyerName: booking.lawyer_name, bookingId, paymentId: pmt.id
     }).catch(console.error);
 
-    // 4. Fire Email and Push Notifications to Lawyer
-    const formattedDate = new Date(booking.scheduled_at).toISOString().split('T')[0];
-    const formattedTime = new Date(booking.scheduled_at).toTimeString().substring(0, 5);
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, title, body, link)
+       VALUES ($1,'booking','✅ تم تأكيد الحجز',$2,'/bookings')`,
+      [booking.client_id, `تم تأكيد حجزك مع ${booking.lawyer_name} بتاريخ ${formattedDate} الساعة ${formattedTime}`]
+    ).catch(console.error);
 
+    // 4. Email + DB notification → Lawyer
     await sendBookingConfirmation({
-      to: booking.lawyer_email, clientName: booking.client_name,
-      lawyerName: booking.lawyer_name, date: formattedDate, time: formattedTime
+      to: booking.lawyer_email,
+      clientName: booking.client_name,
+      lawyerName: booking.lawyer_name,
+      date: formattedDate,
+      time: formattedTime,
+      serviceType: booking.type || 'VIDEO',
+      fee: amount,
+      bookingId,
     }).catch(console.error);
+
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, title, body, link)
+       VALUES ($1,'booking','📅 حجز جديد',$2,'/lawyer/dashboard')`,
+      [booking.lawyer_id, `${booking.client_name} حجز معك بتاريخ ${formattedDate} الساعة ${formattedTime}. المبلغ: ${amount} جم`]
+    ).catch(console.error);
 
     await notifyNewBooking(booking.lawyer_id, {
       clientName: booking.client_name, date: formattedDate, time: formattedTime
