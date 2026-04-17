@@ -3,9 +3,9 @@ const pool     = require('../config/db');
 const { validate, rules } = require('../middleware/validate');
 const { requireAuth } = require('../middleware/auth');
 const { initiatePayment, verifyWebhook } = require('../utils/paymob');
-const { sendPaymentReceipt }   = require('../utils/email');
+const { sendPaymentReceipt, sendBookingConfirmation } = require('../utils/email');
 const { sendPaymentReceiptWA } = require('../utils/sms');
-const { notifyPaymentReceived } = require('../utils/push');
+const { notifyPaymentReceived, notifyNewBooking } = require('../utils/push');
 
 // POST /api/payments/initiate
 router.post('/initiate', requireAuth, async (req, res, next) => {
@@ -41,33 +41,48 @@ router.post('/initiate', requireAuth, async (req, res, next) => {
       }
     }
 
-    const { paymentKey, orderId, checkoutUrl, simulated } = await initiatePayment({
-      amountEGP:   amount,
-      method,
-      description: `Wakeel — استشارة قانونية مع ${booking.lawyer_name}`,
-      billing: {
-        firstName: booking.client_name?.split(' ')[0] || 'Client',
-        lastName:  booking.client_name?.split(' ').slice(1).join(' ') || 'User',
-        email:     booking.client_email,
-        phone:     booking.client_phone,
-      },
-    });
+    // ─────────────────────────────────────────────────────────────────────────────
+    // WAKEEL FAKE PAYMENT BYPASS
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Since Paymob is not live, we simulate an instant success right here to activate the booking!
 
+    // 1. Create a successful payment record instantly
     const { rows: [pmt] } = await pool.query(
       `INSERT INTO payments (booking_id, user_id, amount, method, ref_id, status)
-       VALUES ($1,$2,$3,$4,$5,'pending') RETURNING *`,
-      [bookingId, req.user.id, amount, method, orderId || null]
+       VALUES ($1,$2,$3,$4,$5,'paid') RETURNING *`,
+      [bookingId, req.user.id, amount, method, `fake_txn_${Date.now()}`]
     );
 
-    res.json({
-      paymentId:   pmt.id,
-      paymentKey,
-      orderId,
-      checkoutUrl,
-      amount,
-      simulated,
-      message: simulated ? '⚠️ Paymob not configured — payment simulated' : 'Proceed to checkout',
-    });
+    // 2. Mark booking as confirmed
+    await pool.query(
+      `UPDATE bookings SET status='confirmed' WHERE id=$1`,
+      [bookingId]
+    );
+
+    // 3. Fire Email and Push Notifications to Client
+    await sendPaymentReceipt({
+      to: booking.client_email, clientName: booking.client_name, amount,
+      lawyerName: booking.lawyer_name, bookingId, paymentId: pmt.id
+    }).catch(console.error);
+
+    // 4. Fire Email and Push Notifications to Lawyer
+    const formattedDate = new Date(booking.scheduled_at).toISOString().split('T')[0];
+    const formattedTime = new Date(booking.scheduled_at).toTimeString().substring(0, 5);
+
+    await sendBookingConfirmation({
+      to: booking.lawyer_email, clientName: booking.client_name,
+      lawyerName: booking.lawyer_name, date: formattedDate, time: formattedTime
+    }).catch(console.error);
+
+    await notifyNewBooking(booking.lawyer_id, {
+      clientName: booking.client_name, date: formattedDate, time: formattedTime
+    }).catch(console.error);
+
+    await notifyPaymentReceived(booking.lawyer_id, {
+      clientName: booking.client_name, amount
+    }).catch(console.error);
+
+    res.json({ checkoutUrl: null, success: true, fakeSuccess: true });
   } catch (err) { next(err); }
 });
 
