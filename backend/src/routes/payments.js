@@ -65,7 +65,8 @@ router.post('/initiate', requireAuth, async (req, res, next) => {
 
     await sendPaymentReceipt({
       to: booking.client_email, clientName: booking.client_name, amount,
-      lawyerName: booking.lawyer_name, bookingId, paymentId: pmt.id
+      lawyerName: booking.lawyer_name, bookingId, paymentId: pmt.id,
+      consultationDate: formattedDate, consultationTime: formattedTime,
     }).catch(console.error);
 
     await pool.query(

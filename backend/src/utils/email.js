@@ -245,7 +245,7 @@ async function sendWelcomeEmail({ to, name, role }) {
 }
 
 // ── Payment receipt ────────────────────────────────────────────────────────
-async function sendPaymentReceipt({ to, clientName, amount, lawyerName, bookingId, paymentId }) {
+async function sendPaymentReceipt({ to, clientName, amount, lawyerName, bookingId, paymentId, consultationDate, consultationTime }) {
   const subject = `🧾 إيصال الدفع — ${amount} جنيه — Wakeel`;
   const html = wrap(`
     <h2>تم الدفع بنجاح ✅</h2>
@@ -253,9 +253,11 @@ async function sendPaymentReceipt({ to, clientName, amount, lawyerName, bookingI
     <div class="highlight">
       <p><strong>💰 المبلغ:</strong> ${amount} جنيه مصري</p>
       <p><strong>⚖️ المحامي:</strong> ${lawyerName}</p>
+      ${consultationDate ? `<p><strong>📅 تاريخ الاستشارة:</strong> ${consultationDate}</p>` : ''}
+      ${consultationTime ? `<p><strong>⏰ وقت الاستشارة:</strong> ${consultationTime}</p>` : ''}
       <p><strong>🔖 رقم الحجز:</strong> WK-${String(bookingId).padStart(6,'0')}</p>
       <p><strong>🧾 رقم المعاملة:</strong> ${paymentId}</p>
-      <p><strong>📅 التاريخ:</strong> ${new Date().toLocaleDateString('ar-EG')}</p>
+      <p><strong>📅 تاريخ الدفع:</strong> ${new Date().toLocaleDateString('ar-EG')}</p>
     </div>
     <a href="${BASE_URL}/bookings" class="btn">عرض إيصالاتي</a>
   `);
