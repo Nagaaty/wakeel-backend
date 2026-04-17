@@ -294,6 +294,9 @@ router.post('/me/availability', requireAuth, async (req, res, next) => {
 
     const client = await pool.connect();
     try {
+      // Ensure end_time column exists for old databases
+      await client.query('ALTER TABLE lawyer_availability ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)').catch(() => {});
+
       await client.query('BEGIN');
       await client.query('DELETE FROM lawyer_availability WHERE lawyer_id=$1', [req.user.id]);
 
