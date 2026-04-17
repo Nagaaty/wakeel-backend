@@ -38,7 +38,38 @@ export default function ForumTab() {
   const [attachedFile, setAttachedFile]   = useState<string | null>(null);
   const [uploading, setUploading]         = useState(false);
   const [lightboxUri, setLightboxUri]     = useState<string | null>(null);
+  // Reactors sheet (who liked / reposted)
+  const [reactorsSheet, setReactorsSheet] = useState<{
+    type: 'likes' | 'reposts' | 'comments';
+    postId: number;
+    title: string;
+  } | null>(null);
+  const [reactorsList, setReactorsList]   = useState<any[]>([]);
+  const [reactorsLoading, setReactorsLoading] = useState(false);
   const { user } = useAuth();
+
+  const openReactors = useCallback(async (type: 'likes' | 'reposts' | 'comments', post: any) => {
+    if (type === 'comments') { openComments(post); return; }
+    const titles: Record<string, string> = {
+      likes: `من أعجبه هذا المنشور (❤️)`,
+      reposts: `من أعاد النشر (🔁)`,
+    };
+    setReactorsSheet({ type, postId: post.id, title: titles[type] });
+    setReactorsList([]);
+    setReactorsLoading(true);
+    try {
+      let data: any[];
+      if (type === 'likes') {
+        const res: any = await forumAPI.getLikers(post.id);
+        data = res?.likers || [];
+      } else {
+        const res: any = await forumAPI.getReposts(post.id);
+        data = (res?.reposts || []).map((r: any) => ({ ...r, isRepost: true }));
+      }
+      setReactorsList(data);
+    } catch {} finally { setReactorsLoading(false); }
+  }, []);
+
 
   const pickImage = async () => {
     try {
@@ -353,19 +384,38 @@ export default function ForumTab() {
               </TouchableOpacity>
             )}
 
-            {/* Metrics Row (Likes, Comments counts) */}
-            <View style={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+            {/* Metrics Row — tappable (like Facebook/LinkedIn) */}
+            <View style={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#E4E6EB' }}>
+              {/* Likes pill */}
+              <TouchableOpacity
+                onPress={() => (p.likes_count || 0) > 0 && openReactors('likes', p)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <View style={{ backgroundColor: '#1877F2', width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: '#FFF', fontSize: 10 }}>👍</Text>
                 </View>
-                <Text style={{ color: '#65676B', fontSize: 13 }}>{p.likes_count || 0}</Text>
-              </View>
-              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 12 }}>
-                <Text style={{ color: '#65676B', fontSize: 13 }}>{p.answer_count || 0} {isRTL ? 'تعليق' : 'comments'}</Text>
-                <Text style={{ color: '#65676B', fontSize: 13 }}>{p.shares_count || 0} {isRTL ? 'إعادة نشر' : 'reposts'}</Text>
+                <Text style={{ color: (p.likes_count || 0) > 0 ? C.text : '#65676B', fontSize: 13, fontWeight: (p.likes_count || 0) > 0 ? '600' : '400' }}>
+                  {p.likes_count || 0}
+                </Text>
+              </TouchableOpacity>
+              {/* Comments + Reposts pills */}
+              <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+                {(p.answer_count || 0) > 0 && (
+                  <TouchableOpacity onPress={() => openReactors('comments', p)}>
+                    <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }}>
+                      {p.answer_count || 0} {isRTL ? 'تعليق' : 'comments'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {(p.shares_count || 0) > 0 && (
+                  <TouchableOpacity onPress={() => openReactors('reposts', p)}>
+                    <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }}>
+                      {p.shares_count || 0} {isRTL ? 'إعادة نشر' : 'reposts'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
+
 
             {/* Interactive Action Bar */}
             <View style={{ marginHorizontal: 16, borderTopWidth: 1, borderColor: feedBg, paddingVertical: 4, flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
@@ -604,6 +654,82 @@ export default function ForumTab() {
       </Modal>
 
 
+
+      {/* ─── Reactors Sheet (Who Liked / Who Reposted) ──────────────────── */}
+      <Modal
+        visible={!!reactorsSheet}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setReactorsSheet(null)}>
+        <View style={{ flex: 1, backgroundColor: C.surface }}>
+          {/* Drag handle */}
+          <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 4 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: C.border }} />
+          </View>
+          {/* Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border }}>
+            <Text style={{ color: C.text, fontSize: 18, fontWeight: '800', fontFamily: 'CormorantGaramond-Bold' }}>
+              {reactorsSheet?.title}
+            </Text>
+            <TouchableOpacity onPress={() => setReactorsSheet(null)}
+              style={{ backgroundColor: C.card2, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ color: C.muted, fontWeight: '600' }}>إغلاق</Text>
+            </TouchableOpacity>
+          </View>
+          {/* List */}
+          {reactorsLoading ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator color={C.gold} size="large" />
+            </View>
+          ) : reactorsList.length === 0 ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              <Text style={{ fontSize: 44 }}>{reactorsSheet?.type === 'likes' ? '❤️' : '🔁'}</Text>
+              <Text style={{ color: C.muted, fontSize: 15 }}>لا يوجد بيانات بعد</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={reactorsList}
+              keyExtractor={(r, i) => String(r.id || i)}
+              contentContainerStyle={{ padding: 12, gap: 8 }}
+              renderItem={({ item: r }) => (
+                <TouchableOpacity
+                  onPress={() => {
+                    setReactorsSheet(null);
+                    if (r.isRepost) {
+                      router.push({ pathname: '/post/[id]', params: { id: r.id } } as any);
+                    } else if (r.role === 'lawyer') {
+                      router.push({ pathname: '/lawyer/[id]', params: { id: r.id } } as any);
+                    } else {
+                      router.push({ pathname: '/user/[id]', params: { id: r.id } } as any);
+                    }
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, backgroundColor: C.card, borderRadius: 14 }}>
+                  {/* Avatar */}
+                  <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: C.gold + '28', borderWidth: 1.5, borderColor: C.gold + '50', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: C.gold, fontWeight: '800', fontSize: 16 }}>
+                      {(r.name || '?').substring(0, 2).toUpperCase()}
+                    </Text>
+                  </View>
+                  {/* Info */}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: C.text, fontWeight: '700', fontSize: 15 }}>{r.name || 'مستخدم'}</Text>
+                    {r.isRepost && r.question && (
+                      <Text style={{ color: C.muted, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{r.question}</Text>
+                    )}
+                    {!r.isRepost && (
+                      <Text style={{ color: C.gold, fontSize: 12, marginTop: 2 }}>
+                        {r.role === 'lawyer' ? '⚖️ محامٍ' : '👤 عميل'}
+                      </Text>
+                    )}
+                  </View>
+                  {/* Chevron */}
+                  <Text style={{ color: C.muted, fontSize: 18 }}>›</Text>
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
+      </Modal>
 
       {/* ─── Fullscreen Image Lightbox ─────────────────────────────────── */}
       <Modal visible={!!lightboxUri} transparent animationType="fade" onRequestClose={() => setLightboxUri(null)}>

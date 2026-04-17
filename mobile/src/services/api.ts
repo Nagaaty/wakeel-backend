@@ -230,6 +230,10 @@ export const forumAPI = {
     api.post(`/forum/questions/${id}/like`),
   sharePost: (id: string | number) =>
     api.post(`/forum/questions/${id}/share`),
+  getLikers: (id: string | number) =>
+    api.get(`/forum/questions/${id}/likers`),
+  getReposts: (id: string | number) =>
+    api.get(`/forum/questions/${id}/reposts`),
 };
 
 export const analyticsAPI = {

@@ -36,6 +36,40 @@ router.get('/questions/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/forum/questions/:id/likers — who liked this post
+router.get('/questions/:id/likers', async (req, res, next) => {
+  try {
+    const { rows: [post] } = await pool.query(
+      `SELECT liked_by FROM forum_questions WHERE id=$1`, [req.params.id]
+    );
+    if (!post || !post.liked_by || !post.liked_by.length) return res.json({ likers: [] });
+    // liked_by is JSONB array of user-id strings
+    const ids = post.liked_by.map(Number).filter(Boolean);
+    if (!ids.length) return res.json({ likers: [] });
+    const { rows } = await pool.query(
+      `SELECT id, name, avatar_url, role FROM users WHERE id = ANY($1::int[])`, [ids]
+    );
+    res.json({ likers: rows });
+  } catch (err) { next(err); }
+});
+
+// GET /api/forum/questions/:id/reposts — who reposted this post
+router.get('/questions/:id/reposts', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT fq.id, fq.question, fq.created_at, u.name, u.avatar_url, u.role
+       FROM forum_questions fq
+       LEFT JOIN users u ON u.id = fq.user_id
+       WHERE fq.original_post_id=$1 AND fq.is_visible=true
+       ORDER BY fq.created_at DESC`,
+      [req.params.id]
+    );
+    res.json({ reposts: rows });
+  } catch (err) { next(err); }
+});
+
+
+
 // POST /api/forum/questions
 router.post('/questions', requireAuth, async (req, res, next) => {
   try {
