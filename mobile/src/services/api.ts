@@ -220,7 +220,7 @@ export const forumAPI = {
     api.get('/forum/questions', { params: { cat, search } }),
   getQuestion: (id: string | number) =>
     api.get(`/forum/questions/${id}`),
-  createQuestion: (data: { question: string; category: string; anonymous?: boolean; image_url?: string }) =>
+  createQuestion: (data: { question: string; category: string; anonymous?: boolean; image_url?: string; original_post_id?: number; original_post_data?: any }) =>
     api.post('/forum/questions', data),
   getAnswers: (id: string | number) =>
     api.get(`/forum/questions/${id}/answers`),

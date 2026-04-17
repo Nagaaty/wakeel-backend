@@ -119,19 +119,31 @@ export default function ForumTab() {
   };
 
   const handlePost = async () => {
-    // In share mode, allow posting even with empty caption
     const text = newPostText.trim();
     if (!sharingPost && !text) return;
     try {
       setPosting(true);
       const questionText = sharingPost
-        ? (text || `[مشاركة من ${sharingPost.asked_by || 'مستخدم'}]`)
+        ? (text || 'مشاركة')   // non-empty fallback for DB
         : text;
       await forumAPI.createQuestion({
         question: questionText,
         category: 'الكل',
         anonymous: false,
         ...(attachedImage ? { image_url: attachedImage } : {}),
+        // Repost fields — stored in DB for proper LinkedIn-style display
+        ...(sharingPost ? {
+          original_post_id: sharingPost.id,
+          original_post_data: {
+            authorName:   sharingPost.asked_by   || 'مستخدم',
+            authorAvatar: sharingPost.user_avatar_url || null,
+            authorRole:   sharingPost.user_role  || null,
+            authorId:     sharingPost.user_id    || null,
+            category:     sharingPost.category   || '',
+            question:     sharingPost.question   || '',
+            image_url:    sharingPost.image_url  || null,
+          },
+        } : {}),
       });
       if (sharingPost) {
         forumAPI.sharePost(sharingPost.id).catch(console.error);
@@ -242,10 +254,28 @@ export default function ForumTab() {
             </View>
           </>
         }
-        renderItem={({ item: p }) => (
-          // ─── Post Card ────────────────────────────────────────────────────────
+        renderItem={({ item: p }) => {
+          // Parse original post data for repost detection
+          const origData = p.original_post_data
+            ? (typeof p.original_post_data === 'string' ? JSON.parse(p.original_post_data) : p.original_post_data)
+            : null;
+          const isRepost = !!origData;
+
+          return (
+          // ── Post / Repost Card ─────────────────────────────────────────
           <View style={{ backgroundColor: C.surface, marginBottom: 8, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D3D6DB' }}>
             
+
+            {/* Repost banner: "🔁 lawyer 1 أعاد النشر" above the sharer header */}
+            {isRepost && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 2 }}>
+                <Text style={{ color: '#65676B', fontSize: 13 }}>🔁</Text>
+                <Text style={{ color: '#65676B', fontSize: 13 }}>
+                  {p.asked_by || 'مستخدم'} {isRTL ? 'أعاد النشر' : 'reposted this'}
+                </Text>
+              </View>
+            )}
+
             {/* Author Header */}
             <View style={{ padding: 16, paddingBottom: 10, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}>
               <TouchableOpacity onPress={() => {
@@ -276,19 +306,50 @@ export default function ForumTab() {
               </TouchableOpacity>
             </View>
 
-            {/* Post Body */}
-            <Text style={{ paddingHorizontal: 16, fontSize: 15, color: C.text, lineHeight: 24, textAlign: isRTL ? 'right' : 'left', marginBottom: p.image_url ? 8 : 12 }}>
-              {p.question}
-            </Text>
+            {/* Sharer's caption (only show if non-empty and not the auto-fill fallback) */}
+            {!isRepost && (
+              <Text style={{ paddingHorizontal: 16, fontSize: 15, color: C.text, lineHeight: 24, textAlign: isRTL ? 'right' : 'left', marginBottom: p.image_url ? 8 : 12 }}>
+                {p.question}
+              </Text>
+            )}
+            {isRepost && p.question !== 'مشاركة' && (
+              <Text style={{ paddingHorizontal: 16, fontSize: 15, color: C.text, lineHeight: 24, textAlign: isRTL ? 'right' : 'left', marginBottom: 8 }}>
+                {p.question}
+              </Text>
+            )}
 
-            {/* Optional Media (Edge to Edge) — tap to open fullscreen */}
-            {p.image_url && (
+            {/* Optional Media - only for original posts */}
+            {!isRepost && p.image_url && (
               <TouchableOpacity onPress={() => setLightboxUri(p.image_url)} activeOpacity={0.9}>
-                <Image 
-                  source={{ uri: p.image_url }} 
-                  style={{ width: '100%', height: 250, backgroundColor: '#E5E5E5' }} 
-                  resizeMode="cover" 
-                />
+                <Image source={{ uri: p.image_url }} style={{ width: '100%', height: 250, backgroundColor: '#E5E5E5' }} resizeMode="cover" />
+              </TouchableOpacity>
+            )}
+
+            {/* Quoted original post card (for reposts) */}
+            {isRepost && origData && (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => router.push({ pathname: '/post/[id]', params: { id: p.original_post_id } } as any)}
+                style={{ marginHorizontal: 12, marginBottom: 10, borderWidth: 1.5, borderColor: '#D3D6DB', borderRadius: 10, overflow: 'hidden', backgroundColor: '#F7F8FA' }}>
+                {/* Original author row */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.gold + '28', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: C.gold, fontWeight: '800', fontSize: 13 }}>
+                      {(origData.authorName || '?').substring(0, 2).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: C.text, fontWeight: '700', fontSize: 13 }}>{origData.authorName || 'مستخدم'}</Text>
+                    <Text style={{ color: '#8A8D91', fontSize: 11 }}>{origData.category}</Text>
+                  </View>
+                </View>
+                {/* Original post content */}
+                <Text style={{ paddingHorizontal: 12, paddingBottom: origData.image_url ? 8 : 12, fontSize: 14, color: C.text, lineHeight: 22, textAlign: 'right' }} numberOfLines={4}>
+                  {origData.question}
+                </Text>
+                {origData.image_url && (
+                  <Image source={{ uri: origData.image_url }} style={{ width: '100%', height: 160 }} resizeMode="cover" />
+                )}
               </TouchableOpacity>
             )}
 
@@ -328,7 +389,8 @@ export default function ForumTab() {
 
             </View>
           </View>
-        )}
+          );
+        }}
       />
 
       {/* ─── Floating Action Button (FAB) ───────────────────────────────── */}

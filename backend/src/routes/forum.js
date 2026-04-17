@@ -39,12 +39,13 @@ router.get('/questions/:id', async (req, res, next) => {
 // POST /api/forum/questions
 router.post('/questions', requireAuth, async (req, res, next) => {
   try {
-    const { question, category, anonymous, image_url } = req.body;
+    const { question, category, anonymous, image_url, original_post_id, original_post_data } = req.body;
     if (!question || !category) return res.status(400).json({ message: 'question and category required' });
     const { rows: [row] } = await pool.query(
-      `INSERT INTO forum_questions (user_id, question, category, anonymous, is_visible, image_url)
-       VALUES ($1,$2,$3,$4,true,$5) RETURNING *`,
-      [req.user.id, question, category, anonymous !== false, image_url || null]
+      `INSERT INTO forum_questions (user_id, question, category, anonymous, is_visible, image_url, original_post_id, original_post_data)
+       VALUES ($1,$2,$3,$4,true,$5,$6,$7::jsonb) RETURNING *`,
+      [req.user.id, question, category, anonymous !== false, image_url || null,
+       original_post_id || null, original_post_data ? JSON.stringify(original_post_data) : null]
     );
     res.status(201).json({
       question: {

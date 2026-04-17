@@ -138,7 +138,10 @@ server.listen(PORT, '0.0.0.0', () => {
   db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS likes_count INTEGER DEFAULT 0').catch(() => {});
   db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS shares_count INTEGER DEFAULT 0').catch(() => {});
   db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)').catch(() => {});
-  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS liked_by JSONB DEFAULT \'[]\'').catch(() => {});
+  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS liked_by JSONB DEFAULT \'[]\' ').catch(() => {});
+  // Repost support — link shared posts to originals
+  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS original_post_id INTEGER').catch(() => {});
+  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS original_post_data JSONB').catch(() => {});
 
   // Reviews
   db.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS outcome VARCHAR(50)').catch(() => {});
