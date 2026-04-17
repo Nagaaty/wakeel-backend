@@ -216,16 +216,20 @@ export const adminAPI = {
 
 // ─── Forum API ───────────────────────────────────────────────────────────────
 export const forumAPI = {
-  getQuestions: (cat?: string, search?: string) => 
+  getQuestions: (cat?: string, search?: string) =>
     api.get('/forum/questions', { params: { cat, search } }),
-  createQuestion: (data: { question: string; category: string; anonymous?: boolean }) => 
+  getQuestion: (id: string | number) =>
+    api.get(`/forum/questions/${id}`),
+  createQuestion: (data: { question: string; category: string; anonymous?: boolean; image_url?: string }) =>
     api.post('/forum/questions', data),
-  getAnswers: (id: string | number) => 
+  getAnswers: (id: string | number) =>
     api.get(`/forum/questions/${id}/answers`),
-  createAnswer: (id: string | number, answer: string) => 
+  createAnswer: (id: string | number, answer: string) =>
     api.post(`/forum/questions/${id}/answers`, { answer }),
   likeQuestion: (id: string | number) =>
     api.post(`/forum/questions/${id}/like`),
+  sharePost: (id: string | number) =>
+    api.post(`/forum/questions/${id}/share`),
 };
 
 export const analyticsAPI = {

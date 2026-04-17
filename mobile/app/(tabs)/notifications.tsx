@@ -96,12 +96,25 @@ export default function NotificationsScreen() {
     setNotifs(p => p.map(n => ({ ...n, is_read: true })));
   };
 
-  // Social notifications → direct navigate (like LinkedIn)
-  // System notifications → expand inline
+  // Social → deep-link to the specific post page (LinkedIn/Facebook style)
+  // System → expand inline panel
   const handleTap = (n: any) => {
     if (!n.is_read) markRead(n.id);
     if (SOCIAL_TYPES.has(n.type)) {
-      router.push('/(tabs)/forum' as any);
+      // Try to get postId from data field, fallback to link
+      let postId: string | null = null;
+      if (n.data) {
+        const d = typeof n.data === 'string' ? JSON.parse(n.data) : n.data;
+        postId = d?.postId ? String(d.postId) : null;
+      }
+      if (!postId && n.link && n.link.startsWith('/post/')) {
+        postId = n.link.replace('/post/', '');
+      }
+      if (postId) {
+        router.push({ pathname: '/post/[id]', params: { id: postId } } as any);
+      } else {
+        router.push('/(tabs)/forum' as any);
+      }
       return;
     }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
