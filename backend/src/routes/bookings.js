@@ -22,7 +22,9 @@ router.post('/', requireAuth, async (req, res, next) => {
        WHERE u.id=$1`,
       [lawyerId]
     );
-    if (!lawyer) return res.status(404).json({ message: 'Lawyer not found' });
+    if (!lawyer) {
+      return res.status(404).json({ message: `Lawyer not found: ID [${lawyerId}] received but matched 0 rows in users table.` });
+    }
 
     // Determine Scheduled Timestamp
     const scheduledAt = `${bookingDate}T${startTime}:00`;
