@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, RefreshControl,
-  LayoutAnimation, UIManager, Platform,
+  LayoutAnimation, UIManager, Platform, Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../../src/theme';
@@ -14,27 +14,40 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListSkeleton } from '../../src/components/Skeleton';
 
-// Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+const SOCIAL_TYPES = new Set(['forum_like', 'forum_comment', 'forum_share']);
+
 const TYPE_ICONS: Record<string, string> = {
   booking: '📅', payment: '💰', message: '💬',
   review: '⭐', system: '🔔', reminder: '⏰', broadcast: '📣',
+  forum_like: '👍', forum_comment: '💬', forum_share: '🔁',
 };
 
-// Wakeel "W" sender avatar — shown on every notification like LinkedIn system messages
+// — Wakeel "W" system avatar
 function WakeelAvatar({ size = 44, gold }: { size?: number; gold: string }) {
   return (
     <View style={{
       width: size, height: size, borderRadius: size / 2,
       backgroundColor: gold,
       alignItems: 'center', justifyContent: 'center',
-      shadowColor: gold, shadowOpacity: 0.4, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-      elevation: 4,
     }}>
-      <Text style={{ color: '#1a1a2e', fontWeight: '900', fontSize: size * 0.42, letterSpacing: -0.5 }}>W</Text>
+      <Text style={{ color: '#1a1a2e', fontWeight: '900', fontSize: size * 0.42 }}>W</Text>
+    </View>
+  );
+}
+
+// — Actor avatar (for social notifications)
+function ActorAvatar({ url, name, size = 44, gold }: { url?: string; name?: string; size?: number; gold: string }) {
+  if (url) {
+    return <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#eee' }} />;
+  }
+  const initials = (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: gold + '30', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: gold + '60' }}>
+      <Text style={{ color: gold, fontWeight: '800', fontSize: size * 0.38 }}>{initials}</Text>
     </View>
   );
 }
@@ -122,7 +135,6 @@ export default function NotificationsScreen() {
           )}
         </View>
 
-        {/* Filter pills */}
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {(['all', 'unread'] as const).map(f => (
             <TouchableOpacity
@@ -150,9 +162,7 @@ export default function NotificationsScreen() {
           padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10,
         }}>
           <Text style={{ fontSize: 20 }}>🔔</Text>
-          <Text style={{ color: C.text, fontSize: 13, flex: 1 }}>
-            فعّل الإشعارات لتلقي تنبيهات الحجوزات والرسائل
-          </Text>
+          <Text style={{ color: C.text, fontSize: 13, flex: 1 }}>فعّل الإشعارات لتلقي تنبيهات الحجوزات والرسائل</Text>
           <TouchableOpacity
             onPress={async () => { const r = await registerForPushNotifications(); setPermStatus(r.status); }}
             style={{ backgroundColor: C.gold, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 }}>
@@ -175,7 +185,10 @@ export default function NotificationsScreen() {
         renderItem={({ item: n }) => {
           const isRead     = !!n.is_read;
           const isExpanded = expandedId === n.id;
+          const isSocial   = SOCIAL_TYPES.has(n.type);
           const icon       = TYPE_ICONS[n.type] || '🔔';
+          // Parse actor data for social notifications
+          const actorData  = isSocial && n.data ? (typeof n.data === 'string' ? JSON.parse(n.data) : n.data) : null;
 
           return (
             <View>
@@ -193,10 +206,14 @@ export default function NotificationsScreen() {
                     : C.gold + '0C',
                 }}>
 
-                {/* Wakeel "W" avatar (LinkedIn-style system message sender) */}
+                {/* Avatar: actor pic for social, W for system */}
                 <View>
-                  <WakeelAvatar size={46} gold={C.gold} />
-                  {/* Type icon badge on bottom-right of avatar */}
+                  {isSocial && actorData ? (
+                    <ActorAvatar url={actorData.actorAvatar} name={actorData.actorName} size={46} gold={C.gold} />
+                  ) : (
+                    <WakeelAvatar size={46} gold={C.gold} />
+                  )}
+                  {/* Type icon badge */}
                   <View style={{
                     position: 'absolute', bottom: -2, right: -2,
                     width: 20, height: 20, borderRadius: 10,
@@ -210,9 +227,11 @@ export default function NotificationsScreen() {
 
                 {/* Content */}
                 <View style={{ flex: 1 }}>
-                  {/* Sender line — "Wakeel" like LinkedIn */}
+                  {/* Sender line */}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 1 }}>
-                    <Text style={{ color: C.gold, fontWeight: '700', fontSize: 12 }}>Wakeel</Text>
+                    <Text style={{ color: C.gold, fontWeight: '700', fontSize: 12 }}>
+                      {isSocial && actorData ? actorData.actorName : 'Wakeel'}
+                    </Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                       <Text style={{ color: C.muted, fontSize: 11 }}>{timeAgo(n.created_at)}</Text>
                       {!isRead && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.gold }} />}
@@ -220,18 +239,13 @@ export default function NotificationsScreen() {
                   </View>
 
                   {/* Title */}
-                  <Text style={{ color: C.text, fontWeight: isRead ? '500' : '700', fontSize: 14 }}>
-                    {n.title}
-                  </Text>
+                  <Text style={{ color: C.text, fontWeight: isRead ? '500' : '700', fontSize: 14 }}>{n.title}</Text>
 
                   {/* Preview body (collapsed) */}
                   {!isExpanded && (
-                    <Text style={{ color: C.muted, fontSize: 13, marginTop: 2 }} numberOfLines={2}>
-                      {n.body}
-                    </Text>
+                    <Text style={{ color: C.muted, fontSize: 13, marginTop: 2 }} numberOfLines={2}>{n.body}</Text>
                   )}
 
-                  {/* Expand hint */}
                   <Text style={{ color: C.gold + '99', fontSize: 11, marginTop: 4 }}>
                     {isExpanded ? '▲ إخفاء' : '▼ عرض التفاصيل'}
                   </Text>
@@ -241,7 +255,7 @@ export default function NotificationsScreen() {
               {/* ── Expanded detail panel ─────────────────────────── */}
               {isExpanded && (
                 <View style={{
-                  marginHorizontal: 16, marginTop: 0, marginBottom: 10,
+                  marginHorizontal: 16, marginBottom: 10,
                   backgroundColor: C.card,
                   borderRadius: 14,
                   borderWidth: 1, borderColor: C.gold + '33',
@@ -250,41 +264,100 @@ export default function NotificationsScreen() {
                   shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
                   elevation: 4,
                 }}>
-                  {/* Panel header with sender */}
+                  {/* Panel header */}
                   <View style={{
                     flexDirection: 'row', alignItems: 'center', gap: 10,
                     backgroundColor: C.gold + '12',
                     paddingHorizontal: 14, paddingVertical: 10,
                     borderBottomWidth: 1, borderBottomColor: C.gold + '22',
                   }}>
-                    <WakeelAvatar size={34} gold={C.gold} />
-                    <View>
-                      <Text style={{ color: C.gold, fontWeight: '700', fontSize: 13 }}>Wakeel</Text>
-                      <Text style={{ color: C.muted, fontSize: 11 }}>منصة المحامين المعتمدة</Text>
+                    {isSocial && actorData ? (
+                      <ActorAvatar url={actorData.actorAvatar} name={actorData.actorName} size={34} gold={C.gold} />
+                    ) : (
+                      <WakeelAvatar size={34} gold={C.gold} />
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: C.gold, fontWeight: '700', fontSize: 13 }}>
+                        {isSocial && actorData ? actorData.actorName : 'Wakeel'}
+                      </Text>
+                      <Text style={{ color: C.muted, fontSize: 11 }}>
+                        {isSocial && actorData
+                          ? (actorData.actorRole === 'lawyer' ? 'محامٍ معتمد' : 'عضو في المنتدى')
+                          : 'منصة المحامين المعتمدة'
+                        }
+                      </Text>
                     </View>
-                    <Text style={{ color: C.muted, fontSize: 11, marginRight: 'auto' as any }}>{timeAgo(n.created_at)}</Text>
+                    <Text style={{ color: C.muted, fontSize: 11 }}>{timeAgo(n.created_at)}</Text>
                   </View>
 
                   {/* Full message */}
                   <View style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
                     <Text style={{ color: C.text, fontWeight: '700', fontSize: 15, marginBottom: 8 }}>{n.title}</Text>
                     <Text style={{ color: C.text, fontSize: 14, lineHeight: 22 }}>{n.body}</Text>
+
+                    {/* Post snippet preview for social */}
+                    {isSocial && actorData?.postSnippet && (
+                      <View style={{ marginTop: 12, padding: 10, backgroundColor: C.bg, borderRadius: 8, borderLeftWidth: 3, borderLeftColor: C.gold }}>
+                        <Text style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>📌 المنشور</Text>
+                        <Text style={{ color: C.text, fontSize: 13 }} numberOfLines={3}>
+                          {actorData.postSnippet}{actorData.postSnippet.length >= 80 ? '…' : ''}
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
-                  {/* Close button only — no misleading navigation */}
-                  <TouchableOpacity
-                    onPress={() => {
-                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                      setExpandedId(null);
-                    }}
-                    style={{
-                      marginHorizontal: 16, marginBottom: 14,
-                      paddingVertical: 10, borderRadius: 10,
-                      borderWidth: 1, borderColor: C.border,
-                      alignItems: 'center',
-                    }}>
-                    <Text style={{ color: C.muted, fontSize: 13 }}>إغلاق</Text>
-                  </TouchableOpacity>
+                  {/* Action buttons */}
+                  <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 14 }}>
+                    {/* Social: View Post + View Profile */}
+                    {isSocial && actorData ? (
+                      <>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setExpandedId(null);
+                            // Navigate to forum tab — the forum will show the feed
+                            router.push('/(tabs)/forum' as any);
+                          }}
+                          style={{ flex: 1, backgroundColor: C.gold, borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}>
+                          <Text style={{ color: '#000', fontWeight: '700', fontSize: 13 }}>عرض المنشور ›</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          onPress={() => {
+                            setExpandedId(null);
+                            if (actorData.actorRole === 'lawyer') {
+                              router.push({ pathname: '/lawyer/[id]', params: { id: actorData.actorId } } as any);
+                            } else {
+                              router.push({ pathname: '/user/[id]', params: { id: actorData.actorId } } as any);
+                            }
+                          }}
+                          style={{ flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1.5, borderColor: C.gold }}>
+                          <Text style={{ color: C.gold, fontWeight: '700', fontSize: 13 }}>عرض الملف ›</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      // System notification: just close
+                      <TouchableOpacity
+                        onPress={() => {
+                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                          setExpandedId(null);
+                        }}
+                        style={{ flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center' }}>
+                        <Text style={{ color: C.muted, fontSize: 13 }}>إغلاق</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Close row for social too */}
+                  {isSocial && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        setExpandedId(null);
+                      }}
+                      style={{ marginHorizontal: 16, marginBottom: 14, paddingVertical: 8, alignItems: 'center' }}>
+                      <Text style={{ color: C.muted, fontSize: 12 }}>إغلاق</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
             </View>
