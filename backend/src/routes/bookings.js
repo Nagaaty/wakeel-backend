@@ -15,15 +15,14 @@ router.post('/', requireAuth, async (req, res, next) => {
       return res.status(400).json({ message: 'lawyerId, bookingDate, startTime and fee required' });
     }
 
-    let { rows: [lawyer] } = await pool.query(
+    const { rows: [lawyer] } = await pool.query(
       `SELECT u.*, lp.price AS consultation_fee, lp.is_verified
        FROM users u LEFT JOIN lawyer_profiles lp ON lp.user_id=u.id
        WHERE u.id=$1`,
       [lawyerId]
     );
     if (!lawyer) {
-      console.log(`[DEBUG] Lawyer ID ${lawyerId} not found in users. Proceeding to FK constraint test...`);
-      lawyer = { id: lawyerId, email: null, phone: null, name: 'Unknown Lawyer' };
+      return res.status(404).json({ message: 'Lawyer not found' });
     }
 
     // Determine Scheduled Timestamp

@@ -95,8 +95,8 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const { rows: [lawyer] } = await pool.query(
-      `SELECT u.id, u.name, u.avatar_url, u.is_online, u.last_active_at, u.created_at,
-              lp.*,
+      `SELECT lp.*, 
+              u.id, u.name, u.avatar_url, u.is_online, u.last_active_at, u.created_at,
               (SELECT json_agg(r ORDER BY r.created_at DESC) FROM reviews r WHERE r.lawyer_id=u.id LIMIT 20) AS reviews,
               (SELECT json_agg(json_build_object('day_of_week', la.day_of_week, 'start_time', la.start_time)) FROM lawyer_availability la WHERE la.lawyer_id=u.id) AS availability_map,
               (SELECT json_agg(json_build_object('override_date', lo.override_date, 'is_off', lo.is_off, 'slots', lo.slots)) FROM lawyer_schedule_overrides lo WHERE lo.lawyer_id=u.id) AS schedule_overrides
