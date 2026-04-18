@@ -244,6 +244,12 @@ export const forumAPI = {
   // Comment likes
   likeAnswer: (id: string | number) =>
     api.post(`/forum/answers/${id}/like`),
+  // Nested comment replies
+  getReplies: (answerId: string | number) =>
+    api.get(`/forum/answers/${answerId}/replies`),
+  // Updated createAnswer — accepts optional parent_answer_id for replies
+  createAnswer: (id: string | number, answer: string, parent_answer_id?: number) =>
+    api.post(`/forum/questions/${id}/answers`, { answer, ...(parent_answer_id ? { parent_answer_id } : {}) }),
 };
 
 export const analyticsAPI = {

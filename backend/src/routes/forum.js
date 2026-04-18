@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool   = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { emitForum }  = require('../utils/socket');
 
 // ── Auto-migration: add comment-like columns if not present
 (async () => {
@@ -16,15 +17,16 @@ const { requireAuth } = require('../middleware/auth');
 // GET  /api/forum/questions
 router.get('/questions', async (req, res, next) => {
   try {
-    const { cat, search } = req.query;
+    const { cat, search, tag } = req.query;
     let q = `SELECT fq.*, u.name as asked_by, u.avatar_url as user_avatar_url, u.role as user_role,
-              (SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id) as answer_count
+              (SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id AND fa.parent_answer_id IS NULL) as answer_count
               FROM forum_questions fq
               LEFT JOIN users u ON u.id=fq.user_id
               WHERE fq.is_visible=true`;
     const params = [];
     if (cat)    { params.push(cat);    q += ` AND fq.category=$${params.length}`; }
     if (search) { params.push('%'+search+'%'); q += ` AND (fq.question ILIKE $${params.length} OR fq.category ILIKE $${params.length})`; }
+    if (tag)    { params.push(JSON.stringify([tag.toLowerCase()])); q += ` AND fq.tags @> $${params.length}::jsonb`; }
     q += ' ORDER BY fq.created_at DESC LIMIT 50';
     const { rows } = await pool.query(q, params);
     res.json({ questions: rows });
@@ -104,21 +106,25 @@ router.post('/questions', requireAuth, async (req, res, next) => {
   try {
     const { question, category, anonymous, image_url, original_post_id, original_post_data } = req.body;
     if (!question || !category) return res.status(400).json({ message: 'question and category required' });
+    // Extract hashtags from question text (supports Arabic + Latin + underscore)
+    const tags = (question.match(/#[\w\u0600-\u06FF_]+/g) || []).map(t => t.toLowerCase());
     const { rows: [row] } = await pool.query(
-      `INSERT INTO forum_questions (user_id, question, category, anonymous, is_visible, image_url, original_post_id, original_post_data)
-       VALUES ($1,$2,$3,$4,true,$5,$6,$7::jsonb) RETURNING *`,
+      `INSERT INTO forum_questions (user_id, question, category, anonymous, is_visible, image_url, original_post_id, original_post_data, tags)
+       VALUES ($1,$2,$3,$4,true,$5,$6,$7::jsonb,$8::jsonb) RETURNING *`,
       [req.user.id, question, category, anonymous !== false, image_url || null,
-       original_post_id || null, original_post_data ? JSON.stringify(original_post_data) : null]
+       original_post_id || null, original_post_data ? JSON.stringify(original_post_data) : null,
+       JSON.stringify(tags)]
     );
-    res.status(201).json({
-      question: {
-        ...row,
-        asked_by: anonymous ? 'Anonymous' : req.user.name,
-        user_avatar_url: anonymous ? null : req.user.avatar_url,
-        user_role: req.user.role,
-        answer_count: 0, views: 1,
-      }
-    });
+    const newPost = {
+      ...row,
+      asked_by: anonymous ? 'Anonymous' : req.user.name,
+      user_avatar_url: anonymous ? null : req.user.avatar_url,
+      user_role: req.user.role,
+      answer_count: 0, views: 1,
+    };
+    // Emit real-time event so other users see the new post immediately
+    emitForum('forum:new_post', { post: newPost });
+    res.status(201).json({ question: newPost });
   } catch (err) { next(err); }
 });
 
@@ -180,7 +186,8 @@ router.post('/questions/:id/like', requireAuth, async (req, res, next) => {
         ]
       ).catch(console.error);
     }
-
+    // ── Emit real-time like event so all clients update the count
+    emitForum('forum:like', { postId: parseInt(req.params.id), likes_count: row.likes_count, liked: true });
     res.json({ question: row, liked: true });
   } catch (err) { next(err); }
 });
@@ -247,37 +254,56 @@ router.post('/answers/:id/like', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /api/forum/questions/:id/answers
+// GET /api/forum/questions/:id/answers — top-level comments only
 router.get('/questions/:id/answers', async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT fa.*, u.name as lawyer_name, u.avatar_url as lawyer_avatar, u.role as lawyer_role, lp.specialization
+      `SELECT fa.*,
+              u.name as lawyer_name, u.avatar_url as lawyer_avatar, u.role as lawyer_role,
+              lp.specialization,
+              (SELECT COUNT(*) FROM forum_answers r WHERE r.parent_answer_id=fa.id) AS reply_count
        FROM forum_answers fa
        JOIN users u ON u.id=fa.lawyer_id
        LEFT JOIN lawyer_profiles lp ON lp.user_id=fa.lawyer_id
-       WHERE fa.question_id=$1 ORDER BY fa.is_accepted DESC, fa.upvotes DESC`,
+       WHERE fa.question_id=$1 AND fa.parent_answer_id IS NULL
+       ORDER BY fa.is_accepted DESC, fa.upvotes DESC, fa.created_at ASC`,
       [req.params.id]
     );
     res.json({ answers: rows });
   } catch (err) { next(err); }
 });
 
+// GET /api/forum/answers/:id/replies — replies to a specific comment
+router.get('/answers/:id/replies', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT fa.*, u.name as lawyer_name, u.avatar_url as lawyer_avatar, u.role as lawyer_role
+       FROM forum_answers fa
+       JOIN users u ON u.id=fa.lawyer_id
+       WHERE fa.parent_answer_id=$1
+       ORDER BY fa.created_at ASC`,
+      [req.params.id]
+    );
+    res.json({ replies: rows });
+  } catch (err) { next(err); }
+});
+
 // POST /api/forum/questions/:id/answers
 router.post('/questions/:id/answers', requireAuth, async (req, res, next) => {
   try {
-    const { answer } = req.body;
+    const { answer, parent_answer_id } = req.body;
     if (!answer) return res.status(400).json({ message: 'answer required' });
     const { rows: [row] } = await pool.query(
-      `INSERT INTO forum_answers (question_id, lawyer_id, answer) VALUES ($1,$2,$3) RETURNING *`,
-      [req.params.id, req.user.id, answer]
+      `INSERT INTO forum_answers (question_id, lawyer_id, answer, parent_answer_id) VALUES ($1,$2,$3,$4) RETURNING *`,
+      [req.params.id, req.user.id, answer, parent_answer_id || null]
     );
 
-    // Notify post author
+    // Notify post author (only for top-level comments, not replies)
     const { rows: [post] } = await pool.query(
       `SELECT user_id, question FROM forum_questions WHERE id=$1`, [req.params.id]
     ).catch(() => ({ rows: [] }));
 
-    if (post && post.user_id && post.user_id.toString() !== req.user.id.toString()) {
+    if (!parent_answer_id && post && post.user_id && post.user_id.toString() !== req.user.id.toString()) {
       const actor        = req.user;
       const snippet      = (post.question || '').substring(0, 80);
       const answerSnip   = (answer || '').substring(0, 60);
@@ -295,6 +321,8 @@ router.post('/questions/:id/answers', requireAuth, async (req, res, next) => {
       ).catch(console.error);
     }
 
+    // Emit real-time comment event
+    emitForum('forum:comment', { postId: parseInt(req.params.id), answer: { ...row, lawyer_name: req.user.name, lawyer_role: req.user.role }, isReply: !!parent_answer_id });
     res.status(201).json({ answer: row });
   } catch (err) { next(err); }
 });
@@ -332,6 +360,8 @@ router.post('/questions/:id/share', requireAuth, async (req, res, next) => {
     }
 
     res.json({ question: row });
+    // Emit real-time share event
+    emitForum('forum:share', { postId: parseInt(req.params.id), shares_count: row.shares_count });
   } catch (err) { next(err); }
 });
 

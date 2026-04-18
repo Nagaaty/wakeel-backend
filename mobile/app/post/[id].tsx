@@ -13,6 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/theme';
 import { useAuth } from '../../src/hooks/useAuth';
 import { forumAPI } from '../../src/services/api';
+import HashtagText from '../../src/components/HashtagText';
+import { useForumSocket } from '../../src/hooks/useForumSocket';
 
 /* ─── Helpers ──────────────────────────────────────────────────────────── */
 function UserAvatar({
@@ -79,6 +81,48 @@ export default function PostDetail() {
   const likeScale = useRef(new Animated.Value(1)).current;
 
   /* ─ Load ─ */
+  // ── Real-time Socket Events
+  useForumSocket({
+    onLike: ({ postId, likes_count }) => {
+      if (post?.id === postId) {
+        setPost((prev: any) => ({ ...prev, likes_count }));
+        setLikeCount(likes_count);
+      }
+    },
+    onComment: ({ postId, answer }) => {
+      if (post?.id === postId) {
+        setPost((prev: any) => ({ ...prev, answer_count: (prev.answer_count || 0) + 1 }));
+        if (!answer.parent_answer_id) {
+          setAnswers((prev: any) => [answer, ...prev]);
+        } else {
+          setReplies((prev: any) => ({ ...prev, [answer.parent_answer_id]: [...(prev[answer.parent_answer_id] || []), answer] }));
+        }
+      }
+    },
+    onShare: ({ postId, shares_count }) => {
+      if (post?.id === postId) {
+        setPost((prev: any) => ({ ...prev, shares_count }));
+      }
+    }
+  });
+
+  const toggleReplies = async (answerId: number) => {
+    if (expandedReplies.has(answerId)) {
+      setExpandedReplies(prev => { const n = new Set(prev); n.delete(answerId); return n; });
+    } else {
+      setExpandedReplies(prev => new Set(prev).add(answerId));
+      if (!replies[answerId]) {
+        setLoadingReplies(prev => new Set(prev).add(answerId));
+        try {
+          const res: any = await forumAPI.getReplies(answerId);
+          setReplies(prev => ({ ...prev, [answerId]: res.replies || [] }));
+        } catch {} finally {
+          setLoadingReplies(prev => { const n = new Set(prev); n.delete(answerId); return n; });
+        }
+      }
+    }
+  };
+
   const loadPost = useCallback(async () => {
     if (!id) return;
     try {
@@ -144,7 +188,8 @@ export default function PostDetail() {
     if (!answerText.trim() || posting) return;
     setPosting(true);
     try {
-      await forumAPI.createAnswer(id, answerText.trim());
+      await forumAPI.createAnswer(id, answerText.trim(), replyingTo?.answerId);
+      if (replyingTo) { toggleReplies(replyingTo.answerId); }
       setAnswerText('');
       await loadAnswers();
       setPost((p: any) => p ? { ...p, answer_count: (p.answer_count || 0) + 1 } : p);

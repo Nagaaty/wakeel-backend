@@ -1,23 +1,24 @@
 // ─── Socket.io Real-time Server ────────────────────────────────────────────────
-// Handles: live chat, typing indicators, online presence, notifications
+// Handles: live chat, typing indicators, online presence, notifications, forum events
 
 const jwt  = require('jsonwebtoken');
 const pool = require('../config/db');
 const { notifyNewMessage } = require('./push');
 
 const onlineUsers = new Map(); // userId → Set of socket IDs
+let _io = null; // singleton — accessible via getIO()
 
 function initSocket(server) {
   const { Server } = require('socket.io');
-  const io = new Server(server, {
+  _io = new Server(server, {
     cors: {
-      origin:      process.env.FRONTEND_URL || 'http://localhost:3000',
+      origin:      '*', // allow Expo Go + all origins (auth is token-based anyway)
       credentials: true,
     },
   });
 
   // ── Auth middleware ────────────────────────────────────────────────────────
-  io.use(async (socket, next) => {
+  _io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
       if (!token) return next(new Error('No token'));
@@ -28,7 +29,7 @@ function initSocket(server) {
     } catch { next(new Error('Invalid token')); }
   });
 
-  io.on('connection', async (socket) => {
+  _io.on('connection', async (socket) => {
     const userId = socket.userId;
     console.log(`🔌 Socket connected: user ${userId}`);
 
@@ -39,8 +40,9 @@ function initSocket(server) {
     // Mark user as online in DB
     await pool.query(`UPDATE users SET is_online=true, last_active_at=NOW() WHERE id=$1`, [userId]).catch(() => {});
 
-    // Join user's personal room
+    // Join user's personal room + a global forum room
     socket.join(`user:${userId}`);
+    socket.join('forum');
 
     // Tell others this user is online
     socket.broadcast.emit('user:online', { userId });
@@ -67,7 +69,7 @@ function initSocket(server) {
         const conv = rows[0];
 
         // Broadcast to conversation room
-        io.to(`conv:${conversationId}`).emit('message:new', {
+        _io.to(`conv:${conversationId}`).emit('message:new', {
           ...msg, sender_id: userId,
         });
 
@@ -109,7 +111,7 @@ function initSocket(server) {
 
     // ── Notify a specific user ────────────────────────────────────────────────
     socket.on('notify:user', ({ targetUserId, notification }) => {
-      io.to(`user:${targetUserId}`).emit('notification:new', notification);
+      _io.to(`user:${targetUserId}`).emit('notification:new', notification);
     });
 
     // ── Disconnect ────────────────────────────────────────────────────────────
@@ -127,15 +129,24 @@ function initSocket(server) {
     });
   });
 
-  return io;
+  return _io;
 }
 
 function isUserOnline(userId) {
   return onlineUsers.has(userId) && onlineUsers.get(userId).size > 0;
 }
 
-function emitToUser(io, userId, event, data) {
-  io.to(`user:${userId}`).emit(event, data);
+function emitToUser(userId, event, data) {
+  if (_io) _io.to(`user:${userId}`).emit(event, data);
 }
 
-module.exports = { initSocket, isUserOnline, emitToUser };
+/** Emit a forum real-time event to all connected clients */
+function emitForum(event, data) {
+  if (_io) _io.to('forum').emit(event, data);
+}
+
+/** Get the socket.io instance (for use in route files) */
+function getIO() { return _io; }
+
+module.exports = { initSocket, isUserOnline, emitToUser, emitForum, getIO };
+

@@ -9,6 +9,8 @@ import { forumAPI, uploadAPI } from '../../src/services/api';
 import { useAuth } from '../../src/hooks/useAuth';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import HashtagText from '../../src/components/HashtagText';
+import { useForumSocket } from '../../src/hooks/useForumSocket';
 
 /** Relative time — same pattern as LinkedIn (e.g. منذ 3 ساعات) */
 function timeAgo(iso: string) {
@@ -74,6 +76,10 @@ export default function ForumTab() {
   const [postingAnswer, setPostingAnswer] = useState(false);
   // Reply-to state (for replying to a specific comment)
   const [replyingTo, setReplyingTo]     = useState<{ name: string; answerId: number } | null>(null);
+  // Nested comments state
+  const [expandedReplies, setExpandedReplies] = useState<Set<number>>(new Set());
+  const [replies, setReplies] = useState<Record<number, any[]>>({});
+  const [loadingReplies, setLoadingReplies] = useState<Set<number>>(new Set());
   // Comment likes
   const [likedAnswers, setLikedAnswers] = useState<Set<number>>(new Set());
   // Share modal state
@@ -171,15 +177,33 @@ export default function ForumTab() {
     } catch (e: any) { Alert.alert('Error', e?.message); }
   };
 
+  useForumSocket({
+    onLike: ({ postId, likes_count }) => {
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes_count } : p));
+    },
+    onComment: ({ postId, answer }) => {
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, answer_count: (p.answer_count || 0) + 1 } : p));
+      if (commentPost?.id === postId) {
+        if (!answer.parent_answer_id) {
+          setAnswers(prev => [answer, ...prev]);
+        } else {
+          setReplies(prev => ({ ...prev, [answer.parent_answer_id]: [...(prev[answer.parent_answer_id] || []), answer] }));
+        }
+      }
+    },
+    onNewPost: ({ post }) => {
+      setPosts(prev => {
+        if (prev.some(p => p.id === post.id)) return prev;
+        return [post, ...prev];
+      });
+    },
+    onShare: ({ postId, shares_count }) => {
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, shares_count } : p));
+    }
+  });
+
   useEffect(() => {
     loadPosts();
-    // ── Polling: silently refresh counts every 30 seconds
-    const poll = setInterval(() => {
-      forumAPI.getQuestions().then((res: any) => {
-        setPosts(res.questions || []);
-      }).catch(() => {});
-    }, 30000);
-    return () => clearInterval(poll);
   }, []);
 
   const loadPosts = async () => {
@@ -359,7 +383,8 @@ export default function ForumTab() {
     try {
       // Prepend @name if replying to someone
       const text = replyingTo ? `@${replyingTo.name} ${answerText.trim()}` : answerText.trim();
-      await forumAPI.createAnswer(commentPost.id, text);
+      await forumAPI.createAnswer(commentPost.id, text, replyingTo?.answerId);
+      if (replyingTo) { toggleReplies(replyingTo.answerId); }
       setAnswerText('');
       setReplyingTo(null);
       const res: any = await forumAPI.getAnswers(commentPost.id);
@@ -519,13 +544,15 @@ export default function ForumTab() {
 
                 {/* Post text (caption / sharer's thought) */}
                 {p.question && p.question !== 'مشاركة' && (
-                  <Text style={{
-                    paddingHorizontal: 16, paddingBottom: isRepost ? 10 : (p.image_url ? 10 : 14),
-                    fontSize: 15, lineHeight: 24, color: '#1A1A1A',
-                    textAlign: 'right',
-                  }}>
-                    {p.question}
-                  </Text>
+                  <HashtagText
+                      text={p.question}
+                      goldColor="#0A66C2"
+                      style={{
+                        paddingHorizontal: 16, paddingBottom: isRepost ? 10 : (p.image_url ? 10 : 14),
+                        fontSize: 15, lineHeight: 24, color: '#1A1A1A',
+                        textAlign: 'right',
+                      }}
+                    />
                 )}
 
                 {/* Full-width image (original posts only) */}
@@ -572,12 +599,15 @@ export default function ForumTab() {
                     {(() => {
                       const cleanText = cleanQuotedText(origData.question);
                       return cleanText ? (
-                        <Text style={{
-                          padding: 10, paddingTop: 8,
-                          fontSize: 14, lineHeight: 22, color: '#1A1A1A', textAlign: 'right',
-                        }} numberOfLines={5}>
-                          {cleanText}
-                        </Text>
+                        <HashtagText
+                          text={cleanText}
+                          numberOfLines={5}
+                          goldColor="#0A66C2"
+                          style={{
+                            padding: 10, paddingTop: 8,
+                            fontSize: 14, lineHeight: 22, color: '#1A1A1A', textAlign: 'right',
+                          }}
+                        />
                       ) : null;
                     })()}
 
@@ -765,30 +795,50 @@ export default function ForumTab() {
                     </View>
                     {/* Like + Reply row under each comment */}
                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 14, marginTop: 4, paddingHorizontal: 4 }}>
-                      <Text style={{ color: C.muted, fontSize: 11 }}>
-                        {timeAgo(a.created_at)}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => handleLikeAnswer(a.id)}
-                        style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-                        <Text style={{ fontSize: 14, color: likedAnswers.has(a.id) ? '#0A66C2' : '#888' }}>
-                          {likedAnswers.has(a.id) ? '👍' : '🤍'}
-                        </Text>
-                        {(a.likes_count || 0) > 0 && (
-                          <Text style={{ fontSize: 11, color: likedAnswers.has(a.id) ? '#0A66C2' : '#888', fontWeight: '600' }}>
-                            {a.likes_count}
-                          </Text>
-                        )}
+                      <Text style={{ color: C.muted, fontSize: 11 }}>{timeAgo(a.created_at)}</Text>
+                      <TouchableOpacity onPress={() => handleLikeAnswer(a.id)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                        <Text style={{ fontSize: 14, color: likedAnswers.has(a.id) ? '#0A66C2' : '#888' }}>{likedAnswers.has(a.id) ? '👍' : '🤍'}</Text>
+                        {(a.likes_count || 0) > 0 && <Text style={{ fontSize: 11, color: likedAnswers.has(a.id) ? '#0A66C2' : '#888', fontWeight: '600' }}>{a.likes_count}</Text>}
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setReplyingTo({ name: a.lawyer_name || 'محامٍ', answerId: a.id });
-                        }}
-                        style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                      <TouchableOpacity onPress={() => setReplyingTo({ name: a.lawyer_name || 'محامٍ', answerId: a.id })} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
                         <Text style={{ fontSize: 13, color: '#888' }}>↩️</Text>
                         <Text style={{ fontSize: 12, color: '#888', fontWeight: '600' }}>رد</Text>
                       </TouchableOpacity>
                     </View>
+                    {(a.reply_count > 0 || expandedReplies.has(a.id)) && (
+                      <View style={{ marginTop: 8 }}>
+                        {a.reply_count > 0 && !expandedReplies.has(a.id) && (
+                           <TouchableOpacity onPress={() => toggleReplies(a.id)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                             <Text style={{ color: C.gold, fontSize: 13, fontWeight: '700' }}>⤿ عرض {a.reply_count} ردود</Text>
+                           </TouchableOpacity>
+                        )}
+                        {expandedReplies.has(a.id) && (
+                          loadingReplies.has(a.id) ? <ActivityIndicator size="small" color={C.gold} /> :
+                          <View style={{ gap: 12, paddingRight: 10, borderRightWidth: 2, borderColor: C.border, marginTop: 4 }}>
+                            {(replies[a.id] || []).map((rep: any) => (
+                              <View key={rep.id} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+                                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: C.card2, alignItems: 'center', justifyContent: 'center' }}>
+                                  <Text style={{ fontSize: 11, fontWeight: '800', color: C.muted }}>{(rep.lawyer_name || 'م').substring(0, 2).toUpperCase()}</Text>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                  <View style={{ backgroundColor: '#F0F2F5', borderRadius: 14, borderTopLeftRadius: 4, padding: 10 }}>
+                                    <Text style={{ color: C.text, fontWeight: '700', fontSize: 12, marginBottom: 4 }}>{rep.lawyer_name}</Text>
+                                    <Text style={{ color: C.text, fontSize: 13, textAlign: 'right' }}>{rep.answer}</Text>
+                                  </View>
+                                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                                    <Text style={{ color: C.muted, fontSize: 10 }}>{timeAgo(rep.created_at)}</Text>
+                                    <TouchableOpacity onPress={() => handleLikeAnswer(rep.id)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                                      <Text style={{ fontSize: 12, color: likedAnswers.has(rep.id) ? '#0A66C2' : '#888' }}>{likedAnswers.has(rep.id) ? '👍' : '🤍'}</Text>
+                                      {(rep.likes_count || 0) > 0 && <Text style={{ fontSize: 10, color: likedAnswers.has(rep.id) ? '#0A66C2' : '#888' }}>{rep.likes_count}</Text>}
+                                    </TouchableOpacity>
+                                  </View>
+                                </View>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    )}
                   </View>
                 </View>
               )}

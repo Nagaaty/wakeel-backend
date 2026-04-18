@@ -142,6 +142,11 @@ server.listen(PORT, '0.0.0.0', () => {
   // Repost support — link shared posts to originals
   db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS original_post_id INTEGER').catch(() => {});
   db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS original_post_data JSONB').catch(() => {});
+  // Hashtag system — store extracted #tags as a JSONB array
+  db.query("ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'").catch(() => {});
+  // Nested comments — replies reference a parent answer
+  db.query('ALTER TABLE forum_answers ADD COLUMN IF NOT EXISTS parent_answer_id INT REFERENCES forum_answers(id)').catch(() => {});
+
 
   // Reviews
   db.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS outcome VARCHAR(50)').catch(() => {});
