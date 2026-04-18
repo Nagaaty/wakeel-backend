@@ -331,175 +331,245 @@ export default function ForumTab() {
           </>
         }
         renderItem={({ item: p }) => {
-          // Parse original post data for repost detection
           const origData = p.original_post_data
-            ? (typeof p.original_post_data === 'string' ? JSON.parse(p.original_post_data) : p.original_post_data)
+            ? (typeof p.original_post_data === 'string'
+                ? JSON.parse(p.original_post_data)
+                : p.original_post_data)
             : null;
           const isRepost = !!origData;
+          const liked = likedPosts.has(p.id);
 
           return (
-          // ── Post / Repost Card ─────────────────────────────────────────
-          <View style={{ backgroundColor: C.surface, marginBottom: 8, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D3D6DB' }}>
-            
+            <View style={{ marginBottom: 8 }}>
 
-            {/* Repost banner: "🔁 lawyer 1 أعاد النشر" above the sharer header */}
-            {isRepost && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 2 }}>
-                <Text style={{ color: '#65676B', fontSize: 13 }}>🔁</Text>
-                <Text style={{ color: '#65676B', fontSize: 13 }}>
-                  {p.asked_by || 'مستخدم'} {isRTL ? 'أعاد النشر' : 'reposted this'}
-                </Text>
-              </View>
-            )}
-
-            {/* Author Header */}
-            <View style={{ padding: 16, paddingBottom: 10, flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-              <TouchableOpacity onPress={() => {
-                if (p.user_id === user?.id) {
-                  router.push(user?.role === 'lawyer' ? '/(lawyer-tabs)/profile' : '/(tabs)/profile' as any);
-                } else if (p.user_role === 'lawyer') {
-                  router.push({ pathname: '/lawyer/[id]', params: { id: p.user_id } } as any);
-                } else {
-                  router.push({ pathname: '/user/[id]', params: { id: p.user_id } } as any);
-                }
-              }}>
-                {/* Always use initials — no role icons confusing the author */}
-                <InitialsAvatar name={p.asked_by} size={50} gold={C.gold} />
-              </TouchableOpacity>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: C.text }}>{p.asked_by || 'مستخدم'}</Text>
-                  {p.user_role === 'lawyer' && <Text style={{ color: C.gold, fontSize: 11, fontWeight: '700', backgroundColor: C.gold + '18', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>⚖️ محامٍ</Text>}
-                </View>
-                <Text style={{ color: '#65676B', fontSize: 12, marginTop: 1, textAlign: 'right' }}>{p.category}</Text>
-                <Text style={{ color: '#8A8D91', fontSize: 11, marginTop: 1 }}>
-                  {timeAgo(p.created_at)} · 🌎
-                </Text>
-              </View>
-              <TouchableOpacity style={{ padding: 6 }}>
-                <Text style={{ color: '#65676B', fontSize: 20, fontWeight: '800', lineHeight: 20 }}>···</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Sharer's caption — only if not the empty placeholder */}
-            {(p.question && p.question !== 'مشاركة') && (
-              <Text style={{ paddingHorizontal: 16, fontSize: 15, color: C.text, lineHeight: 24, textAlign: 'right', marginBottom: (isRepost || p.image_url) ? 10 : 14 }}>
-                {p.question}
-              </Text>
-            )}
-
-            {/* Media — only for original (non-repost) posts */}
-            {!isRepost && p.image_url && (
-              <TouchableOpacity onPress={() => setLightboxUri(p.image_url)} activeOpacity={0.9}>
-                <Image source={{ uri: p.image_url }} style={{ width: '100%', height: 260, backgroundColor: '#E5E5E5' }} resizeMode="cover" />
-              </TouchableOpacity>
-            )}
-
-            {/* ── Quoted original post card (LinkedIn style) ── */}
-            {isRepost && origData && (
-              <TouchableOpacity
-                activeOpacity={0.88}
-                onPress={() => router.push({ pathname: '/post/[id]', params: { id: p.original_post_id } } as any)}
-                style={{
-                  marginHorizontal: 14, marginBottom: 12,
-                  borderWidth: 1, borderColor: '#CDD0D4',
-                  borderRadius: 12, overflow: 'hidden',
-                  backgroundColor: C.surface,
-                  // Subtle shadow to make it look embedded
-                  shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
-                  elevation: 2,
+              {/* ── Repost banner above card (like LinkedIn: "🔁 Name reposted") ── */}
+              {isRepost && (
+                <View style={{
+                  flexDirection: 'row-reverse', alignItems: 'center',
+                  gap: 6, paddingHorizontal: 20, paddingVertical: 6,
+                  backgroundColor: feedBg,
                 }}>
-                {/* Original author row */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#F0F2F5' }}>
-                  <InitialsAvatar name={origData.authorName} size={36} gold={C.gold} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: C.text, fontWeight: '700', fontSize: 13 }}>{origData.authorName || 'مستخدم'}</Text>
-                    <Text style={{ color: '#8A8D91', fontSize: 11 }}>
-                      {origData.authorRole === 'lawyer' ? '⚖️ محامٍ' : '👤 عميل'} · {origData.category}
+                  <Text style={{ color: '#00000060', fontSize: 12 }}>🔁</Text>
+                  <Text style={{ color: '#00000060', fontSize: 12, fontWeight: '600' }}>
+                    {p.asked_by || 'مستخدم'} أعاد النشر
+                  </Text>
+                </View>
+              )}
+
+              {/* ── White card with shadow ── */}
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                shadowColor: '#000',
+                shadowOpacity: 0.08,
+                shadowRadius: 8,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 3,
+              }}>
+
+                {/* Author row */}
+                <View style={{
+                  flexDirection: 'row-reverse',
+                  alignItems: 'flex-start',
+                  paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, gap: 12,
+                }}>
+                  {/* Avatar — tap to open profile */}
+                  <TouchableOpacity onPress={() => {
+                    if (p.user_id === user?.id) {
+                      router.push(user?.role === 'lawyer' ? '/(lawyer-tabs)/profile' : '/(tabs)/profile' as any);
+                    } else if (p.user_role === 'lawyer') {
+                      router.push({ pathname: '/lawyer/[id]', params: { id: p.user_id } } as any);
+                    } else {
+                      router.push({ pathname: '/user/[id]', params: { id: p.user_id } } as any);
+                    }
+                  }}>
+                    <InitialsAvatar name={p.asked_by} size={52} gold={C.gold} />
+                  </TouchableOpacity>
+
+                  {/* Name / role / time */}
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#1A1A1A' }}>
+                        {p.asked_by || 'مستخدم'}
+                      </Text>
+                      {p.user_role === 'lawyer' && (
+                        <View style={{ backgroundColor: C.gold + '22', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ color: C.gold, fontSize: 11, fontWeight: '700' }}>⚖️ محامٍ</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{ color: '#666', fontSize: 13, marginTop: 2, textAlign: 'right' }}>
+                      {p.category}
+                    </Text>
+                    <Text style={{ color: '#999', fontSize: 12, marginTop: 2, textAlign: 'right' }}>
+                      {timeAgo(p.created_at)} · 🌐
                     </Text>
                   </View>
+
+                  {/* ··· menu */}
+                  <TouchableOpacity style={{ paddingTop: 4, paddingLeft: 4 }}>
+                    <Text style={{ color: '#888', fontSize: 22, lineHeight: 22 }}>···</Text>
+                  </TouchableOpacity>
                 </View>
-                {/* Original post text */}
-                <Text style={{ paddingHorizontal: 12, paddingTop: 10, paddingBottom: origData.image_url ? 8 : 12, fontSize: 14, color: C.text, lineHeight: 22, textAlign: 'right' }} numberOfLines={5}>
-                  {origData.question}
-                </Text>
-                {/* Original image */}
-                {origData.image_url && (
-                  <Image source={{ uri: origData.image_url }} style={{ width: '100%', height: 170 }} resizeMode="cover" />
+
+                {/* Post text (caption / sharer's thought) */}
+                {p.question && p.question !== 'مشاركة' && (
+                  <Text style={{
+                    paddingHorizontal: 16, paddingBottom: isRepost ? 10 : (p.image_url ? 10 : 14),
+                    fontSize: 15, lineHeight: 24, color: '#1A1A1A',
+                    textAlign: 'right',
+                  }}>
+                    {p.question}
+                  </Text>
                 )}
-              </TouchableOpacity>
-            )}
 
-            {/* ── Metrics Row (tappable) ── */}
-            {((p.likes_count || 0) + (p.answer_count || 0) + (p.shares_count || 0)) > 0 && (
-              <View style={{ paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#E4E6EB' }}>
-                <TouchableOpacity
-                  onPress={() => (p.likes_count || 0) > 0 && openReactors('likes', p)}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  {(p.likes_count || 0) > 0 && (
-                    <>
-                      <View style={{ backgroundColor: '#1877F2', width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ color: '#FFF', fontSize: 9 }}>👍</Text>
+                {/* Full-width image (original posts only) */}
+                {!isRepost && p.image_url && (
+                  <TouchableOpacity onPress={() => setLightboxUri(p.image_url)} activeOpacity={0.95}>
+                    <Image
+                      source={{ uri: p.image_url }}
+                      style={{ width: '100%', height: 280, backgroundColor: '#E8E8E8' }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                )}
+
+                {/* ── Quoted original post card ── */}
+                {isRepost && origData && (
+                  <TouchableOpacity
+                    activeOpacity={0.88}
+                    onPress={() => router.push({ pathname: '/post/[id]', params: { id: p.original_post_id } } as any)}
+                    style={{
+                      marginHorizontal: 16, marginBottom: 12,
+                      borderWidth: 1.5, borderColor: '#E0E0E0',
+                      borderRadius: 10, overflow: 'hidden',
+                      backgroundColor: '#F7F8FA',
+                    }}>
+
+                    {/* Original author in card */}
+                    <View style={{
+                      flexDirection: 'row-reverse', alignItems: 'center',
+                      gap: 10, padding: 10, paddingBottom: 8,
+                      borderBottomWidth: 1, borderBottomColor: '#ECECEC',
+                    }}>
+                      <InitialsAvatar name={origData.authorName} size={34} gold={C.gold} />
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <Text style={{ fontWeight: '700', fontSize: 13, color: '#1A1A1A' }}>
+                          {origData.authorName || 'مستخدم'}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#888' }}>
+                          {origData.authorRole === 'lawyer' ? '⚖️ محامٍ' : '👤 عميل'} · {origData.category}
+                        </Text>
                       </View>
-                      <Text style={{ color: '#65676B', fontSize: 13 }}>{p.likes_count}</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                  {(p.answer_count || 0) > 0 && (
-                    <TouchableOpacity onPress={() => openReactors('comments', p)}>
-                      <Text style={{ color: '#65676B', fontSize: 13 }}>{p.answer_count} تعليق</Text>
+                    </View>
+
+                    {/* Original content */}
+                    <Text style={{
+                      padding: 10, paddingTop: 8,
+                      fontSize: 14, lineHeight: 22, color: '#1A1A1A', textAlign: 'right',
+                    }} numberOfLines={5}>
+                      {origData.question}
+                    </Text>
+
+                    {/* Original image */}
+                    {origData.image_url && (
+                      <Image
+                        source={{ uri: origData.image_url }}
+                        style={{ width: '100%', height: 160 }}
+                        resizeMode="cover"
+                      />
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {/* ── Stats row (only when > 0, tappable) ── */}
+                {((p.likes_count || 0) + (p.answer_count || 0) + (p.shares_count || 0)) > 0 && (
+                  <View style={{
+                    flexDirection: 'row-reverse',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 16, paddingVertical: 8,
+                    borderTopWidth: 1, borderTopColor: '#F0F0F0',
+                  }}>
+
+                    {/* Likes */}
+                    <TouchableOpacity
+                      onPress={() => (p.likes_count || 0) > 0 && openReactors('likes', p)}
+                      style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
+                      {(p.likes_count || 0) > 0 && (
+                        <>
+                          <Text style={{ color: '#444', fontSize: 13 }}>{p.likes_count}</Text>
+                          <View style={{
+                            width: 20, height: 20, borderRadius: 10,
+                            backgroundColor: '#1877F2',
+                            alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            <Text style={{ fontSize: 10, color: '#FFF' }}>👍</Text>
+                          </View>
+                        </>
+                      )}
                     </TouchableOpacity>
-                  )}
-                  {(p.shares_count || 0) > 0 && (
-                    <TouchableOpacity onPress={() => openReactors('reposts', p)}>
-                      <Text style={{ color: '#65676B', fontSize: 13 }}>{p.shares_count} إعادة نشر</Text>
-                    </TouchableOpacity>
-                  )}
+
+                    {/* Comments + Reposts */}
+                    <View style={{ flexDirection: 'row-reverse', gap: 14 }}>
+                      {(p.answer_count || 0) > 0 && (
+                        <TouchableOpacity onPress={() => openReactors('comments', p)}>
+                          <Text style={{ color: '#666', fontSize: 13 }}>{p.answer_count} تعليق</Text>
+                        </TouchableOpacity>
+                      )}
+                      {(p.shares_count || 0) > 0 && (
+                        <TouchableOpacity onPress={() => openReactors('reposts', p)}>
+                          <Text style={{ color: '#666', fontSize: 13 }}>{p.shares_count} إعادة نشر</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+                {/* ── Action bar (3 equal buttons in RTL order: أعجبني | تعليق | إعادة نشر) ── */}
+                <View style={{
+                  flexDirection: 'row-reverse',
+                  borderTopWidth: 1, borderTopColor: '#F0F0F0',
+                }}>
+                  {/* أعجبني (Like) — rightmost in Arabic */}
+                  <TouchableOpacity
+                    onPress={() => handleLike(p.id)}
+                    style={{ flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
+                    <Text style={{ fontSize: 18, color: liked ? '#0A66C2' : '#606060' }}>
+                      {liked ? '👍' : '🤍'}
+                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: liked ? '700' : '600', color: liked ? '#0A66C2' : '#606060' }}>
+                      أعجبني
+                    </Text>
+                  </TouchableOpacity>
+
+                  <View style={{ width: 1, backgroundColor: '#F0F0F0', marginVertical: 8 }} />
+
+                  {/* تعليق (Comment) */}
+                  <TouchableOpacity
+                    onPress={() => openComments(p)}
+                    style={{ flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
+                    <Text style={{ fontSize: 18, color: '#606060' }}>💬</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#606060' }}>تعليق</Text>
+                  </TouchableOpacity>
+
+                  <View style={{ width: 1, backgroundColor: '#F0F0F0', marginVertical: 8 }} />
+
+                  {/* إعادة نشر (Repost) — leftmost in Arabic */}
+                  <TouchableOpacity
+                    onPress={() => handleShare(p)}
+                    style={{ flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
+                    <Text style={{ fontSize: 18, color: '#606060' }}>🔁</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#606060' }}>إعادة نشر</Text>
+                  </TouchableOpacity>
                 </View>
+
               </View>
-            )}
-
-            {/* ── Action Bar (LinkedIn style: uniform text+icon) ── */}
-            <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#E4E6EB', paddingVertical: 2 }}>
-
-              {/* Like */}
-              <TouchableOpacity
-                onPress={() => handleLike(p.id)}
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 11 }}>
-                <Text style={{ fontSize: 17, color: likedPosts.has(p.id) ? '#0A66C2' : '#65676B' }}>
-                  {likedPosts.has(p.id) ? '👍' : '👍'}
-                </Text>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: likedPosts.has(p.id) ? '#0A66C2' : '#65676B' }}>
-                  أعجبني
-                </Text>
-              </TouchableOpacity>
-
-              <View style={{ width: 1, backgroundColor: '#E4E6EB', marginVertical: 8 }} />
-
-              {/* Comment */}
-              <TouchableOpacity
-                onPress={() => openComments(p)}
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 11 }}>
-                <Text style={{ fontSize: 17, color: '#65676B' }}>💬</Text>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: '#65676B' }}>تعليق</Text>
-              </TouchableOpacity>
-
-              <View style={{ width: 1, backgroundColor: '#E4E6EB', marginVertical: 8 }} />
-
-              {/* Repost */}
-              <TouchableOpacity
-                onPress={() => handleShare(p)}
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 11 }}>
-                <Text style={{ fontSize: 17, color: '#65676B' }}>🔁</Text>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: '#65676B' }}>إعادة نشر</Text>
-              </TouchableOpacity>
-
             </View>
-          </View>
           );
         }}
       />
+
+
 
       {/* ─── Floating Action Button (FAB) ───────────────────────────────── */}
       <TouchableOpacity
