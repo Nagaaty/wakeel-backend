@@ -558,7 +558,7 @@ export default function ForumTab() {
                   <TouchableOpacity
                     onPress={() => handleShare(p)}
                     style={{ flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
-                    <Text style={{ fontSize: 18, color: '#606060' }}>🔁</Text>
+                    <Text style={{ fontSize: 18, color: '#606060' }}>↩️</Text>
                     <Text style={{ fontSize: 13, fontWeight: '600', color: '#606060' }}>إعادة نشر</Text>
                   </TouchableOpacity>
                 </View>

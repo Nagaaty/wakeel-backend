@@ -210,105 +210,196 @@ export default function PostDetail() {
           showsVerticalScrollIndicator={false}>
 
           {/* ── Post Card ──────────────────────────────────────────── */}
-          <View style={{ backgroundColor: C.surface, marginBottom: 8, borderBottomWidth: 1, borderColor: '#D3D6DB' }}>
+          {(() => {
+            const origData = post.original_post_data
+              ? (typeof post.original_post_data === 'string'
+                  ? JSON.parse(post.original_post_data)
+                  : post.original_post_data)
+              : null;
+            const isRepost = !!origData;
 
-            {/* Author row */}
-            <View style={{ padding: 16, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <TouchableOpacity onPress={() => goToProfile(post.user_id, post.user_role)}>
-                <UserAvatar url={post.user_avatar_url} name={post.asked_by} size={52} gold={C.gold} />
-              </TouchableOpacity>
-              <View style={{ flex: 1 }}>
-                <TouchableOpacity onPress={() => goToProfile(post.user_id, post.user_role)}>
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, textAlign: 'right' }}>
-                    {post.asked_by || 'مستخدم'}
-                  </Text>
-                </TouchableOpacity>
-                <Text style={{ color: C.gold, fontSize: 12, marginTop: 1, textAlign: 'right' }}>{post.category}</Text>
-                <Text style={{ color: '#8A8D91', fontSize: 11, marginTop: 2, textAlign: 'right' }}>
-                  {timeAgo(post.created_at)} · 🌎 العامة
-                </Text>
-              </View>
-            </View>
+            return (
+              <View style={{ backgroundColor: '#FFFFFF', marginBottom: 8,
+                shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 6,
+                shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
 
-            {/* Post text */}
-            <Text style={{
-              paddingHorizontal: 16, fontSize: 16, color: C.text,
-              lineHeight: 26, textAlign: 'right',
-              marginBottom: post.image_url ? 10 : 16,
-            }}>
-              {post.question}
-            </Text>
-
-            {/* Image (only if present) */}
-            {!!post.image_url && (
-              <Image
-                source={{ uri: post.image_url }}
-                style={{ width: '100%', height: 260, backgroundColor: '#E5E5E5' }}
-                resizeMode="cover"
-              />
-            )}
-
-            {/* Stats row */}
-            <View style={{
-              paddingHorizontal: 16, paddingVertical: 10,
-              flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-              borderBottomWidth: 1, borderBottomColor: '#E4E6EB',
-            }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <View style={{ backgroundColor: '#1877F2', width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#FFF', fontSize: 11 }}>👍</Text>
-                </View>
-                <Text style={{ color: '#65676B', fontSize: 13 }}>{likeCount}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 14 }}>
-                <Text style={{ color: '#65676B', fontSize: 13 }}>{post.answer_count || answers.length} تعليق</Text>
-                {(post.shares_count || 0) > 0 && (
-                  <Text style={{ color: '#65676B', fontSize: 13 }}>{post.shares_count} إعادة نشر</Text>
+                {/* Repost banner (above author, like LinkedIn) */}
+                {isRepost && (
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center',
+                    gap: 6, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
+                    <Text style={{ color: '#00000055', fontSize: 12 }}>🔁</Text>
+                    <Text style={{ color: '#00000055', fontSize: 12, fontWeight: '600' }}>
+                      {post.asked_by || 'مستخدم'} أعاد النشر
+                    </Text>
+                  </View>
                 )}
+
+                {/* Author row */}
+                <View style={{ paddingHorizontal: 16, paddingTop: isRepost ? 8 : 16,
+                  paddingBottom: 10, flexDirection: 'row-reverse',
+                  alignItems: 'flex-start', gap: 12 }}>
+                  <TouchableOpacity onPress={() => goToProfile(post.user_id, post.user_role)}>
+                    <UserAvatar url={post.user_avatar_url} name={post.asked_by} size={52} gold={C.gold} />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#1A1A1A' }}>
+                        {post.asked_by || 'مستخدم'}
+                      </Text>
+                      {post.user_role === 'lawyer' && (
+                        <View style={{ backgroundColor: C.gold + '22', borderRadius: 6,
+                          paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ color: C.gold, fontSize: 11, fontWeight: '700' }}>⚖️ محامٍ</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{ color: '#666', fontSize: 13, marginTop: 2 }}>{post.category}</Text>
+                    <Text style={{ color: '#999', fontSize: 12, marginTop: 2 }}>
+                      {timeAgo(post.created_at)} · 🌐
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Sharer's caption — hide 'مشاركة' placeholder */}
+                {post.question && post.question !== 'مشاركة' && (
+                  <Text style={{
+                    paddingHorizontal: 16,
+                    paddingBottom: isRepost ? 10 : (post.image_url ? 10 : 16),
+                    fontSize: 16, lineHeight: 26, color: '#1A1A1A', textAlign: 'right',
+                  }}>
+                    {post.question}
+                  </Text>
+                )}
+
+                {/* Full image (original posts only) */}
+                {!isRepost && !!post.image_url && (
+                  <Image
+                    source={{ uri: post.image_url }}
+                    style={{ width: '100%', height: 280, backgroundColor: '#E5E5E5' }}
+                    resizeMode="cover"
+                  />
+                )}
+
+                {/* Quoted original post card */}
+                {isRepost && origData && (
+                  <View style={{
+                    marginHorizontal: 16, marginBottom: 14,
+                    borderWidth: 1.5, borderColor: '#E0E0E0',
+                    borderRadius: 10, overflow: 'hidden',
+                    backgroundColor: '#F7F8FA',
+                  }}>
+                    {/* Original author */}
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center',
+                      gap: 10, padding: 10, paddingBottom: 8,
+                      borderBottomWidth: 1, borderBottomColor: '#ECECEC' }}>
+                      <UserAvatar name={origData.authorName} size={34} gold={C.gold} />
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <Text style={{ fontWeight: '700', fontSize: 13, color: '#1A1A1A' }}>
+                          {origData.authorName || 'مستخدم'}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#888' }}>
+                          {origData.authorRole === 'lawyer' ? '⚖️ محامٍ' : '👤 عميل'} · {origData.category}
+                        </Text>
+                      </View>
+                    </View>
+                    {/* Original text */}
+                    <Text style={{
+                      padding: 10, paddingTop: 8,
+                      fontSize: 14, lineHeight: 22, color: '#1A1A1A', textAlign: 'right',
+                    }}>
+                      {origData.question}
+                    </Text>
+                    {/* Original image */}
+                    {origData.image_url && (
+                      <Image
+                        source={{ uri: origData.image_url }}
+                        style={{ width: '100%', height: 180 }}
+                        resizeMode="cover"
+                      />
+                    )}
+                  </View>
+                )}
+
+                {/* Stats row */}
+                {(likeCount + (post.answer_count || answers.length) + (post.shares_count || 0)) > 0 && (
+                  <View style={{
+                    paddingHorizontal: 16, paddingVertical: 8,
+                    flexDirection: 'row-reverse', justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderTopWidth: 1, borderTopColor: '#F0F0F0',
+                  }}>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
+                      {likeCount > 0 && (
+                        <>
+                          <Text style={{ color: '#555', fontSize: 13 }}>{likeCount}</Text>
+                          <View style={{ backgroundColor: '#1877F2', width: 20, height: 20,
+                            borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ color: '#FFF', fontSize: 10 }}>👍</Text>
+                          </View>
+                        </>
+                      )}
+                    </View>
+                    <View style={{ flexDirection: 'row-reverse', gap: 14 }}>
+                      {(post.answer_count || answers.length) > 0 && (
+                        <Text style={{ color: '#666', fontSize: 13 }}>
+                          {post.answer_count || answers.length} تعليق
+                        </Text>
+                      )}
+                      {(post.shares_count || 0) > 0 && (
+                        <Text style={{ color: '#666', fontSize: 13 }}>
+                          {post.shares_count} إعادة نشر
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+                {/* ── Action bar: RTL — أعجبني | تعليق | إعادة نشر ── */}
+                <View style={{ flexDirection: 'row-reverse',
+                  borderTopWidth: 1, borderTopColor: '#F0F0F0' }}>
+
+                  {/* أعجبني — rightmost in Arabic */}
+                  <TouchableOpacity
+                    onPress={handleLike}
+                    style={{ flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
+                      justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
+                    <Animated.Text
+                      style={{ fontSize: 20, transform: [{ scale: likeScale }],
+                        color: liked ? '#0A66C2' : '#606060' }}>
+                      {liked ? '👍' : '🤍'}
+                    </Animated.Text>
+                    <Text style={{ fontSize: 13, fontWeight: liked ? '700' : '600',
+                      color: liked ? '#0A66C2' : '#606060' }}>
+                      أعجبني
+                    </Text>
+                  </TouchableOpacity>
+
+                  <View style={{ width: 1, backgroundColor: '#F0F0F0', marginVertical: 8 }} />
+
+                  {/* تعليق */}
+                  <TouchableOpacity
+                    onPress={() => scrollRef.current?.scrollToEnd({ animated: true })}
+                    style={{ flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
+                      justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
+                    <Text style={{ fontSize: 20, color: '#606060' }}>💬</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#606060' }}>تعليق</Text>
+                  </TouchableOpacity>
+
+                  <View style={{ width: 1, backgroundColor: '#F0F0F0', marginVertical: 8 }} />
+
+                  {/* إعادة نشر — leftmost in Arabic */}
+                  <TouchableOpacity
+                    onPress={handleShare}
+                    style={{ flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
+                      justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
+                    <Text style={{ fontSize: 20, color: '#606060' }}>↩️</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#606060' }}>إعادة نشر</Text>
+                  </TouchableOpacity>
+
+                </View>
               </View>
-            </View>
-
-            {/* ── Action bar: Like | Comment | Share (always 3) ── */}
-            <View style={{ flexDirection: 'row', paddingVertical: 2 }}>
-
-              {/* Like */}
-              <TouchableOpacity
-                onPress={handleLike}
-                style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, flexDirection: 'row' }}>
-                <Animated.Text
-                  style={{ fontSize: 22, transform: [{ scale: likeScale }], color: liked ? '#1877F2' : '#65676B' }}>
-                  {liked ? '👍' : '🤍'}
-                </Animated.Text>
-                <Text style={{ color: liked ? '#1877F2' : '#65676B', fontSize: 14, fontWeight: liked ? '700' : '500' }}>
-                  أعجبني
-                </Text>
-              </TouchableOpacity>
-
-              <View style={{ width: 1, backgroundColor: '#E4E6EB', marginVertical: 8 }} />
-
-              {/* Comment */}
-              <TouchableOpacity
-                onPress={() => {
-                  // Focus the input by scrolling to bottom
-                  scrollRef.current?.scrollToEnd({ animated: true });
-                }}
-                style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, flexDirection: 'row' }}>
-                <Text style={{ fontSize: 22, color: '#65676B' }}>💬</Text>
-                <Text style={{ color: '#65676B', fontSize: 14, fontWeight: '500' }}>تعليق</Text>
-              </TouchableOpacity>
-
-              <View style={{ width: 1, backgroundColor: '#E4E6EB', marginVertical: 8 }} />
-
-              {/* Share — always visible for consistency */}
-              <TouchableOpacity
-                onPress={handleShare}
-                style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, flexDirection: 'row' }}>
-                <Text style={{ fontSize: 22, color: '#65676B' }}>📤</Text>
-                <Text style={{ color: '#65676B', fontSize: 14, fontWeight: '500' }}>مشاركة</Text>
-              </TouchableOpacity>
-
-            </View>
-          </View>
+            );
+          })()}
 
           {/* ── Comments Section ───────────────────────────────────── */}
           <View style={{ backgroundColor: C.surface }}>
