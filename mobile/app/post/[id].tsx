@@ -51,6 +51,15 @@ function timeAgo(iso: string) {
   return `منذ ${Math.floor(h / 24)} يوم`;
 }
 
+/** Strip old [إعادة نشر من X]: chain garbage from quoted cards */
+function cleanQuotedText(text: string | null | undefined): string {
+  if (!text) return '';
+  const lines = text.split('\n').filter(line => !line.trim().match(/^\[.+\][:：]?\s*$/));
+  const cleaned = lines.join('\n').trim();
+  return cleaned === '.' ? '' : cleaned;
+}
+
+
 /* ─── Screen ─────────────────────────────────────────────────────────── */
 export default function PostDetail() {
   const { id }    = useLocalSearchParams<{ id: string }>();
@@ -302,13 +311,18 @@ export default function PostDetail() {
                         </Text>
                       </View>
                     </View>
-                    {/* Original text */}
-                    <Text style={{
-                      padding: 10, paddingTop: 8,
-                      fontSize: 14, lineHeight: 22, color: '#1A1A1A', textAlign: 'right',
-                    }}>
-                      {origData.question}
-                    </Text>
+                    {/* Original text — cleaned of legacy [إعادة نشر من X]: chain text */}
+                    {(() => {
+                      const cleanText = cleanQuotedText(origData.question);
+                      return cleanText ? (
+                        <Text style={{
+                          padding: 10, paddingTop: 8,
+                          fontSize: 14, lineHeight: 22, color: '#1A1A1A', textAlign: 'right',
+                        }}>
+                          {cleanText}
+                        </Text>
+                      ) : null;
+                    })()}
                     {/* Original image */}
                     {origData.image_url && (
                       <Image

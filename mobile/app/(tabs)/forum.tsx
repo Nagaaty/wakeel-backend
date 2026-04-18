@@ -26,6 +26,20 @@ function timeAgo(iso: string) {
   return `منذ ${Math.floor(days / 30)} شهر`;
 }
 
+/**
+ * Strip old-format repost chain text like "[إعادة نشر من lawyer1]:[إعادة نشر من X]: ."
+ * This is garbage data written by the old system. Show clean content only.
+ */
+function cleanQuotedText(text: string | null | undefined): string {
+  if (!text) return '';
+  // Remove lines starting with [ and ending with ]:
+  const lines = text.split('\n').filter(line => !line.trim().match(/^\[.+\][:：]?\s*$/));
+  const cleaned = lines.join('\n').trim();
+  // Also strip the remaining orphan "." left by old chain
+  return cleaned === '.' ? '' : cleaned;
+}
+
+
 /** Compact initials-only avatar — never shows role icons */
 function InitialsAvatar({ name, size = 44, gold }: { name?: string; size?: number; gold: string }) {
   const ini = (name || '؟')
@@ -462,12 +476,17 @@ export default function ForumTab() {
                     </View>
 
                     {/* Original content */}
-                    <Text style={{
-                      padding: 10, paddingTop: 8,
-                      fontSize: 14, lineHeight: 22, color: '#1A1A1A', textAlign: 'right',
-                    }} numberOfLines={5}>
-                      {origData.question}
-                    </Text>
+                    {(() => {
+                      const cleanText = cleanQuotedText(origData.question);
+                      return cleanText ? (
+                        <Text style={{
+                          padding: 10, paddingTop: 8,
+                          fontSize: 14, lineHeight: 22, color: '#1A1A1A', textAlign: 'right',
+                        }} numberOfLines={5}>
+                          {cleanText}
+                        </Text>
+                      ) : null;
+                    })()}
 
                     {/* Original image */}
                     {origData.image_url && (
