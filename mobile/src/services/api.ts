@@ -234,6 +234,9 @@ export const forumAPI = {
     api.get(`/forum/questions/${id}/likers`),
   getReposts: (id: string | number) =>
     api.get(`/forum/questions/${id}/reposts`),
+  // Find the repost of :originalId created by :actorId — used for notification deep-link
+  getRepostByUser: (originalId: string | number, actorId: string | number) =>
+    api.get(`/forum/questions/${originalId}/repost-by/${actorId}`),
 };
 
 export const analyticsAPI = {

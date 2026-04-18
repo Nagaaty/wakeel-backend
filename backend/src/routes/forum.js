@@ -68,6 +68,24 @@ router.get('/questions/:id/reposts', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/forum/questions/:id/repost-by/:userId
+// Find the repost of post :id that was created by :userId
+// Used by notification tap handler to correctly deep-link to the reposter's post
+router.get('/questions/:id/repost-by/:userId', async (req, res, next) => {
+  try {
+    const { rows: [repost] } = await pool.query(
+      `SELECT id FROM forum_questions
+       WHERE original_post_id=$1 AND user_id=$2 AND is_visible=true
+       ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id, req.params.userId]
+    );
+    if (!repost) return res.status(404).json({ message: 'Repost not found' });
+    res.json({ repost_id: repost.id });
+  } catch (err) { next(err); }
+});
+
+
+
 
 
 // POST /api/forum/questions

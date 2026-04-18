@@ -6,7 +6,7 @@ import {
 import { router } from 'expo-router';
 import { useTheme } from '../../src/theme';
 import { Empty } from '../../src/components/ui';
-import { notificationsAPI } from '../../src/services/api';
+import { notificationsAPI, forumAPI } from '../../src/services/api';
 import {
   getNotificationPermissionStatus,
   registerForPushNotifications,
@@ -98,15 +98,40 @@ export default function NotificationsScreen() {
 
   // Social → deep-link to the specific post page (LinkedIn/Facebook style)
   // System → expand inline panel
-  const handleTap = (n: any) => {
+  const handleTap = async (n: any) => {
     if (!n.is_read) markRead(n.id);
     if (SOCIAL_TYPES.has(n.type)) {
-      // Try to get postId from data field, fallback to link
-      let postId: string | null = null;
-      if (n.data) {
-        const d = typeof n.data === 'string' ? JSON.parse(n.data) : n.data;
-        postId = d?.postId ? String(d.postId) : null;
+      const d = n.data
+        ? (typeof n.data === 'string' ? JSON.parse(n.data) : n.data)
+        : {};
+
+      // ── forum_share: ALWAYS navigate to the reposter's post, not the original ──
+      // Look up the repost created by actorId of originalPostId in real time.
+      // This fixes both old notifications (wrong link in DB) and new ones.
+      if (n.type === 'forum_share') {
+        const actorId       = d?.actorId;
+        const originalPostId = d?.originalPostId || d?.postId;
+        if (actorId && originalPostId) {
+          try {
+            const res: any = await forumAPI.getRepostByUser(originalPostId, actorId);
+            const repostId = res?.repost_id || res?.data?.repost_id;
+            if (repostId) {
+              router.push({ pathname: '/post/[id]', params: { id: String(repostId) } } as any);
+              return;
+            }
+          } catch {}
+        }
+        // Fallback: try link field
+        if (n.link && n.link.startsWith('/post/')) {
+          router.push({ pathname: '/post/[id]', params: { id: n.link.replace('/post/', '') } } as any);
+          return;
+        }
+        router.push('/(tabs)/forum' as any);
+        return;
       }
+
+      // ── forum_like / forum_comment: go to the post directly ──
+      let postId: string | null = d?.postId ? String(d.postId) : null;
       if (!postId && n.link && n.link.startsWith('/post/')) {
         postId = n.link.replace('/post/', '');
       }
