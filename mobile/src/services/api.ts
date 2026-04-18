@@ -234,9 +234,16 @@ export const forumAPI = {
     api.get(`/forum/questions/${id}/likers`),
   getReposts: (id: string | number) =>
     api.get(`/forum/questions/${id}/reposts`),
-  // Find the repost of :originalId created by :actorId — used for notification deep-link
   getRepostByUser: (originalId: string | number, actorId: string | number) =>
     api.get(`/forum/questions/${originalId}/repost-by/${actorId}`),
+  // Post management
+  deletePost: (id: string | number) =>
+    api.delete(`/forum/questions/${id}`),
+  editPost: (id: string | number, question: string) =>
+    api.patch(`/forum/questions/${id}`, { question }),
+  // Comment likes
+  likeAnswer: (id: string | number) =>
+    api.post(`/forum/answers/${id}/like`),
 };
 
 export const analyticsAPI = {

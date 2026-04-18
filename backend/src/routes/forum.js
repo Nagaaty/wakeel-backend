@@ -2,6 +2,17 @@ const router = require('express').Router();
 const pool   = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 
+// ── Auto-migration: add comment-like columns if not present
+(async () => {
+  try {
+    await pool.query(`
+      ALTER TABLE forum_answers
+        ADD COLUMN IF NOT EXISTS likes_count INT DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS liked_by    JSONB DEFAULT '[]'::jsonb
+    `);
+  } catch (e) { console.warn('forum_answers migration skipped:', e.message); }
+})();
+
 // GET  /api/forum/questions
 router.get('/questions', async (req, res, next) => {
   try {
@@ -111,84 +122,129 @@ router.post('/questions', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/forum/questions/:id/like  — idempotent, fixed notification bug
+// POST /api/forum/questions/:id/like — TOGGLE (like OR unlike)
 router.post('/questions/:id/like', requireAuth, async (req, res, next) => {
   try {
     const userId = req.user.id.toString();
 
-    // ── PRE-CHECK (before UPDATE) because RETURNING evaluates post-mutation
     const { rows: [pre] } = await pool.query(
       `SELECT liked_by @> $2::jsonb AS already_liked, user_id, question
        FROM forum_questions WHERE id=$1`,
       [req.params.id, JSON.stringify([userId])]
     );
     if (!pre) return res.status(404).json({ message: 'Post not found' });
-
     const wasAlreadyLiked = !!pre.already_liked;
 
-    // ── UPDATE
-    const { rows: [row] } = await pool.query(
+    let row;
+    if (wasAlreadyLiked) {
+      // ── UNLIKE — remove from array, decrement
+      const { rows } = await pool.query(
+        `UPDATE forum_questions
+           SET likes_count = GREATEST(0, COALESCE(likes_count, 0) - 1),
+               liked_by = (
+                 SELECT COALESCE(jsonb_agg(x), '[]'::jsonb)
+                 FROM jsonb_array_elements(COALESCE(liked_by, '[]'::jsonb)) AS x
+                 WHERE x != to_jsonb($2::text)
+               )
+         WHERE id=$1 RETURNING *`,
+        [req.params.id, userId]
+      );
+      row = rows[0];
+      return res.json({ question: row, liked: false });
+    }
+
+    // ── LIKE — add to array, increment
+    const { rows } = await pool.query(
       `UPDATE forum_questions
-         SET likes_count = CASE
-               WHEN liked_by @> $2::jsonb THEN likes_count
-               ELSE COALESCE(likes_count, 0) + 1
-             END,
-             liked_by = COALESCE(
-               CASE WHEN liked_by @> $2::jsonb THEN liked_by
-                    ELSE liked_by || $2::jsonb END,
-               $2::jsonb)
+         SET likes_count = COALESCE(likes_count, 0) + 1,
+             liked_by = COALESCE(liked_by, '[]'::jsonb) || $2::jsonb
        WHERE id=$1 RETURNING *`,
       [req.params.id, JSON.stringify([userId])]
     );
+    row = rows[0];
 
-    // ── NOTIFY only on first like
-    if (!wasAlreadyLiked && pre.user_id && pre.user_id.toString() !== req.user.id.toString()) {
+    // ── Notify on like (only when liking, not unliking)
+    if (pre.user_id && pre.user_id.toString() !== req.user.id.toString()) {
       const actor   = req.user;
-      const snippet = (pre.question || '').substring(0, 80);
-      const postId  = req.params.id;
+      const rawSnip = (pre.question || '').trim();
+      const snippet = (rawSnip && rawSnip !== 'مشاركة') ? rawSnip.substring(0, 80) : 'منشورك الأصلي';
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, body, link, data)
          VALUES ($1,'forum_like',$2,$3,$4,$5::jsonb)`,
         [
           pre.user_id,
           `👍 ${actor.name} أعجبه منشورك`,
-          `"${snippet}${snippet.length >= 80 ? '…' : ''}"`,
-          `/post/${postId}`,
-          JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: parseInt(postId), postSnippet: snippet, action: 'like' }),
+          `"${snippet}${rawSnip.length >= 80 ? '…' : ''}"`,
+          `/post/${req.params.id}`,
+          JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: parseInt(req.params.id), postSnippet: snippet, action: 'like' }),
         ]
       ).catch(console.error);
     }
 
-    res.json({ question: row, already_liked: wasAlreadyLiked });
-  } catch (err) {
-    // Fallback if liked_by column doesn't exist yet
-    try {
-      const { rows: [pre] } = await pool.query(
-        `SELECT user_id, question FROM forum_questions WHERE id=$1`, [req.params.id]
-      ).catch(() => ({ rows: [null] }));
+    res.json({ question: row, liked: true });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/forum/questions/:id — soft-delete own post (reposts stay visible)
+router.delete('/questions/:id', requireAuth, async (req, res, next) => {
+  try {
+    const { rows: [row] } = await pool.query(
+      `UPDATE forum_questions SET is_visible=false WHERE id=$1 AND user_id=$2 RETURNING id`,
+      [req.params.id, req.user.id]
+    );
+    if (!row) return res.status(403).json({ message: 'Not found or not authorized' });
+    res.json({ success: true, id: parseInt(req.params.id) });
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/forum/questions/:id — edit own post text
+router.patch('/questions/:id', requireAuth, async (req, res, next) => {
+  try {
+    const { question } = req.body;
+    if (!question) return res.status(400).json({ message: 'question required' });
+    const { rows: [row] } = await pool.query(
+      `UPDATE forum_questions SET question=$2 WHERE id=$1 AND user_id=$3 AND is_visible=true RETURNING *`,
+      [req.params.id, question, req.user.id]
+    );
+    if (!row) return res.status(403).json({ message: 'Not found or not authorized' });
+    res.json({ question: row });
+  } catch (err) { next(err); }
+});
+
+// POST /api/forum/answers/:id/like — toggle like on a comment
+router.post('/answers/:id/like', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString();
+    const { rows: [pre] } = await pool.query(
+      `SELECT liked_by @> $2::jsonb AS already_liked FROM forum_answers WHERE id=$1`,
+      [req.params.id, JSON.stringify([userId])]
+    );
+    if (!pre) return res.status(404).json({ message: 'Answer not found' });
+
+    if (pre.already_liked) {
       const { rows: [row] } = await pool.query(
-        `UPDATE forum_questions SET likes_count = COALESCE(likes_count, 0) + 1 WHERE id=$1 RETURNING *`,
-        [req.params.id]
+        `UPDATE forum_answers
+           SET likes_count = GREATEST(0, COALESCE(likes_count, 0) - 1),
+               liked_by = (
+                 SELECT COALESCE(jsonb_agg(x), '[]'::jsonb)
+                 FROM jsonb_array_elements(COALESCE(liked_by, '[]'::jsonb)) AS x
+                 WHERE x != to_jsonb($2::text)
+               )
+         WHERE id=$1 RETURNING id, likes_count, liked_by`,
+        [req.params.id, userId]
       );
-      if (!row) return res.status(404).json({ message: 'Post not found' });
-      if (pre && pre.user_id && pre.user_id.toString() !== req.user.id.toString()) {
-        const actor   = req.user;
-        const snippet = (pre.question || '').substring(0, 80);
-        await pool.query(
-          `INSERT INTO notifications (user_id, type, title, body, link, data)
-           VALUES ($1,'forum_like',$2,$3,$4,$5::jsonb)`,
-          [
-            pre.user_id,
-            `👍 ${actor.name} أعجبه منشورك`,
-            `"${snippet}${snippet.length >= 80 ? '…' : ''}"`,
-            `/post/${row.id}`,
-            JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: row.id, postSnippet: snippet, action: 'like' }),
-          ]
-        ).catch(console.error);
-      }
-      res.json({ question: row });
-    } catch (e2) { next(e2); }
-  }
+      return res.json({ answer: row, liked: false });
+    }
+
+    const { rows: [row] } = await pool.query(
+      `UPDATE forum_answers
+         SET likes_count = COALESCE(likes_count, 0) + 1,
+             liked_by = COALESCE(liked_by, '[]'::jsonb) || $2::jsonb
+       WHERE id=$1 RETURNING id, likes_count, liked_by`,
+      [req.params.id, JSON.stringify([userId])]
+    );
+    res.json({ answer: row, liked: true });
+  } catch (err) { next(err); }
 });
 
 // GET /api/forum/questions/:id/answers

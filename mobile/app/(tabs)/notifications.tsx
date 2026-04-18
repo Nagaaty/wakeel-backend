@@ -27,6 +27,16 @@ const TYPE_BADGE: Record<string, string> = {
   forum_like:    '👍', forum_comment: '💬', forum_share:'🔁',
 };
 
+/** Strip "مشاركة" placeholder and other garbage from notification body preview */
+function cleanNotifBody(body: string | null | undefined): string {
+  if (!body) return '';
+  // Remove surrounding quotes if present
+  const stripped = body.replace(/^[""](.*)[""]$/, '$1').trim();
+  if (!stripped || stripped === 'مشاركة' || stripped === 'مشاركة.') return 'منشورك الأصلي';
+  return stripped;
+}
+
+
 // ── Parse actor name from notification title e.g. "💬 Omar liked your post"
 function extractActorName(title: string): string {
   // Title format: "emoji name action" — strip leading emoji + space
@@ -322,7 +332,7 @@ export default function NotificationsScreen() {
                     <Text
                       style={{ color: C.muted, fontSize: 13, marginTop: 3, lineHeight: 18, textAlign: 'right' }}
                       numberOfLines={isSocial ? 1 : 2}>
-                      {n.body}
+                      {cleanNotifBody(n.body)}
                     </Text>
                   ) : null}
                   {/* Time + expand hint for system */}

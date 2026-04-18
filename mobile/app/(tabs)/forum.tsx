@@ -72,6 +72,10 @@ export default function ForumTab() {
   const [answersLoading, setAnswersLoading] = useState(false);
   const [answerText, setAnswerText]       = useState('');
   const [postingAnswer, setPostingAnswer] = useState(false);
+  // Reply-to state (for replying to a specific comment)
+  const [replyingTo, setReplyingTo]     = useState<{ name: string; answerId: number } | null>(null);
+  // Comment likes
+  const [likedAnswers, setLikedAnswers] = useState<Set<number>>(new Set());
   // Share modal state
   const [sharingPost, setSharingPost]     = useState<any | null>(null);
   const [repostPost, setRepostPost]       = useState<any | null>(null);
@@ -81,6 +85,12 @@ export default function ForumTab() {
   const [attachedFile, setAttachedFile]   = useState<string | null>(null);
   const [uploading, setUploading]         = useState(false);
   const [lightboxUri, setLightboxUri]     = useState<string | null>(null);
+  // Post ··· menu state
+  const [menuPost, setMenuPost]           = useState<any | null>(null);
+  // Edit post state
+  const [editingPost, setEditingPost]     = useState<any | null>(null);
+  const [editText, setEditText]           = useState('');
+  const [savingEdit, setSavingEdit]       = useState(false);
   // Reactors sheet (who liked / reposted)
   const [reactorsSheet, setReactorsSheet] = useState<{
     type: 'likes' | 'reposts' | 'comments';
@@ -163,6 +173,13 @@ export default function ForumTab() {
 
   useEffect(() => {
     loadPosts();
+    // ── Polling: silently refresh counts every 30 seconds
+    const poll = setInterval(() => {
+      forumAPI.getQuestions().then((res: any) => {
+        setPosts(res.questions || []);
+      }).catch(() => {});
+    }, 30000);
+    return () => clearInterval(poll);
   }, []);
 
   const loadPosts = async () => {
@@ -178,19 +195,92 @@ export default function ForumTab() {
   };
 
   const handleLike = async (id: number) => {
-    if (likedPosts.has(id)) return; // Prevent double liking
-    
-    // Optimistic UI update & track local visually
-    setLikedPosts(prev => new Set(prev).add(id));
-    setPosts(prev => prev.map(p => p.id === id ? { ...p, likes_count: (p.likes_count||0)+1 } : p));
-    try {
-      await forumAPI.likeQuestion(id);
-    } catch {
-      // Revert if failed
+    const isLiked = likedPosts.has(id);
+    // Optimistic toggle
+    if (isLiked) {
       setLikedPosts(prev => { const n = new Set(prev); n.delete(id); return n; });
       setPosts(prev => prev.map(p => p.id === id ? { ...p, likes_count: Math.max(0, (p.likes_count||1)-1) } : p));
+    } else {
+      setLikedPosts(prev => new Set(prev).add(id));
+      setPosts(prev => prev.map(p => p.id === id ? { ...p, likes_count: (p.likes_count||0)+1 } : p));
+    }
+    try {
+      const res: any = await forumAPI.likeQuestion(id);
+      // Sync server count
+      const serverCount = res?.question?.likes_count ?? res?.data?.question?.likes_count;
+      if (serverCount !== undefined) {
+        setPosts(prev => prev.map(p => p.id === id ? { ...p, likes_count: serverCount } : p));
+      }
+      const liked = res?.liked ?? res?.data?.liked;
+      if (liked === false) setLikedPosts(prev => { const n = new Set(prev); n.delete(id); return n; });
+      else if (liked === true) setLikedPosts(prev => new Set(prev).add(id));
+    } catch {
+      // Revert on error
+      if (isLiked) setLikedPosts(prev => new Set(prev).add(id));
+      else { setLikedPosts(prev => { const n = new Set(prev); n.delete(id); return n; }); }
     }
   };
+
+  const handleDeletePost = useCallback(async (post: any) => {
+    Alert.alert(
+      'حذف المنشور',
+      'هل أنت متأكد أنك تريد حذف هذا المنشور؟ لا يمكن التراجع.',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'حذف', style: 'destructive',
+          onPress: async () => {
+            try {
+              await forumAPI.deletePost(post.id);
+              setPosts(prev => prev.filter(p => p.id !== post.id));
+              setMenuPost(null);
+            } catch {
+              Alert.alert('خطأ', 'تعذّر حذف المنشور');
+            }
+          },
+        },
+      ]
+    );
+  }, []);
+
+  const handleEditPost = useCallback((post: any) => {
+    setMenuPost(null);
+    setEditingPost(post);
+    setEditText(post.question || '');
+  }, []);
+
+  const saveEdit = useCallback(async () => {
+    if (!editText.trim() || !editingPost) return;
+    setSavingEdit(true);
+    try {
+      await forumAPI.editPost(editingPost.id, editText.trim());
+      setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, question: editText.trim() } : p));
+      setEditingPost(null);
+      setEditText('');
+    } catch {
+      Alert.alert('خطأ', 'تعذّر تعديل المنشور');
+    } finally { setSavingEdit(false); }
+  }, [editText, editingPost]);
+
+  const handleLikeAnswer = useCallback(async (answerId: number) => {
+    const isLiked = likedAnswers.has(answerId);
+    // Optimistic toggle
+    if (isLiked) {
+      setLikedAnswers(prev => { const n = new Set(prev); n.delete(answerId); return n; });
+      setAnswers(prev => prev.map(a => a.id === answerId ? { ...a, likes_count: Math.max(0, (a.likes_count||1)-1) } : a));
+    } else {
+      setLikedAnswers(prev => new Set(prev).add(answerId));
+      setAnswers(prev => prev.map(a => a.id === answerId ? { ...a, likes_count: (a.likes_count||0)+1 } : a));
+    }
+    try {
+      await forumAPI.likeAnswer(answerId);
+    } catch {
+      // Revert
+      if (isLiked) setLikedAnswers(prev => new Set(prev).add(answerId));
+      else setLikedAnswers(prev => { const n = new Set(prev); n.delete(answerId); return n; });
+    }
+  }, [likedAnswers]);
+
 
   const handlePost = async () => {
     const text = newPostText.trim();
@@ -267,13 +357,16 @@ export default function ForumTab() {
     if (!answerText.trim() || !commentPost) return;
     setPostingAnswer(true);
     try {
-      await forumAPI.createAnswer(commentPost.id, answerText.trim());
+      // Prepend @name if replying to someone
+      const text = replyingTo ? `@${replyingTo.name} ${answerText.trim()}` : answerText.trim();
+      await forumAPI.createAnswer(commentPost.id, text);
       setAnswerText('');
+      setReplyingTo(null);
       const res: any = await forumAPI.getAnswers(commentPost.id);
       setAnswers(res.answers || []);
       setPosts(prev => prev.map(p => p.id === commentPost.id ? { ...p, answer_count: (p.answer_count || 0) + 1 } : p));
     } catch {} finally { setPostingAnswer(false); }
-  }, [answerText, commentPost]);
+  }, [answerText, commentPost, replyingTo]);
 
   // Share — opens compose modal with empty caption + stores the original post as a card
   const handleShare = useCallback((post: any) => {
@@ -418,8 +511,8 @@ export default function ForumTab() {
                     </Text>
                   </View>
 
-                  {/* ··· menu */}
-                  <TouchableOpacity style={{ paddingTop: 4, paddingLeft: 4 }}>
+                  {/* ··· menu — opens edit/delete for own posts, report/hide for others */}
+                  <TouchableOpacity onPress={() => setMenuPost(p)} style={{ paddingTop: 4, paddingLeft: 4 }}>
                     <Text style={{ color: '#888', fontSize: 22, lineHeight: 22 }}>···</Text>
                   </TouchableOpacity>
                 </View>
@@ -662,15 +755,40 @@ export default function ForumTab() {
                       {(a.lawyer_name || 'م').substring(0, 2).toUpperCase()}
                     </Text>
                   </View>
-                  <View style={{ flex: 1, backgroundColor: C.card, borderRadius: 16, borderTopLeftRadius: 4, padding: 12, borderWidth: 1, borderColor: a.is_accepted ? C.gold + '40' : C.border }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <Text style={{ color: C.text, fontWeight: '700', fontSize: 13 }}>{a.lawyer_name || (isRTL ? 'محامي' : 'Lawyer')}</Text>
-                      {a.is_accepted && <Text style={{ color: C.gold, fontSize: 11, fontWeight: '700' }}>✔️ {isRTL ? 'مقبول' : 'Accepted'}</Text>}
+                  <View style={{ flex: 1 }}>
+                    <View style={{ backgroundColor: C.card, borderRadius: 16, borderTopLeftRadius: 4, padding: 12, borderWidth: 1, borderColor: a.is_accepted ? C.gold + '40' : C.border }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <Text style={{ color: C.text, fontWeight: '700', fontSize: 13 }}>{a.lawyer_name || (isRTL ? 'محامي' : 'Lawyer')}</Text>
+                        {a.is_accepted && <Text style={{ color: C.gold, fontSize: 11, fontWeight: '700' }}>✔️ {isRTL ? 'مقبول' : 'Accepted'}</Text>}
+                      </View>
+                      <Text style={{ color: C.text, fontSize: 14, lineHeight: 22, textAlign: 'right' }}>{a.answer}</Text>
                     </View>
-                    <Text style={{ color: C.text, fontSize: 14, lineHeight: 22 }}>{a.answer}</Text>
-                    <Text style={{ color: C.muted, fontSize: 11, marginTop: 6 }}>
-                      {new Date(a.created_at).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US')}
-                    </Text>
+                    {/* Like + Reply row under each comment */}
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 14, marginTop: 4, paddingHorizontal: 4 }}>
+                      <Text style={{ color: C.muted, fontSize: 11 }}>
+                        {timeAgo(a.created_at)}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => handleLikeAnswer(a.id)}
+                        style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                        <Text style={{ fontSize: 14, color: likedAnswers.has(a.id) ? '#0A66C2' : '#888' }}>
+                          {likedAnswers.has(a.id) ? '👍' : '🤍'}
+                        </Text>
+                        {(a.likes_count || 0) > 0 && (
+                          <Text style={{ fontSize: 11, color: likedAnswers.has(a.id) ? '#0A66C2' : '#888', fontWeight: '600' }}>
+                            {a.likes_count}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setReplyingTo({ name: a.lawyer_name || 'محامٍ', answerId: a.id });
+                        }}
+                        style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                        <Text style={{ fontSize: 13, color: '#888' }}>↩️</Text>
+                        <Text style={{ fontSize: 12, color: '#888', fontWeight: '600' }}>رد</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               )}
@@ -678,24 +796,39 @@ export default function ForumTab() {
           )}
 
           {/* Answer input */}
-          <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: C.border, flexDirection: 'row', gap: 10, alignItems: 'flex-end', paddingBottom: insets.bottom + 12 }}>
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.gold + '20', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Text style={{ fontSize: 14, fontWeight: '800', color: C.gold }}>
-                {user?.name ? user.name.substring(0, 2).toUpperCase() : 'ME'}
-              </Text>
+          <View style={{ borderTopWidth: 1, borderTopColor: C.border, paddingBottom: insets.bottom + 12 }}>
+            {/* Replying-to indicator */}
+            {replyingTo && (
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
+                paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4,
+                backgroundColor: C.gold + '15' }}>
+                <Text style={{ color: C.gold, fontSize: 12, fontWeight: '600' }}>
+                  ↩️ رد على {replyingTo.name}
+                </Text>
+                <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                  <Text style={{ color: C.muted, fontSize: 16 }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <View style={{ padding: 12, flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.gold + '20', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: C.gold }}>
+                  {user?.name ? user.name.substring(0, 2).toUpperCase() : 'ME'}
+                </Text>
+              </View>
+              <TextInput
+                multiline
+                placeholder={replyingTo ? `الرد على ${replyingTo.name}...` : (isRTL ? 'شارك رأيك القانوني...' : 'Share your legal insight...')}
+                placeholderTextColor={C.muted}
+                value={answerText}
+                onChangeText={setAnswerText}
+                style={{ flex: 1, backgroundColor: C.card2, borderWidth: 1, borderColor: replyingTo ? C.gold : C.border, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, color: C.text, fontSize: 14, maxHeight: 100, textAlign: isRTL ? 'right' : 'left' }}
+              />
+              <TouchableOpacity onPress={submitAnswer} disabled={!answerText.trim() || postingAnswer}
+                style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: answerText.trim() ? C.gold : C.dim, alignItems: 'center', justifyContent: 'center' }}>
+                {postingAnswer ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontSize: 18 }}>{isRTL ? '←' : '→'}</Text>}
+              </TouchableOpacity>
             </View>
-            <TextInput
-              multiline
-              placeholder={isRTL ? 'شارك رأيك القانوني...' : 'Share your legal insight...'}
-              placeholderTextColor={C.muted}
-              value={answerText}
-              onChangeText={setAnswerText}
-              style={{ flex: 1, backgroundColor: C.card2, borderWidth: 1, borderColor: C.border, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, color: C.text, fontSize: 14, maxHeight: 100, textAlign: isRTL ? 'right' : 'left' }}
-            />
-            <TouchableOpacity onPress={submitAnswer} disabled={!answerText.trim() || postingAnswer}
-              style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: answerText.trim() ? C.gold : C.dim, alignItems: 'center', justifyContent: 'center' }}>
-              {postingAnswer ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontSize: 18 }}>{isRTL ? '←' : '→'}</Text>}
-            </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -884,7 +1017,6 @@ export default function ForumTab() {
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' }}
           activeOpacity={1}
         >
-          {/* Close button */}
           <View style={{ position: 'absolute', top: 50, right: 20, zIndex: 10,
             backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, width: 40, height: 40,
             alignItems: 'center', justifyContent: 'center' }}>
@@ -901,6 +1033,132 @@ export default function ForumTab() {
             {isRTL ? 'اضغط في أي مكان للإغلاق' : 'Tap anywhere to close'}
           </Text>
         </TouchableOpacity>
+      </Modal>
+
+      {/* ─── Post ··· Menu Bottom Sheet ────────────────────────────────── */}
+      <Modal visible={!!menuPost} transparent animationType="slide" onRequestClose={() => setMenuPost(null)}>
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}
+          activeOpacity={1}
+          onPress={() => setMenuPost(null)}
+        />
+        <View style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+          paddingBottom: insets.bottom + 8, overflow: 'hidden',
+        }}>
+          {/* Handle */}
+          <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 8 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: C.border }} />
+          </View>
+          {/* Post preview */}
+          {menuPost && (
+            <Text style={{ paddingHorizontal: 16, paddingBottom: 12, color: C.muted, fontSize: 13, textAlign: 'right' }} numberOfLines={1}>
+              {menuPost.question && menuPost.question !== 'مشاركة' ? menuPost.question : 'منشور'}
+            </Text>
+          )}
+          <View style={{ height: 1, backgroundColor: C.border, marginBottom: 4 }} />
+
+          {menuPost?.user_id === user?.id ? (
+            // ── OWN POST: Edit + Delete
+            <>
+              <TouchableOpacity
+                onPress={() => menuPost && handleEditPost(menuPost)}
+                style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 16 }}>
+                <Text style={{ fontSize: 22 }}>✏️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: C.text, fontWeight: '700', fontSize: 16, textAlign: 'right' }}>تعديل المنشور</Text>
+                  <Text style={{ color: C.muted, fontSize: 12, textAlign: 'right' }}>تغيير نص منشورك</Text>
+                </View>
+              </TouchableOpacity>
+              <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 16 }} />
+              <TouchableOpacity
+                onPress={() => menuPost && handleDeletePost(menuPost)}
+                style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 16 }}>
+                <Text style={{ fontSize: 22 }}>🗑️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#E53935', fontWeight: '700', fontSize: 16, textAlign: 'right' }}>حذف المنشور</Text>
+                  <Text style={{ color: C.muted, fontSize: 12, textAlign: 'right' }}>سيختفي من المجتمع نهائياً</Text>
+                </View>
+              </TouchableOpacity>
+            </>
+          ) : (
+            // ── OTHERS' POST: Hide + Report
+            <>
+              <TouchableOpacity
+                onPress={() => {
+                  if (menuPost) setPosts(prev => prev.filter(p => p.id !== menuPost.id));
+                  setMenuPost(null);
+                }}
+                style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 16 }}>
+                <Text style={{ fontSize: 22 }}>🙈</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: C.text, fontWeight: '700', fontSize: 16, textAlign: 'right' }}>إخفاء المنشور</Text>
+                  <Text style={{ color: C.muted, fontSize: 12, textAlign: 'right' }}>لن يظهر في خلاصتك</Text>
+                </View>
+              </TouchableOpacity>
+              <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 16 }} />
+              <TouchableOpacity
+                onPress={() => {
+                  setMenuPost(null);
+                  Alert.alert('تم الإبلاغ', 'شكراً لتعليمنا. سيراجع فريقنا هذا المنشور قريباً.');
+                }}
+                style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 16 }}>
+                <Text style={{ fontSize: 22 }}>🚩</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#E53935', fontWeight: '700', fontSize: 16, textAlign: 'right' }}>إبلاغ</Text>
+                  <Text style={{ color: C.muted, fontSize: 12, textAlign: 'right' }}>إبلاغ عن محتوى مخالف</Text>
+                </View>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* Cancel */}
+          <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 16, marginTop: 4 }} />
+          <TouchableOpacity
+            onPress={() => setMenuPost(null)}
+            style={{ alignItems: 'center', paddingVertical: 16 }}>
+            <Text style={{ color: C.muted, fontSize: 16, fontWeight: '600' }}>إلغاء</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* ─── Edit Post Modal ───────────────────────────────────────── */}
+      <Modal visible={!!editingPost} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setEditingPost(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: C.surface }}>
+          <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 4 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: C.border }} />
+          </View>
+          {/* Header */}
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+            <TouchableOpacity onPress={() => { setEditingPost(null); setEditText(''); }}>
+              <Text style={{ color: C.muted, fontSize: 16 }}>إلغاء</Text>
+            </TouchableOpacity>
+            <Text style={{ color: C.text, fontSize: 18, fontWeight: '700', fontFamily: 'CormorantGaramond-Bold' }}>✏️ تعديل المنشور</Text>
+            <TouchableOpacity onPress={saveEdit} disabled={!editText.trim() || savingEdit}>
+              <Text style={{ color: editText.trim() ? C.gold : C.muted, fontSize: 16, fontWeight: '700' }}>حفظ</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Text area */}
+          <TextInput
+            autoFocus
+            multiline
+            value={editText}
+            onChangeText={setEditText}
+            placeholder="نص المنشور..."
+            placeholderTextColor={C.muted}
+            style={{
+              flex: 1, padding: 20, fontSize: 17, lineHeight: 28,
+              color: C.text, textAlign: 'right', textAlignVertical: 'top',
+            }}
+          />
+          {savingEdit && (
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator color={C.gold} size="large" />
+            </View>
+          )}
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
