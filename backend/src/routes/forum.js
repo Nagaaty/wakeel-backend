@@ -235,18 +235,24 @@ router.post('/questions/:id/share', requireAuth, async (req, res, next) => {
     if (!row) return res.status(404).json({ message: 'Post not found' });
 
     if (row.user_id && row.user_id.toString() !== req.user.id.toString()) {
-      const actor   = req.user;
-      const snippet = (row.question || '').substring(0, 80);
-      const postId  = req.params.id;
+      const actor    = req.user;
+      // Use the original post's question as snippet; hide the 'مشاركة' placeholder
+      const rawSnippet = (row.question || '').trim();
+      const snippet    = (rawSnippet && rawSnippet !== 'مشاركة')
+        ? rawSnippet.substring(0, 80)
+        : 'منشورك الأصلي';
+      // repost_id = the NEW post lawyer 1 created; link goes there so lawyer 2 sees lawyer 1's repost
+      const repostId = req.body && req.body.repost_id ? req.body.repost_id : null;
+      const link     = repostId ? `/post/${repostId}` : `/post/${req.params.id}`;
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, body, link, data)
          VALUES ($1,'forum_share',$2,$3,$4,$5::jsonb)`,
         [
           row.user_id,
           `🔁 ${actor.name} أعاد نشر منشورك`,
-          `"${snippet}${snippet.length >= 80 ? '…' : ''}"`,
-          `/post/${postId}`,
-          JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: parseInt(postId), postSnippet: snippet, action: 'share' }),
+          `"${snippet}${rawSnippet.length >= 80 ? '…' : ''}"`,
+          link,
+          JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: repostId ? parseInt(repostId) : parseInt(req.params.id), originalPostId: parseInt(req.params.id), postSnippet: snippet, action: 'share' }),
         ]
       ).catch(console.error);
     }

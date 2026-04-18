@@ -186,27 +186,22 @@ export default function ForumTab() {
       const questionText = sharingPost
         ? (text || 'مشاركة')   // non-empty fallback for DB
         : text;
-      await forumAPI.createQuestion({
+      // createQuestion returns the new post — capture its ID for the notification link
+      const createRes: any = await forumAPI.createQuestion({
         question: questionText,
         category: 'الكل',
         anonymous: false,
         ...(attachedImage ? { image_url: attachedImage } : {}),
         // —— Repost chain: always link to the TRUE original, not an intermediate sharer ——
         ...(sharingPost ? (() => {
-          // If the post being shared IS ITSELF a repost, chain back to the root original
           const origDataOfShared = sharingPost.original_post_data
             ? (typeof sharingPost.original_post_data === 'string'
                 ? JSON.parse(sharingPost.original_post_data)
                 : sharingPost.original_post_data)
             : null;
           if (origDataOfShared) {
-            // Chain: share the root original, not the intermediate sharer
-            return {
-              original_post_id: sharingPost.original_post_id,
-              original_post_data: origDataOfShared,
-            };
+            return { original_post_id: sharingPost.original_post_id, original_post_data: origDataOfShared };
           }
-          // Normal repost — embed the post's own info
           return {
             original_post_id: sharingPost.id,
             original_post_data: {
@@ -221,8 +216,12 @@ export default function ForumTab() {
           };
         })() : {}),
       });
+
       if (sharingPost) {
-        forumAPI.sharePost(sharingPost.id).catch(console.error);
+        // Get the id of the newly created repost so the notification links to IT (LinkedIn style)
+        const newRepostId = createRes?.question?.id || createRes?.data?.question?.id || null;
+        // Pass repost_id so lawyer 2's notification opens lawyer 1's repost, not lawyer 2's original
+        forumAPI.sharePost(sharingPost.id, newRepostId ? { repost_id: newRepostId } : undefined).catch(console.error);
         setPosts(prev => prev.map(p =>
           p.id === sharingPost.id ? { ...p, shares_count: (p.shares_count || 0) + 1 } : p
         ));
