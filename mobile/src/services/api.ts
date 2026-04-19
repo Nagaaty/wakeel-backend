@@ -216,8 +216,8 @@ export const adminAPI = {
 
 // ─── Forum API ───────────────────────────────────────────────────────────────
 export const forumAPI = {
-  getQuestions: (cat?: string, search?: string) =>
-    api.get('/forum/questions', { params: { cat, search } }),
+  getQuestions: (params?: { sort?: string; cat?: string; search?: string; tag?: string }) =>
+    api.get('/forum/questions', { params }),
   getQuestion: (id: string | number) =>
     api.get(`/forum/questions/${id}`),
   createQuestion: (data: { question: string; category: string; anonymous?: boolean; image_url?: string; original_post_id?: number; original_post_data?: any }) =>
