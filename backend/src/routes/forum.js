@@ -49,7 +49,7 @@ router.get('/questions', async (req, res, next) => {
               FROM forum_questions fq
               LEFT JOIN users u ON u.id=fq.user_id
               WHERE fq.is_visible=true`;
-    const params: any[] = [];
+    const params = [];
     if (cat)    { params.push(cat);    q += ` AND fq.category=$${params.length}`; }
     if (search) { params.push('%'+search+'%'); q += ` AND (fq.question ILIKE $${params.length} OR fq.category ILIKE $${params.length})`; }
     if (tag)    { params.push(JSON.stringify([tag.toLowerCase()])); q += ` AND fq.tags @> $${params.length}::jsonb`; }
