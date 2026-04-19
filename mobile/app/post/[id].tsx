@@ -75,9 +75,15 @@ export default function PostDetail() {
   const [loading,         setLoading]        = useState(true);
   const [answersLoading,  setAnswersLoading] = useState(true);
   const [liked,           setLiked]          = useState(false);
+  const [saved,           setSaved]          = useState(false);
   const [likeCount,       setLikeCount]      = useState(0);
   const [answerText,      setAnswerText]     = useState('');
   const [posting,         setPosting]        = useState(false);
+  const [likedAnswers,    setLikedAnswers]   = useState<Set<number>>(new Set());
+  const [replies,         setReplies]        = useState<{ [key: number]: any[] }>({});
+  const [expandedReplies, setExpandedReplies] = useState<Set<number>>(new Set());
+  const [loadingReplies,  setLoadingReplies] = useState<Set<number>>(new Set());
+  const [replyingTo,      setReplyingTo]     = useState<{ answerId: number; name: string } | null>(null);
   const likeScale = useRef(new Animated.Value(1)).current;
 
   /* ─ Load ─ */
@@ -127,14 +133,18 @@ export default function PostDetail() {
     if (!id) return;
     try {
       setLoading(true);
-      const res: any = await forumAPI.getQuestion(id);
+      const [res, savedRes]: any = await Promise.all([
+        forumAPI.getQuestion(id),
+        user?.id ? forumAPI.getSavedPosts().catch(() => ({ questions: [] })) : Promise.resolve({ questions: [] })
+      ]);
       const q = res?.question || res?.data?.question;
       setPost(q || null);
       setLikeCount(q?.likes_count || 0);
+      setSaved((savedRes?.questions || []).some((sq: any) => String(sq.id) === String(id)));
     } catch {
       Alert.alert('خطأ', 'تعذّر تحميل المنشور');
     } finally { setLoading(false); }
-  }, [id]);
+  }, [id, user?.id]);
 
   const loadAnswers = useCallback(async () => {
     if (!id) return;
@@ -150,6 +160,12 @@ export default function PostDetail() {
     loadAnswers();
   }, [loadPost, loadAnswers]);
 
+  /* ─ Save ─ */
+  const handleSave = async () => {
+    setSaved(!saved);
+    try { await forumAPI.savePost(id); } catch { setSaved(s => !s); }
+  };
+
   /* ─ Like with bouncy animation ─ */
   const handleLike = async () => {
     if (liked) return;
@@ -163,6 +179,23 @@ export default function PostDetail() {
       setLiked(false);
       setLikeCount(c => Math.max(0, c - 1));
     });
+  };
+
+  const handleLikeAnswer = async (answerId: number) => {
+    const isLiked = likedAnswers.has(answerId);
+    if (isLiked) {
+      setLikedAnswers(prev => { const n = new Set(prev); n.delete(answerId); return n; });
+      setAnswers(prev => prev.map(a => a.id === answerId ? { ...a, likes_count: Math.max(0, (a.likes_count||1)-1) } : a));
+    } else {
+      setLikedAnswers(prev => new Set(prev).add(answerId));
+      setAnswers(prev => prev.map(a => a.id === answerId ? { ...a, likes_count: (a.likes_count||0)+1 } : a));
+    }
+    try {
+      await forumAPI.likeAnswer(answerId);
+    } catch {
+      if (isLiked) setLikedAnswers(prev => new Set(prev).add(answerId));
+      else { setLikedAnswers(prev => { const n = new Set(prev); n.delete(answerId); return n; }); }
+    }
   };
 
   /* ─ Share (reposts as new post + notifies author) ─ */
@@ -188,9 +221,11 @@ export default function PostDetail() {
     if (!answerText.trim() || posting) return;
     setPosting(true);
     try {
-      await forumAPI.createAnswer(id, answerText.trim(), replyingTo?.answerId);
+      const text = replyingTo ? `@${replyingTo.name.replace(/\s+/g, '_')} ${answerText.trim()}` : answerText.trim();
+      await forumAPI.createAnswer(id, text, replyingTo?.answerId);
       if (replyingTo) { toggleReplies(replyingTo.answerId); }
       setAnswerText('');
+      setReplyingTo(null);
       await loadAnswers();
       setPost((p: any) => p ? { ...p, answer_count: (p.answer_count || 0) + 1 } : p);
       // Scroll to bottom
@@ -300,7 +335,12 @@ export default function PostDetail() {
                       <Text style={{ fontSize: 16, fontWeight: '700', color: '#1A1A1A' }}>
                         {post.asked_by || 'مستخدم'}
                       </Text>
-                      {post.user_role === 'lawyer' && (
+                      {post.user_flair ? (
+                        <View style={{ backgroundColor: C.gold + '22', borderRadius: 6,
+                          paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ color: C.gold, fontSize: 11, fontWeight: '700' }}>{post.user_flair}</Text>
+                        </View>
+                      ) : post.user_role === 'lawyer' && (
                         <View style={{ backgroundColor: C.gold + '22', borderRadius: 6,
                           paddingHorizontal: 6, paddingVertical: 2 }}>
                           <Text style={{ color: C.gold, fontSize: 11, fontWeight: '700' }}>⚖️ محامٍ</Text>
@@ -316,13 +356,15 @@ export default function PostDetail() {
 
                 {/* Sharer's caption — hide 'مشاركة' placeholder */}
                 {post.question && post.question !== 'مشاركة' && (
-                  <Text style={{
-                    paddingHorizontal: 16,
-                    paddingBottom: isRepost ? 10 : (post.image_url ? 10 : 16),
-                    fontSize: 16, lineHeight: 26, color: '#1A1A1A', textAlign: 'right',
-                  }}>
-                    {post.question}
-                  </Text>
+                  <HashtagText
+                    text={post.question}
+                    goldColor="#0A66C2"
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingBottom: isRepost ? 10 : (post.image_url ? 10 : 16),
+                      fontSize: 16, lineHeight: 26, color: '#1A1A1A', textAlign: 'right',
+                    }}
+                  />
                 )}
 
                 {/* Full image (original posts only) */}
@@ -356,16 +398,16 @@ export default function PostDetail() {
                         </Text>
                       </View>
                     </View>
-                    {/* Original text — cleaned of legacy [إعادة نشر من X]: chain text */}
                     {(() => {
                       const cleanText = cleanQuotedText(origData.question);
                       return cleanText ? (
-                        <Text style={{
-                          padding: 10, paddingTop: 8,
-                          fontSize: 14, lineHeight: 22, color: '#1A1A1A', textAlign: 'right',
-                        }}>
-                          {cleanText}
-                        </Text>
+                        <View style={{ padding: 10, paddingTop: 8 }}>
+                          <HashtagText
+                            text={cleanText}
+                            goldColor="#0A66C2"
+                            style={{ fontSize: 14, lineHeight: 22, color: '#1A1A1A', textAlign: 'right' }}
+                          />
+                        </View>
                       ) : null;
                     })()}
                     {/* Original image */}
@@ -413,46 +455,66 @@ export default function PostDetail() {
                   </View>
                 )}
 
-                {/* ── Action bar: RTL — أعجبني | تعليق | إعادة نشر ── */}
+                {/* ── Action bar ── */}
                 <View style={{ flexDirection: 'row-reverse',
-                  borderTopWidth: 1, borderTopColor: '#F0F0F0' }}>
+                  borderTopWidth: 1, borderTopColor: '#F0F0F0',
+                  paddingHorizontal: 8, paddingVertical: 4, gap: 6 }}>
 
-                  {/* أعجبني — rightmost in Arabic */}
+                  {/* أعجبني */}
                   <TouchableOpacity
                     onPress={handleLike}
-                    style={{ flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
-                      justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
+                    style={{
+                      flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
+                      justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8,
+                      backgroundColor: liked ? '#0A66C215' : 'transparent',
+                    }}>
                     <Animated.Text
-                      style={{ fontSize: 20, transform: [{ scale: likeScale }],
-                        color: liked ? '#0A66C2' : '#606060' }}>
+                      style={{ fontSize: 17, transform: [{ scale: likeScale }],
+                        color: liked ? '#0A66C2' : '#777' }}>
                       {liked ? '👍' : '🤍'}
                     </Animated.Text>
-                    <Text style={{ fontSize: 13, fontWeight: liked ? '700' : '600',
-                      color: liked ? '#0A66C2' : '#606060' }}>
+                    <Text style={{ fontSize: 11, fontWeight: liked ? '700' : '500',
+                      color: liked ? '#0A66C2' : '#777' }}>
                       أعجبني
                     </Text>
                   </TouchableOpacity>
 
-                  <View style={{ width: 1, backgroundColor: '#F0F0F0', marginVertical: 8 }} />
-
                   {/* تعليق */}
                   <TouchableOpacity
                     onPress={() => scrollRef.current?.scrollToEnd({ animated: true })}
-                    style={{ flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
-                      justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
-                    <Text style={{ fontSize: 20, color: '#606060' }}>💬</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#606060' }}>تعليق</Text>
+                    style={{
+                      flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
+                      justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8,
+                    }}>
+                    <Text style={{ fontSize: 17, color: '#777' }}>💬</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '500', color: '#777' }}>تعليق</Text>
                   </TouchableOpacity>
 
-                  <View style={{ width: 1, backgroundColor: '#F0F0F0', marginVertical: 8 }} />
-
-                  {/* إعادة نشر — leftmost in Arabic */}
+                  {/* نشر */}
                   <TouchableOpacity
                     onPress={handleShare}
-                    style={{ flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
-                      justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
-                    <Text style={{ fontSize: 20, color: '#606060' }}>↩️</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#606060' }}>إعادة نشر</Text>
+                    style={{
+                      flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
+                      justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8,
+                    }}>
+                    <Text style={{ fontSize: 17, color: '#777' }}>↩️</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '500', color: '#777' }}>نشر</Text>
+                  </TouchableOpacity>
+
+                  {/* حفظ */}
+                  <TouchableOpacity
+                    onPress={handleSave}
+                    style={{
+                      flex: 1, flexDirection: 'row-reverse', alignItems: 'center',
+                      justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8,
+                      backgroundColor: saved ? C.gold + '18' : 'transparent',
+                      borderWidth: saved ? 1 : 0,
+                      borderColor: saved ? C.gold + '50' : 'transparent',
+                    }}>
+                    <Text style={{ fontSize: 17, color: saved ? C.gold : '#777' }}>🔖</Text>
+                    <Text style={{ fontSize: 11, fontWeight: saved ? '700' : '500', color: saved ? C.gold : '#777' }}>
+                      {saved ? 'محفوظ' : 'حفظ'}
+                    </Text>
                   </TouchableOpacity>
 
                 </View>
@@ -499,13 +561,58 @@ export default function PostDetail() {
                             ⚖️ {a.specialization}
                           </Text>
                         )}
-                        <Text style={{ color: C.text, fontSize: 14, lineHeight: 22, textAlign: 'right' }}>
-                          {a.answer}
-                        </Text>
+                        <HashtagText text={a.answer} goldColor="#0A66C2" style={{ color: C.text, fontSize: 14, lineHeight: 22, textAlign: 'right' }} />
                       </View>
-                      <Text style={{ color: '#8A8D91', fontSize: 11, marginTop: 4, textAlign: 'right' }}>
-                        {timeAgo(a.created_at)}
-                      </Text>
+                      
+                      {/* Like + Reply row under each comment */}
+                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 14, marginTop: 4, paddingHorizontal: 4 }}>
+                        <Text style={{ color: '#8A8D91', fontSize: 11 }}>{timeAgo(a.created_at)}</Text>
+                        <TouchableOpacity onPress={() => handleLikeAnswer(a.id)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                          <Text style={{ fontSize: 14, color: likedAnswers.has(a.id) ? '#0A66C2' : '#888' }}>{likedAnswers.has(a.id) ? '👍' : '🤍'}</Text>
+                          {(a.likes_count || 0) > 0 && <Text style={{ fontSize: 11, color: likedAnswers.has(a.id) ? '#0A66C2' : '#888', fontWeight: '600' }}>{a.likes_count}</Text>}
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setReplyingTo({ name: a.lawyer_name || 'محامٍ', answerId: a.id })} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                          <Text style={{ fontSize: 13, color: '#888' }}>↩️</Text>
+                          <Text style={{ fontSize: 12, color: '#888', fontWeight: '600' }}>رد</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Nested Replies */}
+                      {(a.reply_count > 0 || expandedReplies.has(a.id)) && (
+                        <View style={{ marginTop: 8 }}>
+                          {a.reply_count > 0 && !expandedReplies.has(a.id) && (
+                             <TouchableOpacity onPress={() => toggleReplies(a.id)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                               <Text style={{ color: C.gold, fontSize: 13, fontWeight: '700' }}>⤿ عرض {a.reply_count} ردود</Text>
+                             </TouchableOpacity>
+                          )}
+                          {expandedReplies.has(a.id) && (
+                            loadingReplies.has(a.id) ? <ActivityIndicator size="small" color={C.gold} /> :
+                            <View style={{ gap: 12, paddingRight: 10, borderRightWidth: 2, borderColor: C.border, marginTop: 4 }}>
+                              {(replies[a.id] || []).map((rep: any) => (
+                                <View key={rep.id} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+                                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: C.card2, alignItems: 'center', justifyContent: 'center' }}>
+                                    <Text style={{ fontSize: 11, fontWeight: '800', color: C.muted }}>{(rep.lawyer_name || 'م').substring(0, 2).toUpperCase()}</Text>
+                                  </View>
+                                  <View style={{ flex: 1 }}>
+                                    <View style={{ backgroundColor: '#F0F2F5', borderRadius: 14, borderTopRightRadius: 4, padding: 10 }}>
+                                      <Text style={{ color: C.text, fontWeight: '700', fontSize: 12, marginBottom: 4 }}>{rep.lawyer_name}</Text>
+                                      <HashtagText text={rep.answer} goldColor="#0A66C2" style={{ color: C.text, fontSize: 13, textAlign: 'right' }} />
+                                    </View>
+                                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                                      <Text style={{ color: C.muted, fontSize: 10 }}>{timeAgo(rep.created_at)}</Text>
+                                      <TouchableOpacity onPress={() => handleLikeAnswer(rep.id)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                                        <Text style={{ fontSize: 12, color: likedAnswers.has(rep.id) ? '#0A66C2' : '#888' }}>{likedAnswers.has(rep.id) ? '👍' : '🤍'}</Text>
+                                        {(rep.likes_count || 0) > 0 && <Text style={{ fontSize: 10, color: likedAnswers.has(rep.id) ? '#0A66C2' : '#888' }}>{rep.likes_count}</Text>}
+                                      </TouchableOpacity>
+                                    </View>
+                                  </View>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      )}
+
                     </View>
                   </View>
                 ))}
@@ -521,10 +628,17 @@ export default function PostDetail() {
           position: 'absolute', bottom: 0, left: 0, right: 0,
           backgroundColor: C.surface,
           borderTopWidth: 1, borderTopColor: '#D3D6DB',
-          flexDirection: 'row', alignItems: 'flex-end', gap: 10,
-          paddingHorizontal: 12, paddingTop: 10,
           paddingBottom: insets.bottom + 12,
         }}>
+          {replyingTo && (
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, backgroundColor: C.gold + '15' }}>
+              <Text style={{ color: C.gold, fontSize: 12, fontWeight: '600' }}>↩️ رد على {replyingTo.name}</Text>
+              <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                <Text style={{ color: C.muted, fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingHorizontal: 12, paddingTop: replyingTo ? 4 : 10 }}>
           <UserAvatar url={user?.avatar_url} name={user?.name} size={40} gold={C.gold} />
           <TextInput
             value={answerText}
@@ -562,6 +676,7 @@ export default function PostDetail() {
               : <Text style={{ color: answerText.trim() ? '#000' : '#BCC0C4', fontSize: 20 }}>↩</Text>
             }
           </TouchableOpacity>
+          </View>
         </View>
       )}
     </KeyboardAvoidingView>

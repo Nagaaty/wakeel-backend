@@ -3,9 +3,9 @@ import { View, Text, FlatList, TouchableOpacity, Image, Modal, ActivityIndicator
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { forumAPI } from '../../src/services/api';
-import { useAuth } from '../../src/context/AuthContext';
-import { useTheme } from '../../src/context/ThemeContext';
-import { useI18n } from '../../src/context/I18nContext';
+import { useAuth } from '../../src/hooks/useAuth';
+import { useTheme } from '../../src/hooks/useTheme';
+import { useI18n } from '../../src/i18n';
 import HashtagText from '../../src/components/HashtagText';
 
 // Helpers

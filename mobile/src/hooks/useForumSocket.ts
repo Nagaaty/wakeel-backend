@@ -1,12 +1,8 @@
 import { useEffect } from 'react';
 import io from 'socket.io-client';
-import { useAuth } from '../context/AuthContext';
-import { API_BASE_URL } from '../config';
-
+import { useAuth } from './useAuth';
+const WS_URL = 'https://wakeel-api.onrender.com';
 let socket: any = null;
-
-// Match the port format or fallback
-const WS_URL = API_BASE_URL.replace('/api', '');
 
 export function useForumSocket({ onLike, onComment, onNewPost, onShare }: {
   onLike?: (data: { postId: number, likes_count: number, liked: boolean }) => void;

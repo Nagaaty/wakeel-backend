@@ -18,11 +18,11 @@ export default function HashtagText({ text, style, numberOfLines, goldColor = '#
 
   if (!text) return null;
 
-  // Split by hashtag pattern (supports Arabic + Latin + underscore)
-  const parts = text.split(/(#[\w\u0600-\u06FF_]+)/g);
+  // Split by hashtag or mention pattern (supports Arabic + Latin + underscore)
+  const parts = text.split(/([#@][\w\u0600-\u06FF_]+)/g);
 
   if (parts.length === 1) {
-    // No hashtags — plain text
+    // No formatting — plain text
     return (
       <Text style={style} numberOfLines={numberOfLines}>
         {text}
@@ -45,6 +45,12 @@ export default function HashtagText({ text, style, numberOfLines, goldColor = '#
                 })
               }
             >
+              {part}
+            </Text>
+          );
+        } else if (/^@[\w\u0600-\u06FF_]+$/.test(part)) {
+          return (
+            <Text key={i} style={[styles.hashtag, { color: goldColor }]}>
               {part}
             </Text>
           );
