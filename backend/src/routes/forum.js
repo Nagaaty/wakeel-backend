@@ -11,6 +11,14 @@ const { emitForum }  = require('../utils/socket');
         ADD COLUMN IF NOT EXISTS likes_count INT DEFAULT 0,
         ADD COLUMN IF NOT EXISTS liked_by    JSONB DEFAULT '[]'::jsonb
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS forum_saved (
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        question_id INT REFERENCES forum_questions(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY(user_id, question_id)
+      );
+    `);
   } catch (e) { console.warn('forum_answers migration skipped:', e.message); }
 })();
 
@@ -19,6 +27,11 @@ router.get('/questions', async (req, res, next) => {
   try {
     const { cat, search, tag } = req.query;
     let q = `SELECT fq.*, u.name as asked_by, u.avatar_url as user_avatar_url, u.role as user_role,
+              CASE 
+                WHEN u.role = 'lawyer' AND u.is_verified THEN 'محامٍ موثوق ✔️'
+                WHEN u.role = 'lawyer' THEN 'مستشار قانوني ⚖️'
+                ELSE NULL 
+              END as user_flair,
               (SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id AND fa.parent_answer_id IS NULL) as answer_count
               FROM forum_questions fq
               LEFT JOIN users u ON u.id=fq.user_id
@@ -38,6 +51,11 @@ router.get('/questions/:id', async (req, res, next) => {
   try {
     const { rows: [row] } = await pool.query(
       `SELECT fq.*, u.name as asked_by, u.avatar_url as user_avatar_url, u.role as user_role,
+              CASE 
+                WHEN u.role = 'lawyer' AND u.is_verified THEN 'محامٍ موثوق ✔️'
+                WHEN u.role = 'lawyer' THEN 'مستشار قانوني ⚖️'
+                ELSE NULL 
+              END as user_flair,
               (SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id) as answer_count
        FROM forum_questions fq
        LEFT JOIN users u ON u.id=fq.user_id
@@ -261,7 +279,13 @@ router.get('/questions/:id/answers', async (req, res, next) => {
       `SELECT fa.*,
               u.name as lawyer_name, u.avatar_url as lawyer_avatar, u.role as lawyer_role,
               lp.specialization,
-              (SELECT COUNT(*) FROM forum_answers r WHERE r.parent_answer_id=fa.id) AS reply_count
+              (SELECT COUNT(*) FROM forum_answers r WHERE r.parent_answer_id=fa.id) AS reply_count,
+              CASE 
+                WHEN u.role = 'lawyer' AND fa.likes_count >= 5 THEN 'خبير مجتمعي 🌟'
+                WHEN u.role = 'lawyer' AND u.is_verified THEN 'محامٍ موثوق ✔️'
+                WHEN u.role = 'lawyer' THEN 'مستشار قانوني ⚖️'
+                ELSE NULL 
+              END as flair
        FROM forum_answers fa
        JOIN users u ON u.id=fa.lawyer_id
        LEFT JOIN lawyer_profiles lp ON lp.user_id=fa.lawyer_id
@@ -277,7 +301,13 @@ router.get('/questions/:id/answers', async (req, res, next) => {
 router.get('/answers/:id/replies', async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT fa.*, u.name as lawyer_name, u.avatar_url as lawyer_avatar, u.role as lawyer_role
+      `SELECT fa.*, u.name as lawyer_name, u.avatar_url as lawyer_avatar, u.role as lawyer_role, u.is_verified,
+              CASE 
+                WHEN u.role = 'lawyer' AND fa.likes_count >= 5 THEN 'خبير مجتمعي 🌟'
+                WHEN u.role = 'lawyer' AND u.is_verified THEN 'محامٍ موثوق ✔️'
+                WHEN u.role = 'lawyer' THEN 'مستشار قانوني ⚖️'
+                ELSE NULL 
+              END as flair
        FROM forum_answers fa
        JOIN users u ON u.id=fa.lawyer_id
        WHERE fa.parent_answer_id=$1
@@ -319,6 +349,27 @@ router.post('/questions/:id/answers', requireAuth, async (req, res, next) => {
           JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: parseInt(postId), postSnippet: snippet, commentSnippet: answerSnip, action: 'comment' }),
         ]
       ).catch(console.error);
+    } else if (parent_answer_id) {
+      // Notify parent comment author
+      const { rows: [parentComment] } = await pool.query(
+        `SELECT lawyer_id, answer FROM forum_answers WHERE id=$1`, [parent_answer_id]
+      ).catch(() => ({ rows: [] }));
+      
+      if (parentComment && parentComment.lawyer_id && parentComment.lawyer_id.toString() !== req.user.id.toString()) {
+        const actor = req.user;
+        const answerSnip = (answer || '').substring(0, 60);
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, body, link, data)
+           VALUES ($1,'forum_reply',$2,$3,$4,$5::jsonb)`,
+          [
+            parentComment.lawyer_id,
+            `↩️ ${actor.name} رد على تعليقك`,
+            `"${answerSnip}${answerSnip.length >= 60 ? '…' : ''}"`,
+            `/post/${req.params.id}`,
+            JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: parseInt(req.params.id), commentSnippet: answerSnip, action: 'reply' }),
+          ]
+        ).catch(console.error);
+      }
     }
 
     // Emit real-time comment event
@@ -362,6 +413,43 @@ router.post('/questions/:id/share', requireAuth, async (req, res, next) => {
     res.json({ question: row });
     // Emit real-time share event
     emitForum('forum:share', { postId: parseInt(req.params.id), shares_count: row.shares_count });
+  } catch (err) { next(err); }
+});
+
+// POST /api/forum/questions/:id/save — toggle save
+router.post('/questions/:id/save', requireAuth, async (req, res, next) => {
+  try {
+    const { rows: [existing] } = await pool.query(
+      `SELECT * FROM forum_saved WHERE user_id=$1 AND question_id=$2`,
+      [req.user.id, req.params.id]
+    );
+    if (existing) {
+      await pool.query(`DELETE FROM forum_saved WHERE user_id=$1 AND question_id=$2`, [req.user.id, req.params.id]);
+      return res.json({ saved: false });
+    }
+    await pool.query(`INSERT INTO forum_saved (user_id, question_id) VALUES ($1, $2)`, [req.user.id, req.params.id]);
+    res.json({ saved: true });
+  } catch (err) { next(err); }
+});
+
+// GET /api/forum/saved — get user's saved posts feed
+router.get('/saved', requireAuth, async (req, res, next) => {
+  try {
+    let q = `SELECT fq.*, u.name as asked_by, u.avatar_url as user_avatar_url, u.role as user_role,
+              CASE 
+                WHEN u.role = 'lawyer' AND u.is_verified THEN 'محامٍ موثوق ✔️'
+                WHEN u.role = 'lawyer' THEN 'مستشار قانوني ⚖️'
+                ELSE NULL 
+              END as user_flair,
+              fs.created_at as saved_at,
+              (SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id AND fa.parent_answer_id IS NULL) as answer_count
+              FROM forum_saved fs
+              JOIN forum_questions fq ON fs.question_id = fq.id
+              LEFT JOIN users u ON u.id=fq.user_id
+              WHERE fs.user_id=$1 AND fq.is_visible=true
+              ORDER BY fs.created_at DESC`;
+    const { rows } = await pool.query(q, [req.user.id]);
+    res.json({ questions: rows });
   } catch (err) { next(err); }
 });
 
