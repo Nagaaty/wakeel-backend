@@ -9,7 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/theme';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useI18n } from '../../src/i18n';
-import { lawyersAPI } from '../../src/services/api';
+import { lawyersAPI, forumAPI } from '../../src/services/api';
+import { ActivityIndicator } from 'react-native';
 
 const GOLD = '#C8A84B';
 
@@ -77,6 +78,9 @@ export default function LawyerPublicProfile() {
   const [profile, setProfile] = useState<any>(null);
   const [online, setOnline] = useState(true);
   const pulsAnim = useRef(new Animated.Value(1)).current;
+  const [savedPosts, setSavedPosts] = useState<any[]>([]);
+  const [savedLoading, setSavedLoading] = useState(false);
+  const [savedExpanded, setSavedExpanded] = useState(false);
 
   useEffect(() => {
     lawyersAPI.getMyProfile()
@@ -98,6 +102,15 @@ export default function LawyerPublicProfile() {
     title: `${user?.name} | Wakeel`,
     message: `⚖️ ${user?.name || 'Verified Lawyer'} on Wakeel — ${profile?.specialization || 'Legal Expert'}\nBook a consultation: https://wakeel-api.onrender.com`,
   });
+
+  const loadSaved = async () => {
+    if (savedPosts.length > 0) return;
+    setSavedLoading(true);
+    try {
+      const res: any = await forumAPI.getSavedPosts();
+      setSavedPosts(res?.questions || []);
+    } catch {} finally { setSavedLoading(false); }
+  };
 
   const REVIEWS = [
     { name: isRTL ? 'محمد أحمد' : 'Mohammed Ahmed', rating: 5, text: isRTL ? 'محامٍ محترف واعي بكل تفاصيل القضية، تواصله ممتاز.' : 'Professional, detail-oriented and extremely communicative.', date: '3 Mar 2025' },
@@ -271,7 +284,60 @@ export default function LawyerPublicProfile() {
           {REVIEWS.map((r, i) => <ReviewCard key={i} {...r} C={C} />)}
         </View>
 
-        {/* ── SETTINGS + LOGOUT (bottom) ──────────────────────────────────── */}
+        {/* ── SAVED POSTS ────────────────────────────────────────── */}
+        <View style={{ backgroundColor: C.surface, marginTop: 8, borderTopWidth: 1, borderTopColor: C.border }}>
+          <TouchableOpacity
+            onPress={() => { setSavedExpanded(e => !e); if (!savedExpanded) loadSaved(); }}
+            style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 18, borderBottomWidth: savedExpanded ? 1 : 0, borderBottomColor: C.border }}>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}>
+              <Text style={{ fontSize: 22 }}>🔖</Text>
+              <Text style={{ color: C.text, fontSize: 15, fontWeight: '700' }}>{isRTL ? 'المحفوظات' : 'Saved Posts'}</Text>
+              {savedPosts.length > 0 && (
+                <View style={{ backgroundColor: GOLD + '25', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 }}>
+                  <Text style={{ color: GOLD, fontSize: 11, fontWeight: '700' }}>{savedPosts.length}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={{ color: C.muted, fontSize: 18, transform: [{ rotate: savedExpanded ? '90deg' : '0deg' }] }}>›</Text>
+          </TouchableOpacity>
+
+          {savedExpanded && (
+            <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+              {savedLoading ? (
+                <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                  <ActivityIndicator color={GOLD} />
+                </View>
+              ) : savedPosts.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 28, gap: 8 }}>
+                  <Text style={{ fontSize: 32 }}>🔖</Text>
+                  <Text style={{ color: C.muted, fontSize: 13 }}>{isRTL ? 'لا توجد منشورات محفوظة' : 'No saved posts yet'}</Text>
+                </View>
+              ) : (
+                savedPosts.map((p: any) => (
+                  <TouchableOpacity
+                    key={p.id}
+                    onPress={() => router.push({ pathname: '/post/[id]', params: { id: p.id } } as any)}
+                    style={{ backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, marginTop: 10, borderRightWidth: 3, borderRightColor: GOLD }}
+                  >
+                    <Text style={{ color: C.muted, fontSize: 11, textAlign: 'right', marginBottom: 4 }}>{p.asked_by}{p.user_flair ? ` · ‪${p.user_flair}‬` : ''}</Text>
+                    <Text style={{ color: C.text, fontSize: 13, lineHeight: 19, textAlign: 'right' }} numberOfLines={2}>{p.question}</Text>
+                    <View style={{ flexDirection: 'row-reverse', gap: 10, marginTop: 8 }}>
+                      {(p.likes_count || 0) > 0 && <Text style={{ fontSize: 11, color: C.muted }}>👍 {p.likes_count}</Text>}
+                      {(p.answer_count || 0) > 0 && <Text style={{ fontSize: 11, color: C.muted }}>💬 {p.answer_count}</Text>}
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+              <TouchableOpacity
+                onPress={() => router.push('/saved-posts' as any)}
+                style={{ marginTop: 14, backgroundColor: GOLD + '15', borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: GOLD + '40' }}>
+                <Text style={{ color: GOLD, fontWeight: '700', fontSize: 13 }}>{isRTL ? 'عرض كل المحفوظات →' : 'View all saved posts →'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* ── SETTINGS + LOGOUT (bottom) ────────────────────────────────────── */}
         <View style={{ backgroundColor: C.surface, marginTop:8, borderTopWidth:1, borderTopColor: C.border }}>
           <TouchableOpacity onPress={() => router.push('/account-settings' as any)}
             style={{ flexDirection:'row', alignItems:'center', gap:14, paddingHorizontal:20, paddingVertical:18, borderBottomWidth:1, borderBottomColor: C.border }}>

@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  RefreshControl, Alert, Platform, FlatList, Switch, Animated,
+  RefreshControl, Alert, Platform, FlatList, Switch, Animated, ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme, toggleTheme, isDark } from '../../src/theme';
@@ -12,6 +12,7 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { Avatar, Tag, Btn, Section, Card, Spinner } from '../../src/components/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../../src/i18n';
+import { forumAPI } from '../../src/services/api';
 
 // ─── Demo data ────────────────────────────────────────────────────────────────
 const DEMO_CASES: any[] = [
@@ -257,12 +258,15 @@ export default function ProfileTab() {
   const { user, isLawyer, isAdmin, logout, initials } = useAuth();
   const insets = useSafeAreaInsets();
 
-  const [tab, setTab]                     = useState<'cases' | 'messages' | 'payments'>('cases');
+  const [tab, setTab]                     = useState<'cases' | 'messages' | 'payments' | 'saved'>('cases');
   const [cases, setCases]                 = useState(DEMO_CASES);
   const [expandedCase, setExpandedCase]   = useState<number | null>(null);
   const [caseSubTab, setCaseSubTab]       = useState<Record<number, 'timeline' | 'checklist' | 'expenses'>>({});
   const [cancelConfirm, setCancelConfirm] = useState<number | null>(null);
   const [refreshing, setRefreshing]       = useState(false);
+  const [savedPosts, setSavedPosts]       = useState<any[]>([]);
+  const [savedLoading, setSavedLoading]   = useState(false);
+  const [savedLoaded, setSavedLoaded]     = useState(false);
 
   const serif     = { fontFamily: 'CormorantGaramond-Bold' };
   const activeCount = cases.filter(c => c.status === 'Active').length;
@@ -273,6 +277,30 @@ export default function ProfileTab() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: logout },
     ]);
+  };
+
+  const loadSavedPosts = useCallback(async () => {
+    if (savedLoaded) return;
+    setSavedLoading(true);
+    try {
+      const res: any = await forumAPI.getSavedPosts();
+      setSavedPosts(res?.questions || []);
+      setSavedLoaded(true);
+    } catch {
+      setSavedPosts([]);
+    } finally {
+      setSavedLoading(false);
+    }
+  }, [savedLoaded]);
+
+  // Load saved posts when tab is switched to 'saved'
+  useEffect(() => {
+    if (tab === 'saved') loadSavedPosts();
+  }, [tab, loadSavedPosts]);
+
+  const handleUnsave = async (id: number) => {
+    setSavedPosts(prev => prev.filter(p => p.id !== id));
+    try { await forumAPI.savePost(id); } catch {}
   };
 
   const onRefresh = async () => {
@@ -372,11 +400,11 @@ export default function ProfileTab() {
         </View>
 
         {/* ── PILL TABS ── */}
-        <View style={{ flexDirection: 'row', gap: 8, marginHorizontal: 16, marginTop: 16 }}>
-          {([['cases', '📋', isRTL ? 'القضايا' : 'Cases'], ['messages', '💬', isRTL ? 'الرسائل' : 'Messages'], ['payments', '💳', isRTL ? 'المدفوعات' : 'Payments']] as const).map(([id, icon, label]) => (
+        <View style={{ flexDirection: 'row', gap: 6, marginHorizontal: 16, marginTop: 16, flexWrap: 'wrap' }}>
+          {([['cases', '📋', isRTL ? 'القضايا' : 'Cases'], ['messages', '💬', isRTL ? 'الرسائل' : 'Messages'], ['payments', '💳', isRTL ? 'المدفوعات' : 'Payments'], ['saved', '🔖', isRTL ? 'المحفوظات' : 'Saved']] as const).map(([id, icon, label]) => (
             <TouchableOpacity key={id} onPress={() => setTab(id as any)}
-              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 10, borderRadius: 24, backgroundColor: tab === id ? C.gold : C.card, borderWidth: 1, borderColor: tab === id ? C.gold : C.border }}>
-              <Text style={{ fontSize: 14 }}>{icon}</Text>
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 24, backgroundColor: tab === id ? C.gold : C.card, borderWidth: 1, borderColor: tab === id ? C.gold : C.border }}>
+              <Text style={{ fontSize: 13 }}>{icon}</Text>
               <Text style={{ color: tab === id ? '#fff' : C.muted, fontSize: 12, fontWeight: '700' }}>{label}</Text>
             </TouchableOpacity>
           ))}
@@ -519,6 +547,73 @@ export default function ProfileTab() {
                 <Text style={{ color: C.muted, fontSize: 14 }}>Total Spent</Text>
                 <Text style={{ ...serif, color: C.gold, fontWeight: '700', fontSize: 20 }}>{totalSpent} EGP</Text>
               </View>
+            </View>
+          )}
+
+          {/* ══ SAVED TAB ══ */}
+          {tab === 'saved' && (
+            <View style={{ gap: 10 }}>
+              {savedLoading ? (
+                <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                  <ActivityIndicator color={C.gold} size="large" />
+                  <Text style={{ color: C.muted, marginTop: 10, fontSize: 13 }}>جاري تحميل المحفوظات…</Text>
+                </View>
+              ) : savedPosts.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 48, gap: 10 }}>
+                  <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: C.gold + '15', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.gold + '30' }}>
+                    <Text style={{ fontSize: 36 }}>🔖</Text>
+                  </View>
+                  <Text style={{ color: C.text, fontWeight: '700', fontSize: 16 }}>لا توجد منشورات محفوظة</Text>
+                  <Text style={{ color: C.muted, fontSize: 13, textAlign: 'center' }}>احفظ المقالات المفيدة من منتدى وكيل للرجوع إليها لاحقاً</Text>
+                  <TouchableOpacity
+                    onPress={() => router.push('/(tabs)/forum' as any)}
+                    style={{ backgroundColor: C.gold, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 10 }}>
+                    <Text style={{ color: '#000', fontWeight: '800', fontSize: 14 }}>تصفح المنتدى</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                savedPosts.map((p: any) => (
+                  <TouchableOpacity
+                    key={p.id}
+                    activeOpacity={0.88}
+                    onPress={() => router.push({ pathname: '/post/[id]', params: { id: p.id } } as any)}
+                    style={{ backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14, borderLeftWidth: 3, borderLeftColor: C.gold }}
+                  >
+                    {/* Author row */}
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.gold + '20', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.gold + '40' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: C.gold }}>{(p.asked_by || 'م').charAt(0)}</Text>
+                      </View>
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: C.text }}>{p.asked_by || 'مستخدم'}</Text>
+                          {p.user_flair && (
+                            <View style={{ backgroundColor: C.gold + '20', borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1 }}>
+                              <Text style={{ color: C.gold, fontSize: 9, fontWeight: '700' }}>{p.user_flair}</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={{ fontSize: 10, color: C.muted }}>{p.category}</Text>
+                      </View>
+                    </View>
+                    {/* Post text */}
+                    <Text style={{ color: C.text, fontSize: 13, lineHeight: 19, textAlign: 'right' }} numberOfLines={3}>{p.question}</Text>
+                    {/* Footer */}
+                    <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.border }}>
+                      <View style={{ flexDirection: 'row-reverse', gap: 10 }}>
+                        {(p.likes_count || 0) > 0 && <Text style={{ fontSize: 11, color: C.muted }}>👍 {p.likes_count}</Text>}
+                        {(p.answer_count || 0) > 0 && <Text style={{ fontSize: 11, color: C.muted }}>💬 {p.answer_count}</Text>}
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleUnsave(p.id)}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.gold + '15', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: C.gold + '30' }}>
+                        <Text style={{ fontSize: 12, color: C.gold }}>🔖</Text>
+                        <Text style={{ fontSize: 11, color: C.gold, fontWeight: '600' }}>حذف</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
             </View>
           )}
 
