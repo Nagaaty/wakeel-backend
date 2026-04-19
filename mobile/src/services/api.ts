@@ -255,6 +255,14 @@ export const forumAPI = {
     api.post(`/forum/questions/${id}/save`),
   getSavedPosts: () =>
     api.get(`/forum/saved`),
+  // Dislike / Downvote
+  dislikePost: (id: string | number) =>
+    api.post(`/forum/questions/${id}/dislike`),
+  // Community stats + trending
+  getForumStats: () =>
+    api.get(`/forum/stats`),
+  getTrending: () =>
+    api.get(`/forum/trending`),
 };
 
 export const analyticsAPI = {

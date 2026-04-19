@@ -3,13 +3,18 @@ const pool   = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { emitForum }  = require('../utils/socket');
 
-// ── Auto-migration: add comment-like columns if not present
+// ── Auto-migration: add comment-like columns + dislike columns + forum_saved
 (async () => {
   try {
     await pool.query(`
       ALTER TABLE forum_answers
         ADD COLUMN IF NOT EXISTS likes_count INT DEFAULT 0,
         ADD COLUMN IF NOT EXISTS liked_by    JSONB DEFAULT '[]'::jsonb
+    `);
+    await pool.query(`
+      ALTER TABLE forum_questions
+        ADD COLUMN IF NOT EXISTS dislikes_count INT DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS disliked_by   JSONB DEFAULT '[]'::jsonb
     `);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS forum_saved (
@@ -19,30 +24,87 @@ const { emitForum }  = require('../utils/socket');
         PRIMARY KEY(user_id, question_id)
       );
     `);
-  } catch (e) { console.warn('forum_answers migration skipped:', e.message); }
+  } catch (e) { console.warn('forum migration skipped:', e.message); }
 })();
 
-// GET  /api/forum/questions
+// GET  /api/forum/questions  — supports ?sort=hot|new|top|rising  ?cat= ?search= ?tag=
 router.get('/questions', async (req, res, next) => {
   try {
-    const { cat, search, tag } = req.query;
+    const { cat, search, tag, sort = 'new' } = req.query;
+    const flairExpr = `
+      CASE
+        WHEN u.role = 'lawyer' AND u.is_verified THEN 'محامٍ موثوق ✔️'
+        WHEN u.role = 'lawyer' THEN 'مستشار قانوني ⚖️'
+        ELSE NULL
+      END`;
+    // Karma = likes on posts + 2x likes on answers (computed inline)
+    const karmaExpr = `(
+      COALESCE(fq.likes_count,0) +
+      COALESCE((SELECT SUM(fa2.likes_count)*2 FROM forum_answers fa2 WHERE fa2.question_id=fq.id),0)
+    )`;
     let q = `SELECT fq.*, u.name as asked_by, u.avatar_url as user_avatar_url, u.role as user_role,
-              CASE 
-                WHEN u.role = 'lawyer' AND u.is_verified THEN 'محامٍ موثوق ✔️'
-                WHEN u.role = 'lawyer' THEN 'مستشار قانوني ⚖️'
-                ELSE NULL 
-              END as user_flair,
+              ${flairExpr} as user_flair,
+              ${karmaExpr} as user_karma,
               (SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id AND fa.parent_answer_id IS NULL) as answer_count
               FROM forum_questions fq
               LEFT JOIN users u ON u.id=fq.user_id
               WHERE fq.is_visible=true`;
-    const params = [];
+    const params: any[] = [];
     if (cat)    { params.push(cat);    q += ` AND fq.category=$${params.length}`; }
     if (search) { params.push('%'+search+'%'); q += ` AND (fq.question ILIKE $${params.length} OR fq.category ILIKE $${params.length})`; }
     if (tag)    { params.push(JSON.stringify([tag.toLowerCase()])); q += ` AND fq.tags @> $${params.length}::jsonb`; }
-    q += ' ORDER BY fq.created_at DESC LIMIT 50';
+    // Sorting
+    if (sort === 'hot') {
+      // Hot: engagement in last 24h weighted 3x, total likes weighted 1x
+      q += ` ORDER BY (
+        3 * COALESCE((SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id AND fa.created_at > NOW()-INTERVAL '24 hours'),0)
+        + 3 * COALESCE((SELECT COUNT(*) FROM forum_questions fq2 WHERE fq2.original_post_id=fq.id AND fq2.created_at > NOW()-INTERVAL '24 hours'),0)
+        + COALESCE(fq.likes_count,0)
+      ) DESC LIMIT 50`;
+    } else if (sort === 'top') {
+      q += ' ORDER BY COALESCE(fq.likes_count,0) DESC LIMIT 50';
+    } else if (sort === 'rising') {
+      // Rising: likes + comments in last 2 hours
+      q += ` ORDER BY (
+        COALESCE((SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id AND fa.created_at > NOW()-INTERVAL '2 hours'),0)
+        + COALESCE(fq.likes_count,0)
+      ) DESC, fq.created_at DESC LIMIT 50`;
+    } else {
+      q += ' ORDER BY fq.created_at DESC LIMIT 50';
+    }
     const { rows } = await pool.query(q, params);
     res.json({ questions: rows });
+  } catch (err) { next(err); }
+});
+
+// GET /api/forum/stats — community stats widget
+router.get('/stats', async (req, res, next) => {
+  try {
+    const { rows: [stats] } = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM forum_questions WHERE created_at > NOW()-INTERVAL '24 hours' AND is_visible=true) as posts_today,
+        (SELECT COUNT(DISTINCT user_id) FROM forum_questions WHERE created_at > NOW()-INTERVAL '7 days' AND is_visible=true) as active_this_week,
+        (SELECT COUNT(*) FROM users WHERE role='lawyer' AND is_verified=true) as verified_lawyers,
+        (SELECT COUNT(*) FROM forum_questions WHERE is_visible=true) as total_posts
+    `);
+    res.json({ stats });
+  } catch (err) { next(err); }
+});
+
+// GET /api/forum/trending — top hashtags used in last 7 days
+router.get('/trending', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT tag, COUNT(*) as count
+      FROM forum_questions,
+           jsonb_array_elements_text(COALESCE(tags, '[]'::jsonb)) AS tag
+      WHERE created_at > NOW()-INTERVAL '7 days' AND is_visible=true
+        AND tag != ''
+      GROUP BY tag
+      ORDER BY count DESC
+      LIMIT 12
+    `);
+    res.json({ trending: rows });
   } catch (err) { next(err); }
 });
 
@@ -143,6 +205,53 @@ router.post('/questions', requireAuth, async (req, res, next) => {
     // Emit real-time event so other users see the new post immediately
     emitForum('forum:new_post', { post: newPost });
     res.status(201).json({ question: newPost });
+  } catch (err) { next(err); }
+});
+
+// POST /api/forum/questions/:id/dislike — TOGGLE dislike
+router.post('/questions/:id/dislike', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString();
+    const { rows: [pre] } = await pool.query(
+      `SELECT
+         COALESCE(disliked_by,'[]'::jsonb) @> $2::jsonb AS already_disliked,
+         COALESCE(liked_by,'[]'::jsonb)    @> $2::jsonb AS already_liked
+       FROM forum_questions WHERE id=$1`,
+      [req.params.id, JSON.stringify([userId])]
+    );
+    if (!pre) return res.status(404).json({ message: 'Post not found' });
+
+    // If currently liked, remove that like first
+    if (pre.already_liked) {
+      await pool.query(
+        `UPDATE forum_questions
+           SET likes_count = GREATEST(0,COALESCE(likes_count,0)-1),
+               liked_by = (SELECT COALESCE(jsonb_agg(x),'[]'::jsonb) FROM jsonb_array_elements(COALESCE(liked_by,'[]'::jsonb)) AS x WHERE x != to_jsonb($2::text))
+         WHERE id=$1`,
+        [req.params.id, userId]
+      );
+    }
+
+    if (pre.already_disliked) {
+      // Un-dislike
+      const { rows: [row] } = await pool.query(
+        `UPDATE forum_questions
+           SET dislikes_count = GREATEST(0,COALESCE(dislikes_count,0)-1),
+               disliked_by = (SELECT COALESCE(jsonb_agg(x),'[]'::jsonb) FROM jsonb_array_elements(COALESCE(disliked_by,'[]'::jsonb)) AS x WHERE x != to_jsonb($2::text))
+         WHERE id=$1 RETURNING *`,
+        [req.params.id, userId]
+      );
+      return res.json({ question: row, disliked: false });
+    }
+
+    const { rows: [row] } = await pool.query(
+      `UPDATE forum_questions
+         SET dislikes_count = COALESCE(dislikes_count,0)+1,
+             disliked_by = COALESCE(disliked_by,'[]'::jsonb) || $2::jsonb
+       WHERE id=$1 RETURNING *`,
+      [req.params.id, JSON.stringify([userId])]
+    );
+    res.json({ question: row, disliked: true });
   } catch (err) { next(err); }
 });
 

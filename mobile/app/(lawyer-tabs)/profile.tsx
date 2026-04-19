@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  Share, Animated, Alert,
+  Share, Animated, Alert, ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +10,6 @@ import { useTheme } from '../../src/theme';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useI18n } from '../../src/i18n';
 import { lawyersAPI, forumAPI } from '../../src/services/api';
-import { ActivityIndicator } from 'react-native';
 
 const GOLD = '#C8A84B';
 

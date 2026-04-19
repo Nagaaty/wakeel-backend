@@ -68,7 +68,13 @@ export default function ForumTab() {
   const [newPostText, setNewPostText] = useState('');
   const [posting, setPosting] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
+  const [dislikedPosts, setDislikedPosts] = useState<Set<number>>(new Set());
   const [savedPosts, setSavedPosts] = useState<Set<number>>(new Set());
+  // Sort feed
+  const [sortMode, setSortMode] = useState<'new' | 'hot' | 'top' | 'rising'>('new');
+  // Community stats + trending
+  const [stats, setStats] = useState<any>(null);
+  const [trending, setTrending] = useState<any[]>([]);
   // Comment modal state
   const [commentPost, setCommentPost]   = useState<any | null>(null);
   const [answers, setAnswers]           = useState<any[]>([]);
@@ -204,22 +210,24 @@ export default function ForumTab() {
   });
 
   useEffect(() => {
-    loadPosts();
+    loadPosts(sortMode);
+    loadStats();
+    loadTrending();
   }, []);
 
-  const loadPosts = async () => {
+  const loadPosts = async (sort: string = sortMode) => {
     try {
       setLoading(true);
       if (user?.id) {
         const [res, savedRes]: any = await Promise.all([
-          forumAPI.getQuestions(),
+          forumAPI.getQuestions({ sort }),
           forumAPI.getSavedPosts().catch(() => ({ questions: [] }))
         ]);
         setPosts(res.questions || []);
         const svd = new Set<number>((savedRes?.questions || []).map((q: any) => q.id));
         setSavedPosts(svd);
       } else {
-        const res: any = await forumAPI.getQuestions();
+        const res: any = await forumAPI.getQuestions({ sort });
         setPosts(res.questions || []);
       }
     } catch (e) {
@@ -227,6 +235,20 @@ export default function ForumTab() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadStats = async () => {
+    try {
+      const res: any = await forumAPI.getForumStats();
+      setStats(res?.stats || null);
+    } catch {}
+  };
+
+  const loadTrending = async () => {
+    try {
+      const res: any = await forumAPI.getTrending();
+      setTrending(res?.trending || []);
+    } catch {}
   };
 
   const handleLike = async (id: number) => {
@@ -254,6 +276,29 @@ export default function ForumTab() {
       if (isLiked) setLikedPosts(prev => new Set(prev).add(id));
       else { setLikedPosts(prev => { const n = new Set(prev); n.delete(id); return n; }); }
     }
+  };
+
+  const handleDislike = async (id: number) => {
+    const isDisliked = dislikedPosts.has(id);
+    // Optimistic — also remove upvote if user switches to downvote
+    if (!isDisliked) {
+      setLikedPosts(prev => { const n = new Set(prev); n.delete(id); return n; });
+      setPosts(prev => prev.map(p => p.id === id ? {
+        ...p,
+        dislikes_count: (p.dislikes_count || 0) + 1,
+        likes_count: Math.max(0, p.likes_count || 0),
+      } : p));
+      setDislikedPosts(prev => new Set(prev).add(id));
+    } else {
+      setDislikedPosts(prev => { const n = new Set(prev); n.delete(id); return n; });
+      setPosts(prev => prev.map(p => p.id === id ? {
+        ...p,
+        dislikes_count: Math.max(0, (p.dislikes_count || 1) - 1),
+      } : p));
+    }
+    try {
+      await forumAPI.dislikePost(id);
+    } catch {}
   };
 
   const handleSave = async (id: number) => {
@@ -431,23 +476,80 @@ export default function ForumTab() {
 
   return (
     <View style={{ flex: 1, backgroundColor: feedBg }}>
-      {/* ─── Header ──────────────────────────────────────────────────────── */}
-      <View style={{ paddingTop: insets.top + 16, backgroundColor: C.surface, paddingBottom: 10, borderBottomWidth: 1, borderColor: '#D3D6DB' }}>
-        <View style={{ paddingHorizontal: 16, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ fontSize: 26, fontWeight: '800', color: C.text, fontFamily: 'CormorantGaramond-Bold' }}>
+      {/* ─── Reddit-style Header ──────────────────────────────────────────── */}
+      <View style={{ paddingTop: insets.top + 12, backgroundColor: C.surface, borderBottomWidth: 1, borderColor: '#D3D6DB' }}>
+        {/* Title + icons */}
+        <View style={{ paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <Text style={{ fontSize: 22, fontWeight: '800', color: C.text, fontFamily: 'CormorantGaramond-Bold' }}>
             {isRTL ? 'مجتمع وكيل' : 'Wakeel Community'}
           </Text>
-          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 16 }}>
-            <TouchableOpacity style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: feedBg, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 18 }}>🔍</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity onPress={() => router.push('/saved-posts' as any)}
+              style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: feedBg, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 16 }}>🔖</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/saved-posts' as any)} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: feedBg, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 18 }}>🔖</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: feedBg, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 18 }}>🔔</Text>
+            <TouchableOpacity style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: feedBg, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 16 }}>🔔</Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Community Stats Widget */}
+        {stats && (
+          <View style={{ flexDirection: 'row-reverse', paddingHorizontal: 16, gap: 12, marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 3 }}>
+              <Text style={{ fontSize: 10, color: '#888' }}>{isRTL ? 'محامٍ معتمد' : 'Verified'}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: C.gold }}>⚖️ {stats.verified_lawyers}</Text>
+            </View>
+            <View style={{ width: 1, backgroundColor: '#E0E0E0' }} />
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 3 }}>
+              <Text style={{ fontSize: 10, color: '#888' }}>{isRTL ? 'اليوم' : 'Today'}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#22C55E' }}>📝 {stats.posts_today}</Text>
+            </View>
+            <View style={{ width: 1, backgroundColor: '#E0E0E0' }} />
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 3 }}>
+              <Text style={{ fontSize: 10, color: '#888' }}>{isRTL ? 'نشطون' : 'Active'}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#3B82F6' }}>👥 {stats.active_this_week}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Trending hashtag chips */}
+        {trending.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8, gap: 6 }}>
+            {trending.map((t: any, i: number) => (
+              <TouchableOpacity key={i}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 3,
+                  backgroundColor: C.gold + '15', borderRadius: 18,
+                  paddingHorizontal: 10, paddingVertical: 4,
+                  borderWidth: 1, borderColor: C.gold + '35' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: C.gold }}>#{t.tag}</Text>
+                <Text style={{ fontSize: 10, color: '#999' }}>· {t.count}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Sort Tabs — Hot / New / Top / Rising */}
+        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F0F0F0' }}>
+          {([
+            ['hot',    '🔥', isRTL ? 'رائج'   : 'Hot'],
+            ['new',    '✨', isRTL ? 'جديد'   : 'New'],
+            ['top',    '⭐', isRTL ? 'الأعلى' : 'Top'],
+            ['rising', '📈', isRTL ? 'صاعد'   : 'Rising'],
+          ] as const).map(([mode, icon, label]) => (
+            <TouchableOpacity key={mode}
+              onPress={() => { setSortMode(mode); loadPosts(mode); }}
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: 4, paddingVertical: 10,
+                borderBottomWidth: 3,
+                borderBottomColor: sortMode === mode ? C.gold : 'transparent' }}>
+              <Text style={{ fontSize: 13 }}>{icon}</Text>
+              <Text style={{ fontSize: 12, fontWeight: sortMode === mode ? '800' : '500',
+                color: sortMode === mode ? C.gold : '#888' }}>{label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
@@ -455,9 +557,10 @@ export default function ForumTab() {
         data={posts}
         keyExtractor={p => p.id.toString()}
         refreshing={loading}
-        onRefresh={loadPosts}
+        onRefresh={() => loadPosts(sortMode)}
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
+
         ListHeaderComponent={
           <>
             {/* ─── Social Composer (Like Facebook/LinkedIn) ────────────────── */}
@@ -512,6 +615,8 @@ export default function ForumTab() {
             : null;
           const isRepost = !!origData;
           const liked = likedPosts.has(p.id);
+          const disliked = dislikedPosts.has(p.id);
+          const netScore = (p.likes_count || 0) - (p.dislikes_count || 0);
 
           return (
             <View style={{ marginBottom: 8 }}>
@@ -572,6 +677,12 @@ export default function ForumTab() {
                       ) : p.user_role === 'lawyer' && (
                         <View style={{ backgroundColor: C.gold + '22', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
                           <Text style={{ color: C.gold, fontSize: 11, fontWeight: '700' }}>⚖️ محامٍ</Text>
+                        </View>
+                      )}
+                      {/* Karma score */}
+                      {p.user_role === 'lawyer' && (p.user_karma || 0) > 0 && (
+                        <View style={{ backgroundColor: '#3B82F615', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 }}>
+                          <Text style={{ color: '#3B82F6', fontSize: 10, fontWeight: '700' }}>⚡ {p.user_karma}</Text>
                         </View>
                       )}
                     </View>
@@ -713,52 +824,75 @@ export default function ForumTab() {
                   </View>
                 )}
 
-                {/* ── Action bar ── */}
+                {/* ── Reddit-style Action bar ── */}
                 <View style={{
                   flexDirection: 'row-reverse',
                   borderTopWidth: 1, borderTopColor: '#F0F0F0',
                   paddingHorizontal: 8, paddingVertical: 4,
-                  gap: 6,
+                  gap: 4, alignItems: 'center',
                 }}>
-                  {/* أعجبني */}
-                  <TouchableOpacity
-                    onPress={() => handleLike(p.id)}
-                    style={{
-                      flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center',
-                      gap: 4, paddingVertical: 8, borderRadius: 8,
-                      backgroundColor: liked ? '#0A66C215' : 'transparent',
-                    }}>
-                    <Text style={{ fontSize: 17, color: liked ? '#0A66C2' : '#777' }}>
-                      {liked ? '👍' : '🤍'}
-                    </Text>
-                    <Text style={{ fontSize: 11, fontWeight: liked ? '700' : '500', color: liked ? '#0A66C2' : '#777' }}>
-                      أعجبني
-                    </Text>
-                  </TouchableOpacity>
 
-                  {/* تعليق */}
+                  {/* ▲▼ Reddit Vote Cluster */}
+                  <View style={{
+                    flexDirection: 'row-reverse', alignItems: 'center',
+                    backgroundColor: '#F6F7F8', borderRadius: 20,
+                    paddingHorizontal: 4, paddingVertical: 2, gap: 2,
+                    borderWidth: 1, borderColor: '#E0E0E0',
+                  }}>
+                    {/* ▲ Upvote */}
+                    <TouchableOpacity
+                      onPress={() => handleLike(p.id)}
+                      style={{
+                        paddingHorizontal: 8, paddingVertical: 6, borderRadius: 16,
+                        backgroundColor: liked ? '#FF4500' + '18' : 'transparent',
+                      }}>
+                      <Text style={{ fontSize: 16, color: liked ? '#FF4500' : '#818384', fontWeight: '800' }}>▲</Text>
+                    </TouchableOpacity>
+
+                    {/* Score */}
+                    <Text style={{
+                      fontSize: 13, fontWeight: '800', minWidth: 24, textAlign: 'center',
+                      color: liked ? '#FF4500' : disliked ? '#7193FF' : '#1A1A1A',
+                    }}>
+                      {netScore > 0 ? `+${netScore}` : netScore === 0 ? '0' : netScore}
+                    </Text>
+
+                    {/* ▼ Downvote */}
+                    <TouchableOpacity
+                      onPress={() => handleDislike(p.id)}
+                      style={{
+                        paddingHorizontal: 8, paddingVertical: 6, borderRadius: 16,
+                        backgroundColor: disliked ? '#7193FF18' : 'transparent',
+                      }}>
+                      <Text style={{ fontSize: 16, color: disliked ? '#7193FF' : '#818384', fontWeight: '800' }}>▼</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* 💬 Comment */}
                   <TouchableOpacity
                     onPress={() => openComments(p)}
                     style={{
                       flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center',
                       gap: 4, paddingVertical: 8, borderRadius: 8,
                     }}>
-                    <Text style={{ fontSize: 17, color: '#777' }}>💬</Text>
-                    <Text style={{ fontSize: 11, fontWeight: '500', color: '#777' }}>تعليق</Text>
+                    <Text style={{ fontSize: 15, color: '#777' }}>💬</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '500', color: '#777' }}>
+                      {(p.answer_count || 0) > 0 ? p.answer_count : 'تعليق'}
+                    </Text>
                   </TouchableOpacity>
 
-                  {/* نشر */}
+                  {/* ↩️ Share */}
                   <TouchableOpacity
                     onPress={() => handleShare(p)}
                     style={{
                       flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center',
                       gap: 4, paddingVertical: 8, borderRadius: 8,
                     }}>
-                    <Text style={{ fontSize: 17, color: '#777' }}>↩️</Text>
+                    <Text style={{ fontSize: 15, color: '#777' }}>↩️</Text>
                     <Text style={{ fontSize: 11, fontWeight: '500', color: '#777' }}>نشر</Text>
                   </TouchableOpacity>
 
-                  {/* حفظ — Bookmark with gold highlight when saved */}
+                  {/* 🔖 Save */}
                   <TouchableOpacity
                     onPress={() => handleSave(p.id)}
                     style={{
@@ -768,10 +902,9 @@ export default function ForumTab() {
                       borderWidth: savedPosts.has(p.id) ? 1 : 0,
                       borderColor: savedPosts.has(p.id) ? C.gold + '50' : 'transparent',
                     }}>
-                    <Text style={{ fontSize: 17, color: savedPosts.has(p.id) ? C.gold : '#777' }}>
-                      {savedPosts.has(p.id) ? '🔖' : '🔖'}
-                    </Text>
-                    <Text style={{ fontSize: 11, fontWeight: savedPosts.has(p.id) ? '700' : '500', color: savedPosts.has(p.id) ? C.gold : '#777' }}>
+                    <Text style={{ fontSize: 15, color: savedPosts.has(p.id) ? C.gold : '#777' }}>🔖</Text>
+                    <Text style={{ fontSize: 11, fontWeight: savedPosts.has(p.id) ? '700' : '500',
+                      color: savedPosts.has(p.id) ? C.gold : '#777' }}>
                       {savedPosts.has(p.id) ? 'محفوظ' : 'حفظ'}
                     </Text>
                   </TouchableOpacity>
