@@ -702,7 +702,6 @@ export default function ForumTab() {
                         </View>
                       )}
                     </View>
-                    </View>
                     {/* Category badge + timestamp */}
                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginTop: 4 }}>
                       {p.category && p.category !== 'الكل' && (
