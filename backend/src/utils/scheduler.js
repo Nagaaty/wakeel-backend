@@ -129,6 +129,69 @@ function startScheduler() {
       await pool.query(`DELETE FROM blacklist_tokens WHERE expires_at < NOW()`);
     } catch (err) { console.error('[Cleanup error]', err.message); }
   });
+
+  // ── 🔄 Agent 1: Data Sync (Infrastructure) ── Nightly at 3:00 AM ────────────
+  cron.schedule('0 3 * * *', async () => {
+    try {
+      console.log('🔄 Data Sync Agent: Recalculating forum counters...');
+      // Fix ghost answers counts
+      await pool.query(`
+        UPDATE forum_questions fq
+        SET answers_count = (SELECT COUNT(*) FROM forum_answers WHERE question_id = fq.id)
+      `);
+      // Hide inactive ghost lawyers
+      await pool.query(`
+        UPDATE lawyer_profiles lp
+        SET is_visible = false
+        FROM users u
+        WHERE u.id = lp.user_id AND u.last_active_at < NOW() - INTERVAL '6 months'
+      `);
+      console.log('✅ Data Sync Agent finished.');
+    } catch (err) { console.error('[Data Sync Agent Error]', err.message); }
+  });
+
+  // ── 🌟 Agent 2: Reputation Karma (Lawyer-Side) ── Nightly at 4:00 AM ───────
+  cron.schedule('0 4 * * *', async () => {
+    try {
+      console.log('🌟 Reputation Agent: Calculating lawyer karma scores...');
+      await pool.query(`
+        UPDATE lawyer_profiles lp
+        SET karma_score = (
+          (COALESCE(lp.accepted_answers, 0) * 10) +
+          (COALESCE((SELECT SUM(likes_count) FROM forum_answers WHERE lawyer_id = lp.user_id), 0) * 2) +
+          (COALESCE((SELECT COUNT(*) FROM reviews WHERE lawyer_id = lp.user_id AND rating = 5), 0) * 5)
+        )
+      `);
+      console.log('✅ Reputation Agent finished.');
+    } catch (err) { console.error('[Reputation Agent Error]', err.message); }
+  });
+
+  // ── 📊 Agent 3: Business Intelligence (Market Trends) ── Sundays at Midnight 
+  cron.schedule('0 0 * * 0', async () => {
+    try {
+      console.log('📊 BI Agent: Generating weekly market insights...');
+      const { rows } = await pool.query(`
+        SELECT category, COUNT(*) as post_count, COALESCE(SUM(likes_count), 0) as likes_count
+        FROM forum_questions
+        WHERE created_at >= NOW() - INTERVAL '7 days' AND category IS NOT NULL
+        GROUP BY category
+        ORDER BY post_count DESC
+        LIMIT 10
+      `);
+
+      if (rows.length > 0) {
+        // Truncate old trends and insert new
+        await pool.query('TRUNCATE TABLE market_trends');
+        for (const trend of rows) {
+          await pool.query(
+            'INSERT INTO market_trends (category, post_count, likes_count) VALUES ($1, $2, $3)',
+            [trend.category, trend.post_count, trend.likes_count]
+          );
+        }
+        console.log('✅ BI Agent finished crunching market trends.');
+      }
+    } catch (err) { console.error('[BI Agent Error]', err.message); }
+  });
 }
 
 module.exports = { startScheduler };

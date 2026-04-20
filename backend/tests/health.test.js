@@ -1,13 +1,15 @@
 const request = require('supertest');
 const { app, server } = require('../src/index');
+const pool = require('../src/config/db');
 
 describe('QA Agent: Health & Uptime Test', () => {
-  afterAll((done) => {
+  afterAll(async () => {
     // Close the server if it somehow started listening, though our NODE_ENV condition prevents this
     if (server.close) {
       server.close();
     }
-    done();
+    // Close the Database connection pool so Jest can exit cleanly unconditionally
+    await pool.end();
   });
 
   it('should return 200 OK from DevOps Health route', async () => {

@@ -155,6 +155,19 @@ if (process.env.NODE_ENV !== 'test') {
   db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS subscription_plan VARCHAR(20) DEFAULT \'basic\'').catch(() => {});
   db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS service_prices JSONB').catch(() => {});
   db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS has_set_schedule BOOLEAN DEFAULT false').catch(() => {});
+  
+  // Reputation Agent columns
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS karma_score INTEGER DEFAULT 0').catch(() => {});
+  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS accepted_answers INTEGER DEFAULT 0').catch(() => {});
+
+  // Business Intelligence Agent table
+  db.query(`CREATE TABLE IF NOT EXISTS market_trends (
+    id SERIAL PRIMARY KEY,
+    category VARCHAR(255) NOT NULL,
+    post_count INTEGER DEFAULT 0,
+    likes_count INTEGER DEFAULT 0,
+    recorded_at TIMESTAMPTZ DEFAULT NOW()
+  )`).catch(() => {});
 
   // Forum social columns
   db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS likes_count INTEGER DEFAULT 0').catch(() => {});
