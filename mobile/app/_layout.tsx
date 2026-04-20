@@ -155,7 +155,18 @@ function RootLayoutNav() {
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
-export default function RootLayout() {
+// ─── Mobile Engineer Agent: Sentry Initialization ───────────────────────────────
+import * as Sentry from '@sentry/react-native';
+
+if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    debug: false, 
+  });
+}
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
+function RootLayout() {
   const [fontsLoaded] = ExpoFont.useFonts({
     'CormorantGaramond-Bold':     'https://fonts.gstatic.com/s/cormorantgaramond/v22/co3YmX5slCNuHLi8bLeY9MK7whWMhyjQAllvuQ.ttf',
     'CormorantGaramond-SemiBold': 'https://fonts.gstatic.com/s/cormorantgaramond/v22/co3YmX5slCNuHLi8bLeY9MK7whWMhyjQWlpvuQ.ttf',
@@ -185,3 +196,5 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+export default Sentry.wrap(RootLayout);

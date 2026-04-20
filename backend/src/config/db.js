@@ -25,4 +25,22 @@ pool.on('error', (err) => {
   console.error('Unexpected DB error:', err.message);
 });
 
+// 🗄️ Database Agent: Query Profiling Interceptor
+const originalQuery = pool.query.bind(pool);
+pool.query = async function (text, params) {
+  const start = Date.now();
+  try {
+    const res = await originalQuery(text, params);
+    const duration = Date.now() - start;
+    if (duration > 500) {
+      console.warn(`[DB Agent] ⚠️ Slow query detected (${duration}ms):`, typeof text === 'string' ? text.substring(0, 100) : text);
+    }
+    return res;
+  } catch (error) {
+    const duration = Date.now() - start;
+    console.error(`[DB Agent] ❌ Query failed after ${duration}ms:`, typeof text === 'string' ? text.substring(0, 100) : text);
+    throw error;
+  }
+};
+
 module.exports = pool;

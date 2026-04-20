@@ -109,7 +109,8 @@
           "photosPermission": "Used to select and attach case files."
         }
       ],
-      "expo-document-picker"
+      "expo-document-picker",
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true

@@ -10,6 +10,23 @@ const errorHandler = require('./middleware/errorHandler');
 const app    = express();
 const server = http.createServer(app);
 
+// ⚙️ Backend Engineer Agent: Sentry Crash Reporting
+// Only initialized if SENTRY_DSN is provided in .env
+const Sentry = require('@sentry/node');
+const { nodeProfilingIntegration } = require('@sentry/profiling-node');
+
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    integrations: [
+      nodeProfilingIntegration(),
+    ],
+    tracesSampleRate: 1.0,
+    profilesSampleRate: 1.0,
+  });
+  console.log('🛡️ Sentry Crash Reporter initialized');
+}
+
 // Trust Render's proxy (fixes rate-limit X-Forwarded-For warning)
 app.set('trust proxy', 1);
 
@@ -58,7 +75,7 @@ const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // ── Health check ───────────────────────────────────────────────────────────────
-app.get('/health', (req, res) => res.json({ ok: true, time: new Date() }));
+app.use('/api/health', require('./routes/health'));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/auth',        require('./routes/auth'));
@@ -94,12 +111,17 @@ app.use('/api/vault',       require('./routes/document_vault'));
 app.use((req, res) => res.status(404).json({ message: `Route not found: ${req.method} ${req.path}` }));
 
 // ── Error handler ──────────────────────────────────────────────────────────────
+if (process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
 app.use(errorHandler);
 
 // ── Start server ───────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n🚀 Wakeel API running on port ${PORT}`);
+
+if (process.env.NODE_ENV !== 'test') {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n🚀 Wakeel API running on port ${PORT}`);
   console.log(`🌐 Frontend: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
   console.log(`📧 Email: ${process.env.EMAIL_HOST || process.env.EMAIL_SENDGRID_KEY ? '✅ configured' : '⚠️  not configured'}`);
   console.log(`📱 Twilio: ${process.env.TWILIO_ACCOUNT_SID ? '✅ configured' : '⚠️  not configured'}`);
@@ -193,5 +215,6 @@ server.listen(PORT, '0.0.0.0', () => {
     startScheduler();
   } catch (err) { console.warn('Scheduler not started:', err.message); }
 });
+}
 
 module.exports = { app, server };
