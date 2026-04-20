@@ -263,6 +263,8 @@ export const forumAPI = {
     api.get(`/forum/stats`),
   getTrending: () =>
     api.get(`/forum/trending`),
+  getMentionableUsers: (q?: string) =>
+    api.get(`/forum/mentionable-users`, { params: { q } }),
 };
 
 export const analyticsAPI = {

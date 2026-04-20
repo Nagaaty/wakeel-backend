@@ -10,6 +10,7 @@ import { useAuth } from '../../src/hooks/useAuth';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import HashtagText from '../../src/components/HashtagText';
+import MentionInput from '../../src/components/MentionInput';
 import { useForumSocket } from '../../src/hooks/useForumSocket';
 
 /** Relative time — same pattern as LinkedIn (e.g. منذ 3 ساعات) */
@@ -34,11 +35,24 @@ function timeAgo(iso: string) {
  */
 function cleanQuotedText(text: string | null | undefined): string {
   if (!text) return '';
-  // Remove lines starting with [ and ending with ]:
   const lines = text.split('\n').filter(line => !line.trim().match(/^\[.+\][:：]?\s*$/));
   const cleaned = lines.join('\n').trim();
-  // Also strip the remaining orphan "." left by old chain
   return cleaned === '.' ? '' : cleaned;
+}
+
+/** Category color map */
+const CAT_COLORS: Record<string, { bg: string; text: string }> = {
+  'جنائي':    { bg: '#FEE2E2', text: '#DC2626' },
+  'تجاري':   { bg: '#DBEAFE', text: '#1D4ED8' },
+  'عقاري':   { bg: '#D1FAE5', text: '#065F46' },
+  'أسرة':    { bg: '#FDE8FF', text: '#9333EA' },
+  'عمالي':   { bg: '#FEF3C7', text: '#B45309' },
+  'إداري':   { bg: '#E0F2FE', text: '#0369A1' },
+  'دستوري':  { bg: '#F3F4F6', text: '#374151' },
+  'الكل':    { bg: '#F3F4F6', text: '#6B7280' },
+};
+function catStyle(cat: string) {
+  return CAT_COLORS[cat] || { bg: '#F3F4F6', text: '#6B7280' };
 }
 
 
@@ -67,6 +81,7 @@ export default function ForumTab() {
   const [modalOpen, setModalOpen] = useState(false);
   const [newPostText, setNewPostText] = useState('');
   const [posting, setPosting] = useState(false);
+  const [postCategory, setPostCategory] = useState('الكل');
   const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
   const [dislikedPosts, setDislikedPosts] = useState<Set<number>>(new Set());
   const [savedPosts, setSavedPosts] = useState<Set<number>>(new Set());
@@ -388,7 +403,7 @@ export default function ForumTab() {
       // createQuestion returns the new post — capture its ID for the notification link
       const createRes: any = await forumAPI.createQuestion({
         question: questionText,
-        category: 'الكل',
+        category: sharingPost ? 'الكل' : postCategory,
         anonymous: false,
         ...(attachedImage ? { image_url: attachedImage } : {}),
         // —— Repost chain: always link to the TRUE original, not an intermediate sharer ——
@@ -429,6 +444,7 @@ export default function ForumTab() {
       setAttachedImage(null);
       setAttachedFile(null);
       setSharingPost(null);
+      setPostCategory('الكل');
       setModalOpen(false);
       loadPosts();
     } catch (e) {
@@ -531,12 +547,12 @@ export default function ForumTab() {
           </ScrollView>
         )}
 
-        {/* Sort Tabs — Hot / New / Top / Rising */}
-        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F0F0F0' }}>
+        {/* Sort Tabs — رائج / الأعلى / جديد / صاعد (RTL order) */}
+        <View style={{ flexDirection: 'row-reverse', borderTopWidth: 1, borderTopColor: '#F0F0F0' }}>
           {([
             ['hot',    '🔥', isRTL ? 'رائج'   : 'Hot'],
-            ['new',    '✨', isRTL ? 'جديد'   : 'New'],
             ['top',    '⭐', isRTL ? 'الأعلى' : 'Top'],
+            ['new',    '✨', isRTL ? 'جديد'   : 'New'],
             ['rising', '📈', isRTL ? 'صاعد'   : 'Rising'],
           ] as const).map(([mode, icon, label]) => (
             <TouchableOpacity key={mode}
@@ -686,12 +702,16 @@ export default function ForumTab() {
                         </View>
                       )}
                     </View>
-                    <Text style={{ color: '#666', fontSize: 13, marginTop: 2, textAlign: 'right' }}>
-                      {p.category}
-                    </Text>
-                    <Text style={{ color: '#999', fontSize: 12, marginTop: 2, textAlign: 'right' }}>
-                      {timeAgo(p.created_at)} · 🌐
-                    </Text>
+                    </View>
+                    {/* Category badge + timestamp */}
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      {p.category && p.category !== 'الكل' && (
+                        <View style={{ backgroundColor: catStyle(p.category).bg, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 }}>
+                          <Text style={{ color: catStyle(p.category).text, fontSize: 10, fontWeight: '700' }}>{p.category}</Text>
+                        </View>
+                      )}
+                      <Text style={{ color: '#999', fontSize: 11 }}>{timeAgo(p.created_at)}</Text>
+                    </View>
                   </View>
 
                   {/* ··· menu — opens edit/delete for own posts, report/hide for others */}
@@ -984,105 +1004,171 @@ export default function ForumTab() {
                   </Text>
                 </View>
               }
-              renderItem={({ item: a }) => (
-                <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: a.is_accepted ? C.gold + '25' : C.card2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: a.is_accepted ? C.gold : C.muted }}>
-                      {(a.lawyer_name || 'م').substring(0, 2).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ backgroundColor: C.card, borderRadius: 16, borderTopLeftRadius: 4, padding: 12, borderWidth: 1, borderColor: a.is_accepted ? C.gold + '40' : C.border }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <Text style={{ color: C.text, fontWeight: '700', fontSize: 13 }}>{a.lawyer_name || (isRTL ? 'محامي' : 'Lawyer')}</Text>
-                        {a.is_accepted && <Text style={{ color: C.gold, fontSize: 11, fontWeight: '700' }}>✔️ {isRTL ? 'مقبول' : 'Accepted'}</Text>}
-                      </View>
-                      <Text style={{ color: C.text, fontSize: 14, lineHeight: 22, textAlign: 'right' }}>{a.answer}</Text>
+              renderItem={({ item: a }) => {
+                const isOwn = a.user_id === user?.id || a.lawyer_id === user?.id;
+                return (
+                  <View key={a.id} style={{ flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                    {/* Avatar */}
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: a.is_accepted ? C.gold + '25' : C.card2,
+                      alignItems: 'center', justifyContent: 'center', flexShrink: 0, borderWidth: a.is_accepted ? 1.5 : 0, borderColor: C.gold }}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: a.is_accepted ? C.gold : C.muted }}>
+                        {(a.lawyer_name || 'م').substring(0, 2).toUpperCase()}
+                      </Text>
                     </View>
-                    {/* Like + Reply row under each comment */}
-                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 14, marginTop: 4, paddingHorizontal: 4 }}>
-                      <Text style={{ color: C.muted, fontSize: 11 }}>{timeAgo(a.created_at)}</Text>
-                      <TouchableOpacity onPress={() => handleLikeAnswer(a.id)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-                        <Text style={{ fontSize: 14, color: likedAnswers.has(a.id) ? '#0A66C2' : '#888' }}>{likedAnswers.has(a.id) ? '👍' : '🤍'}</Text>
-                        {(a.likes_count || 0) > 0 && <Text style={{ fontSize: 11, color: likedAnswers.has(a.id) ? '#0A66C2' : '#888', fontWeight: '600' }}>{a.likes_count}</Text>}
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setReplyingTo({ name: a.lawyer_name || 'محامٍ', answerId: a.id })} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-                        <Text style={{ fontSize: 13, color: '#888' }}>↩️</Text>
-                        <Text style={{ fontSize: 12, color: '#888', fontWeight: '600' }}>رد</Text>
-                      </TouchableOpacity>
-                    </View>
-                    {(a.reply_count > 0 || expandedReplies.has(a.id)) && (
-                      <View style={{ marginTop: 8 }}>
-                        {a.reply_count > 0 && !expandedReplies.has(a.id) && (
-                           <TouchableOpacity onPress={() => toggleReplies(a.id)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                             <Text style={{ color: C.gold, fontSize: 13, fontWeight: '700' }}>⤿ عرض {a.reply_count} ردود</Text>
-                           </TouchableOpacity>
-                        )}
-                        {expandedReplies.has(a.id) && (
-                          loadingReplies.has(a.id) ? <ActivityIndicator size="small" color={C.gold} /> :
-                          <View style={{ gap: 12, paddingRight: 10, borderRightWidth: 2, borderColor: C.border, marginTop: 4 }}>
-                            {(replies[a.id] || []).map((rep: any) => (
-                              <View key={rep.id} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
-                                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: C.card2, alignItems: 'center', justifyContent: 'center' }}>
-                                  <Text style={{ fontSize: 11, fontWeight: '800', color: C.muted }}>{(rep.lawyer_name || 'م').substring(0, 2).toUpperCase()}</Text>
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                  <View style={{ backgroundColor: '#F0F2F5', borderRadius: 14, borderTopLeftRadius: 4, padding: 10 }}>
-                                    <Text style={{ color: C.text, fontWeight: '700', fontSize: 12, marginBottom: 4 }}>{rep.lawyer_name}</Text>
-                                    <Text style={{ color: C.text, fontSize: 13, textAlign: 'right' }}>{rep.answer}</Text>
-                                  </View>
-                                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                                    <Text style={{ color: C.muted, fontSize: 10 }}>{timeAgo(rep.created_at)}</Text>
-                                    <TouchableOpacity onPress={() => handleLikeAnswer(rep.id)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-                                      <Text style={{ fontSize: 12, color: likedAnswers.has(rep.id) ? '#0A66C2' : '#888' }}>{likedAnswers.has(rep.id) ? '👍' : '🤍'}</Text>
-                                      {(rep.likes_count || 0) > 0 && <Text style={{ fontSize: 10, color: likedAnswers.has(rep.id) ? '#0A66C2' : '#888' }}>{rep.likes_count}</Text>}
-                                    </TouchableOpacity>
-                                  </View>
-                                </View>
-                              </View>
-                            ))}
+
+                    {/* Bubble */}
+                    <View style={{ flex: 1 }}>
+                      {/* Name + flair */}
+                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: C.text }}>{a.lawyer_name || 'محامي'}</Text>
+                        {a.is_accepted && (
+                          <View style={{ backgroundColor: C.gold + '20', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 }}>
+                            <Text style={{ color: C.gold, fontSize: 10, fontWeight: '800' }}>✔️ مقبول</Text>
                           </View>
                         )}
                       </View>
-                    )}
+
+                      {/* Bubble body (WhatsApp-style) */}
+                      <View style={{
+                        backgroundColor: isOwn ? C.gold + '18' : '#F0F2F5',
+                        borderRadius: 16,
+                        borderTopRightRadius: 4,
+                        padding: 12,
+                        borderWidth: 1,
+                        borderColor: a.is_accepted ? C.gold + '50' : 'transparent',
+                      }}>
+                        <Text style={{ color: C.text, fontSize: 14, lineHeight: 22, textAlign: 'right' }}>{a.answer}</Text>
+                      </View>
+
+                      {/* Like + Reply + time row */}
+                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 16, marginTop: 4, paddingHorizontal: 4 }}>
+                        <Text style={{ color: C.muted, fontSize: 10 }}>{timeAgo(a.created_at)}</Text>
+                        <TouchableOpacity onPress={() => handleLikeAnswer(a.id)}
+                          style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 3 }}>
+                          <Text style={{ fontSize: 13, color: likedAnswers.has(a.id) ? '#FF4500' : '#888' }}>
+                            {likedAnswers.has(a.id) ? '❤️' : '♡'}
+                          </Text>
+                          {(a.likes_count || 0) > 0 && (
+                            <Text style={{ fontSize: 11, color: likedAnswers.has(a.id) ? '#FF4500' : '#888', fontWeight: '700' }}>{a.likes_count}</Text>
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => setReplyingTo({ name: a.lawyer_name || 'محامٍ', answerId: a.id })}
+                          style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 3 }}>
+                          <Text style={{ fontSize: 12, color: '#0A66C2', fontWeight: '700' }}>رد</Text>
+                          <Text style={{ fontSize: 13, color: '#0A66C2' }}>↩️</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Nested replies with Twitter-style thread line */}
+                      {(a.reply_count > 0 || expandedReplies.has(a.id)) && (
+                        <View style={{ marginTop: 8 }}>
+                          {a.reply_count > 0 && !expandedReplies.has(a.id) && (
+                            <TouchableOpacity onPress={() => toggleReplies(a.id)}
+                              style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingVertical: 4 }}>
+                              <Text style={{ color: '#0A66C2', fontSize: 12, fontWeight: '700' }}>↳ عرض {a.reply_count} رد</Text>
+                            </TouchableOpacity>
+                          )}
+                          {expandedReplies.has(a.id) && (
+                            loadingReplies.has(a.id) ? (
+                              <ActivityIndicator size="small" color={C.gold} />
+                            ) : (
+                              <View style={{ paddingRight: 12, borderRightWidth: 2, borderRightColor: '#0A66C2' + '40', marginTop: 4, gap: 10 }}>
+                                {(replies[a.id] || []).map((rep: any) => (
+                                  <View key={rep.id} style={{ flexDirection: 'row-reverse', gap: 8, alignItems: 'flex-start' }}>
+                                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: C.card2,
+                                      alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                      <Text style={{ fontSize: 10, fontWeight: '800', color: C.muted }}>
+                                        {(rep.lawyer_name || 'م').substring(0, 2).toUpperCase()}
+                                      </Text>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+                                        <Text style={{ fontSize: 12, fontWeight: '800', color: C.text }}>{rep.lawyer_name}</Text>
+                                        <Text style={{ fontSize: 10, color: '#0A66C2', fontWeight: '700' }}>@{a.lawyer_name}</Text>
+                                      </View>
+                                      <View style={{ backgroundColor: '#F0F2F5', borderRadius: 12, borderTopRightRadius: 3, padding: 9 }}>
+                                        <Text style={{ color: C.text, fontSize: 13, textAlign: 'right', lineHeight: 20 }}>{rep.answer}</Text>
+                                      </View>
+                                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginTop: 3 }}>
+                                        <Text style={{ color: C.muted, fontSize: 10 }}>{timeAgo(rep.created_at)}</Text>
+                                        <TouchableOpacity onPress={() => handleLikeAnswer(rep.id)}
+                                          style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 3 }}>
+                                          <Text style={{ fontSize: 12, color: likedAnswers.has(rep.id) ? '#FF4500' : '#888' }}>
+                                            {likedAnswers.has(rep.id) ? '❤️' : '♡'}
+                                          </Text>
+                                          {(rep.likes_count || 0) > 0 && (
+                                            <Text style={{ fontSize: 10, color: likedAnswers.has(rep.id) ? '#FF4500' : '#888' }}>{rep.likes_count}</Text>
+                                          )}
+                                        </TouchableOpacity>
+                                      </View>
+                                    </View>
+                                  </View>
+                                ))}
+                              </View>
+                            )
+                          )}
+                        </View>
+                      )}
+                    </View>
                   </View>
-                </View>
-              )}
+                );
+              }}
             />
           )}
 
-          {/* Answer input */}
-          <View style={{ borderTopWidth: 1, borderTopColor: C.border, paddingBottom: insets.bottom + 12 }}>
-            {/* Replying-to indicator */}
+          {/* Answer input with MentionInput */}
+          <View style={{ borderTopWidth: 1, borderTopColor: C.border, paddingBottom: insets.bottom + 8 }}>
+            {/* Replying-to banner */}
             {replyingTo && (
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between',
                 paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4,
-                backgroundColor: C.gold + '15' }}>
-                <Text style={{ color: C.gold, fontSize: 12, fontWeight: '600' }}>
-                  ↩️ رد على {replyingTo.name}
-                </Text>
-                <TouchableOpacity onPress={() => setReplyingTo(null)}>
-                  <Text style={{ color: C.muted, fontSize: 16 }}>✕</Text>
+                backgroundColor: '#0A66C2' + '12', borderTopWidth: 2, borderTopColor: '#0A66C2' + '40' }}>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 14 }}>↩️</Text>
+                  <Text style={{ color: '#0A66C2', fontSize: 13, fontWeight: '700' }}>رد على {replyingTo.name}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setReplyingTo(null)}
+                  style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#E0E0E0', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#666', fontSize: 13, fontWeight: '800' }}>×</Text>
                 </TouchableOpacity>
               </View>
             )}
-            <View style={{ padding: 12, flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.gold + '20', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: C.gold }}>
+            <View style={{ padding: 10, flexDirection: 'row-reverse', gap: 10, alignItems: 'flex-end' }}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.gold + '20',
+                alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: C.gold }}>
                   {user?.name ? user.name.substring(0, 2).toUpperCase() : 'ME'}
                 </Text>
               </View>
-              <TextInput
-                multiline
-                placeholder={replyingTo ? `الرد على ${replyingTo.name}...` : (isRTL ? 'شارك رأيك القانوني...' : 'Share your legal insight...')}
-                placeholderTextColor={C.muted}
+              <MentionInput
                 value={answerText}
                 onChangeText={setAnswerText}
-                style={{ flex: 1, backgroundColor: C.card2, borderWidth: 1, borderColor: replyingTo ? C.gold : C.border, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, color: C.text, fontSize: 14, maxHeight: 100, textAlign: isRTL ? 'right' : 'left' }}
+                placeholder={replyingTo ? `رد على ${replyingTo.name}...` : 'شارك رأيك القانوني...'}
+                placeholderTextColor={C.muted}
+                gold={C.gold}
+                maxHeight={100}
+                style={{ flex: 1 }}
+                inputStyle={{
+                  flex: 1,
+                  backgroundColor: C.card2,
+                  borderWidth: 1,
+                  borderColor: replyingTo ? '#0A66C2' : C.border,
+                  borderRadius: 20,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  color: C.text,
+                  fontSize: 14,
+                  textAlign: 'right',
+                }}
               />
               <TouchableOpacity onPress={submitAnswer} disabled={!answerText.trim() || postingAnswer}
-                style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: answerText.trim() ? C.gold : C.dim, alignItems: 'center', justifyContent: 'center' }}>
-                {postingAnswer ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontSize: 18 }}>{isRTL ? '←' : '→'}</Text>}
+                style={{ width: 40, height: 40, borderRadius: 20,
+                  backgroundColor: answerText.trim() ? C.gold : '#D0D0D0',
+                  alignItems: 'center', justifyContent: 'center' }}>
+                {postingAnswer
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>↑</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -1118,17 +1204,40 @@ export default function ForumTab() {
             </Text>
           </View>
 
-          <TextInput
-            autoFocus
-            multiline
+          <MentionInput
+            value={newPostText}
+            onChangeText={setNewPostText}
             placeholder={sharingPost
               ? (isRTL ? 'أضف تعليقك (اختياري)...' : 'Add a comment (optional)...')
               : (isRTL ? 'بم تفكر؟ نصيحة، أو سؤال قانوني...' : "What's on your mind? A legal question or tip...")}
             placeholderTextColor={C.muted}
-            value={newPostText}
-            onChangeText={setNewPostText}
-            style={{ paddingHorizontal: 20, paddingTop: 12, fontSize: 18, textAlign: isRTL ? 'right' : 'left', color: C.text, textAlignVertical: 'top', minHeight: 80 }}
+            gold={C.gold}
+            maxHeight={160}
+            style={{ paddingHorizontal: 20, paddingTop: 12 }}
+            inputStyle={{ fontSize: 18, color: C.text, textAlignVertical: 'top', minHeight: 80 }}
           />
+
+          {/* Category selector strip (only for non-reposts) */}
+          {!sharingPost && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
+              {['الكل', 'جنائي', 'تجاري', 'عقاري', 'أسرة', 'عمالي', 'إداري', 'دستوري'].map(cat => {
+                const cs = catStyle(cat);
+                const active = postCategory === cat;
+                return (
+                  <TouchableOpacity key={cat} onPress={() => setPostCategory(cat)}
+                    style={{
+                      paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+                      backgroundColor: active ? cs.text : cs.bg,
+                      borderWidth: 1.5,
+                      borderColor: active ? cs.text : cs.bg,
+                    }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: active ? '#fff' : cs.text }}>{cat}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
 
           {/* Shared post quoted card */}
           {sharingPost && (

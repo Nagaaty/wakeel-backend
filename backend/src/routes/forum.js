@@ -108,6 +108,28 @@ router.get('/trending', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/forum/mentionable-users?q=search — @mention autocomplete
+router.get('/mentionable-users', requireAuth, async (req, res, next) => {
+  try {
+    const q = (req.query.q || '').trim();
+    const { rows } = await pool.query(
+      `SELECT id, name, role,
+              CASE
+                WHEN role = 'lawyer' AND is_verified THEN 'محامٍ موثوق ✔️'
+                WHEN role = 'lawyer' THEN 'مستشار قانوني ⚖️'
+                ELSE NULL
+              END as flair
+       FROM users
+       WHERE ($1 = '' OR name ILIKE $2) AND id != $3
+       ORDER BY
+         CASE WHEN role='lawyer' AND is_verified THEN 0 WHEN role='lawyer' THEN 1 ELSE 2 END, name
+       LIMIT 8`,
+      [q, '%' + q + '%', req.user.id]
+    );
+    res.json({ users: rows });
+  } catch (err) { next(err); }
+});
+
 // GET /api/forum/questions/:id  — single post for deep-link
 router.get('/questions/:id', async (req, res, next) => {
   try {
