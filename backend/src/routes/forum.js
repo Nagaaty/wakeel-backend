@@ -207,13 +207,17 @@ router.get('/questions/:id/repost-by/:userId', async (req, res, next) => {
 router.post('/questions', requireAuth, async (req, res, next) => {
   try {
     const { question, category, anonymous, image_url, original_post_id, original_post_data } = req.body;
-    if (!question || !category) return res.status(400).json({ message: 'question and category required' });
+    // Allow image-only posts — question text is optional when an image is provided
+    if ((!question || !question.trim()) && !image_url) return res.status(400).json({ message: 'question text or image required' });
+    if (!category) return res.status(400).json({ message: 'category required' });
+    // Use a single space as placeholder for image-only posts so DB NOT NULL constraint is satisfied
+    const questionText = (question && question.trim()) ? question.trim() : '';
     // Extract hashtags from question text (supports Arabic + Latin + underscore)
-    const tags = (question.match(/#[\w\u0600-\u06FF_]+/g) || []).map(t => t.toLowerCase());
+    const tags = (questionText.match(/#[\w\u0600-\u06FF_]+/g) || []).map(t => t.toLowerCase());
     const { rows: [row] } = await pool.query(
       `INSERT INTO forum_questions (user_id, question, category, anonymous, is_visible, image_url, original_post_id, original_post_data, tags)
        VALUES ($1,$2,$3,$4,true,$5,$6,$7::jsonb,$8::jsonb) RETURNING *`,
-      [req.user.id, question, category, anonymous !== false, image_url || null,
+      [req.user.id, questionText || ' ', category, anonymous !== false, image_url || null,
        original_post_id || null, original_post_data ? JSON.stringify(original_post_data) : null,
        JSON.stringify(tags)]
     );
@@ -367,15 +371,35 @@ router.patch('/questions/:id', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/forum/answers/:id/like — toggle like on a comment
+// POST /api/forum/answers/:id/like — toggle like on a comment (mutually exclusive with dislike)
 router.post('/answers/:id/like', requireAuth, async (req, res, next) => {
   try {
     const userId = req.user.id.toString();
     const { rows: [pre] } = await pool.query(
-      `SELECT liked_by @> $2::jsonb AS already_liked FROM forum_answers WHERE id=$1`,
+      `SELECT liked_by @> $2::jsonb AS already_liked,
+              disliked_by @> $2::jsonb AS already_disliked,
+              lawyer_id 
+       FROM forum_answers WHERE id=$1`,
       [req.params.id, JSON.stringify([userId])]
     );
     if (!pre) return res.status(404).json({ message: 'Answer not found' });
+
+    const { updateLawyerKarma } = require('../utils/reputation');
+
+    // If disliked, remove the dislike
+    if (pre.already_disliked) {
+      await pool.query(
+        `UPDATE forum_answers
+         SET dislikes_count = GREATEST(0, COALESCE(dislikes_count, 0) - 1),
+             disliked_by = (
+               SELECT COALESCE(jsonb_agg(x), '[]'::jsonb)
+               FROM jsonb_array_elements(COALESCE(disliked_by, '[]'::jsonb)) AS x
+               WHERE x != to_jsonb($2::text)
+             )
+         WHERE id=$1`,
+        [req.params.id, userId]
+      );
+    }
 
     if (pre.already_liked) {
       const { rows: [row] } = await pool.query(
@@ -386,9 +410,10 @@ router.post('/answers/:id/like', requireAuth, async (req, res, next) => {
                  FROM jsonb_array_elements(COALESCE(liked_by, '[]'::jsonb)) AS x
                  WHERE x != to_jsonb($2::text)
                )
-         WHERE id=$1 RETURNING id, likes_count, liked_by`,
+         WHERE id=$1 RETURNING id, likes_count, dislikes_count`,
         [req.params.id, userId]
       );
+      if (pre.lawyer_id) updateLawyerKarma(pre.lawyer_id);
       return res.json({ answer: row, liked: false });
     }
 
@@ -396,10 +421,68 @@ router.post('/answers/:id/like', requireAuth, async (req, res, next) => {
       `UPDATE forum_answers
          SET likes_count = COALESCE(likes_count, 0) + 1,
              liked_by = COALESCE(liked_by, '[]'::jsonb) || $2::jsonb
-       WHERE id=$1 RETURNING id, likes_count, liked_by`,
+       WHERE id=$1 RETURNING id, likes_count, dislikes_count`,
       [req.params.id, JSON.stringify([userId])]
     );
+    if (pre.lawyer_id) updateLawyerKarma(pre.lawyer_id);
     res.json({ answer: row, liked: true });
+  } catch (err) { next(err); }
+});
+
+// POST /api/forum/answers/:id/dislike — toggle dislike on a comment (mutually exclusive with like)
+router.post('/answers/:id/dislike', requireAuth, async (req, res, next) => {
+  try {
+    const userId = req.user.id.toString();
+    const { rows: [pre] } = await pool.query(
+      `SELECT liked_by @> $2::jsonb AS already_liked,
+              disliked_by @> $2::jsonb AS already_disliked,
+              lawyer_id 
+       FROM forum_answers WHERE id=$1`,
+      [req.params.id, JSON.stringify([userId])]
+    );
+    if (!pre) return res.status(404).json({ message: 'Answer not found' });
+
+    const { updateLawyerKarma } = require('../utils/reputation');
+
+    // If liked, remove the like
+    if (pre.already_liked) {
+      await pool.query(
+        `UPDATE forum_answers
+         SET likes_count = GREATEST(0, COALESCE(likes_count, 0) - 1),
+             liked_by = (
+               SELECT COALESCE(jsonb_agg(x), '[]'::jsonb)
+               FROM jsonb_array_elements(COALESCE(liked_by, '[]'::jsonb)) AS x
+               WHERE x != to_jsonb($2::text)
+             )
+         WHERE id=$1`,
+        [req.params.id, userId]
+      );
+      if (pre.lawyer_id) updateLawyerKarma(pre.lawyer_id); // Since they lost a like
+    }
+
+    if (pre.already_disliked) {
+      const { rows: [row] } = await pool.query(
+        `UPDATE forum_answers
+           SET dislikes_count = GREATEST(0, COALESCE(dislikes_count, 0) - 1),
+               disliked_by = (
+                 SELECT COALESCE(jsonb_agg(x), '[]'::jsonb)
+                 FROM jsonb_array_elements(COALESCE(disliked_by, '[]'::jsonb)) AS x
+                 WHERE x != to_jsonb($2::text)
+               )
+         WHERE id=$1 RETURNING id, likes_count, dislikes_count`,
+        [req.params.id, userId]
+      );
+      return res.json({ answer: row, disliked: false });
+    }
+
+    const { rows: [row] } = await pool.query(
+      `UPDATE forum_answers
+         SET dislikes_count = COALESCE(dislikes_count, 0) + 1,
+             disliked_by = COALESCE(disliked_by, '[]'::jsonb) || $2::jsonb
+       WHERE id=$1 RETURNING id, likes_count, dislikes_count`,
+      [req.params.id, JSON.stringify([userId])]
+    );
+    res.json({ answer: row, disliked: true });
   } catch (err) { next(err); }
 });
 
