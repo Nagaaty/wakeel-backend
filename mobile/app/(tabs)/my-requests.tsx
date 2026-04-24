@@ -109,6 +109,33 @@ const FILTERS = [
 ];
 
 
+// ─── Lawyer Avatar ────────────────────────────────────────────────────────────
+function LawyerAvatar({ name, size = 46 }: { name: string; size?: number }) {
+  const initials = name
+    ? name.trim().split(/\s+/).map((w: string) => w[0] || '').join('').slice(0, 2).toUpperCase()
+    : '?';
+  return (
+    <View style={{
+      width: size, height: size, borderRadius: size / 2,
+      backgroundColor: '#9A6F2A',
+      alignItems: 'center', justifyContent: 'center',
+      borderWidth: 2, borderColor: '#C8A84B40',
+    }}>
+      <Text style={{ color: '#fff', fontSize: size * 0.38, fontWeight: '800' }}>{initials}</Text>
+    </View>
+  );
+}
+
+// ─── Section Header ───────────────────────────────────────────────────────────
+function SectionHeader({ label, C }: { label: string; C: any }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, marginTop: 4 }}>
+      <Text style={{ color: C.gold, fontWeight: '800', fontSize: 13 }}>{label}</Text>
+      <View style={{ flex: 1, height: 1, backgroundColor: C.border }} />
+    </View>
+  );
+}
+
 // ─── Consultation Card ────────────────────────────────────────────────────────
 function ConsultCard({
   b, C, isLawyer, actioning, onChangeStatus, onInvoice, t,
@@ -171,12 +198,18 @@ function ConsultCard({
 
       {/* ── Main Info ── */}
       <View style={{ padding: 16 }}>
-        <Text style={{ color: C.text, fontWeight: '700', fontSize: 17, marginBottom: 4 }}>
-          {name || '—'}
-        </Text>
-        {b.specialization ? (
-          <Text style={{ color: C.gold, fontSize: 12, marginBottom: 8 }}>{b.specialization}</Text>
-        ) : null}
+        {/* Avatar + Name row */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+          <LawyerAvatar name={name || ''} size={46} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: C.text, fontWeight: '700', fontSize: 16 }}>
+              {name || '—'}
+            </Text>
+            {b.specialization ? (
+              <Text style={{ color: C.gold, fontSize: 12, marginTop: 2 }}>{b.specialization}</Text>
+            ) : null}
+          </View>
+        </View>
 
         <View style={{ flexDirection: 'row', gap: 16, marginBottom: 12 }}>
           {b.booking_date ? (
@@ -486,9 +519,26 @@ export default function MyConsultationsScreen() {
     }
   }, []);
 
-  const filtered = filter === 'all'
-    ? bookings
-    : bookings.filter((b: any) => b.status === filter);
+  // Section grouping for 'all' filter — Upcoming vs Past
+  const filtered = filter === 'all' ? bookings : bookings.filter((b: any) => b.status === filter);
+  const now0 = new Date();
+  const upcomingList = (filter === 'all' ? bookings : filtered).filter((b: any) => {
+    if (['cancelled','rejected','completed'].includes(b.status)) return false;
+    try { return new Date(`${b.booking_date}T${(b.start_time||'23:59').slice(0,5)}:00`).getTime() > now0.getTime() - 5400000; }
+    catch { return true; }
+  });
+  const pastList = (filter === 'all' ? bookings : filtered).filter((b: any) => {
+    if (['cancelled','rejected','completed'].includes(b.status)) return true;
+    try { return new Date(`${b.booking_date}T${(b.start_time||'23:59').slice(0,5)}:00`).getTime() <= now0.getTime() - 5400000; }
+    catch { return false; }
+  });
+  const showSections = filter === 'all';
+  const listData: any[] = showSections
+    ? [
+        ...(upcomingList.length > 0 ? [{ _sectionHeader: '📅 القادمة', _id: '__upcoming__' }, ...upcomingList] : []),
+        ...(pastList.length > 0    ? [{ _sectionHeader: '📚 السابقة', _id: '__past__' },    ...pastList    ] : []),
+      ]
+    : filtered;
 
   // Stats bar
   const total     = bookings.length;
@@ -572,8 +622,8 @@ export default function MyConsultationsScreen() {
         </View>
       ) : (
         <FlatList
-          data={filtered}
-          keyExtractor={item => String((item as any).id)}
+          data={listData}
+          keyExtractor={item => (item as any)._id || String((item as any).id)}
           contentContainerStyle={{
             padding: 16,
             paddingBottom: insets.bottom + 100,
@@ -588,18 +638,23 @@ export default function MyConsultationsScreen() {
             />
           }
           ListEmptyComponent={<EmptyState C={C} isLawyer={isLawyer} />}
-          renderItem={({ item: b }) => (
-            <ConsultCard
-              key={(b as any).id}
-              b={b}
-              C={C}
-              isLawyer={isLawyer}
-              actioning={actioning}
-              onChangeStatus={onChangeStatus}
-              onInvoice={onInvoice}
-              t={t}
-            />
-          )}
+          renderItem={({ item: b }) => {
+            if ((b as any)._sectionHeader) {
+              return <SectionHeader label={(b as any)._sectionHeader} C={C} />;
+            }
+            return (
+              <ConsultCard
+                key={(b as any).id}
+                b={b}
+                C={C}
+                isLawyer={isLawyer}
+                actioning={actioning}
+                onChangeStatus={onChangeStatus}
+                onInvoice={onInvoice}
+                t={t}
+              />
+            );
+          }}
         />
       )}
 
