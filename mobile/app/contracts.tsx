@@ -24,7 +24,7 @@ export default function ContractsScreen() {
   const insets = useSafeAreaInsets();
   const [catFilter, setCatFilter] = useState('All');
   const [downloads, setDownloads] = useState<Record<number,number>>({});
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   const filtered = catFilter === 'All'
     ? TEMPLATES

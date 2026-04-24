@@ -37,7 +37,7 @@ export default function PaymentResultScreen() {
       <View style={{ width:84, height:84, borderRadius:42, backgroundColor:'#F0FDF4', borderWidth:3, borderColor:'#22C55E', alignItems:'center', justifyContent:'center', marginBottom:20 }}>
         <Text style={{ fontSize:38 }}>✅</Text>
       </View>
-      <Text style={{ fontFamily:'CormorantGaramond-Bold', fontSize:28, fontWeight:'700', color: C.text, marginBottom:8, textAlign:'center' }}>
+      <Text style={{ fontFamily:'Cairo-Bold', fontSize:28, fontWeight:'700', color: C.text, marginBottom:8, textAlign:'center' }}>
         {isRTL ? 'تم الدفع بنجاح!' : 'Payment Successful!'}
       </Text>
       <Text style={{ color: C.muted, fontSize:14, marginBottom:8, textAlign:'center' }}>
@@ -63,7 +63,7 @@ export default function PaymentResultScreen() {
       <View style={{ width:84, height:84, borderRadius:42, backgroundColor:'#FEF2F2', borderWidth:3, borderColor:'#EF4444', alignItems:'center', justifyContent:'center', marginBottom:20 }}>
         <Text style={{ fontSize:38 }}>❌</Text>
       </View>
-      <Text style={{ fontFamily:'CormorantGaramond-Bold', fontSize:28, fontWeight:'700', color: C.text, marginBottom:8 }}>
+      <Text style={{ fontFamily:'Cairo-Bold', fontSize:28, fontWeight:'700', color: C.text, marginBottom:8 }}>
         {isRTL ? 'فشلت عملية الدفع' : 'Payment Failed'}
       </Text>
       <Text style={{ color: C.muted, fontSize:14, marginBottom:32, textAlign:'center' }}>

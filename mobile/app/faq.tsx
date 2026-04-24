@@ -33,7 +33,7 @@ export default function FAQScreen() {
   const { t, isRTL, locale } = useI18n();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState<number | null>(null);
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   const toggle = (i: number) => {
     if (Platform.OS === 'ios') LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);

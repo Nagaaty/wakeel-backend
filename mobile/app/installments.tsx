@@ -106,7 +106,7 @@ function PlanCard({ plan, C, isRTL, t, onPay }: {
   t:       (k: any) => string;
   onPay:   (plan: InstallmentPlan, payment: InstallmentPayment) => void;
 }) {
-  const serif    = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif    = { fontFamily: 'Cairo-Bold' };
   const textDir  = { textAlign: (isRTL ? 'right' : 'left') as 'right' | 'left' };
   const progress = plan.total_amount > 0 ? plan.paid_amount / plan.total_amount : 0;
   const remaining = plan.total_amount - plan.paid_amount;
@@ -262,7 +262,7 @@ export default function InstallmentsScreen() {
   const C      = useTheme();
   const { t, isRTL } = useI18n();
   const insets = useSafeAreaInsets();
-  const serif  = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif  = { fontFamily: 'Cairo-Bold' };
 
   const [plans,     setPlans]     = useState<InstallmentPlan[]>([]);
   const [loading,   setLoading]   = useState(true);

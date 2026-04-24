@@ -35,7 +35,7 @@ const TYPE_COLOR: Record<string, string> = { pdf: '#EF4444', img: '#8B5CF6', doc
 export default function SharedCaseFolderScreen() {
   const C      = useTheme();
   const insets = useSafeAreaInsets();
-  const serif  = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif  = { fontFamily: 'Cairo-Bold' };
 
   const [files,     setFiles]     = useState<CaseFile[]>(DEMO_FILES);
   const [uploading, setUploading] = useState(false);

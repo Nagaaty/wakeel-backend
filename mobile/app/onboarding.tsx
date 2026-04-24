@@ -170,7 +170,7 @@ export default function OnboardingScreen() {
         </View>
 
         <Text style={{
-          fontFamily: "CormorantGaramond-Bold",
+          fontFamily: "Cairo-Bold",
           fontSize: 34, fontWeight: "700",
           color: "#fff", textAlign: "center",
           marginBottom: 16, lineHeight: 40,

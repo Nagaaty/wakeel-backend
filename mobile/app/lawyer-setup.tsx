@@ -153,7 +153,7 @@ export default function LawyerSetupScreen() {
               <Text style={{ color: C.gold, fontSize: 22 }}>‹</Text>
             </TouchableOpacity>
           )}
-          <Text style={{ color: C.gold, fontFamily: 'CormorantGaramond-Bold', fontSize: 20, fontWeight: '700' }}>
+          <Text style={{ color: C.gold, fontFamily: 'Cairo-Bold', fontSize: 20, fontWeight: '700' }}>
             ⚖️ {isRTL ? 'إعداد ملفك المهني' : 'Set Up Your Profile'}
           </Text>
         </View>

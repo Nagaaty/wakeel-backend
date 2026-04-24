@@ -66,7 +66,7 @@ export default function LoginScreen() {
   const loading  = useSelector(selLoading);
   const error    = useSelector(selError);
   const insets   = useSafeAreaInsets();
-  const serif    = { fontFamily: "CormorantGaramond-Bold" };
+  const serif    = { fontFamily: "Cairo-Bold" };
 
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");

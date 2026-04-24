@@ -69,7 +69,7 @@ function LawyerMiniCard({ lawyer, C, onBook }: any) {
         width: 42, height: 42, borderRadius: 21, backgroundColor: C.gold,
         alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>
-        <Text style={{ color: '#000', fontWeight: '800', fontSize: 14, fontFamily: 'CormorantGaramond-Bold' }}>
+        <Text style={{ color: '#000', fontWeight: '800', fontSize: 14, fontFamily: 'Cairo-Bold' }}>
           {(lawyer.name || 'LA').substring(0, 2).toUpperCase()}
         </Text>
       </View>

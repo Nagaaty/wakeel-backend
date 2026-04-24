@@ -52,7 +52,7 @@ export default function AdminPromosScreen() {
             <TouchableOpacity onPress={() => router.back()}>
               <Text style={{ color:C.text, fontSize:22 }}>‹</Text>
             </TouchableOpacity>
-            <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'CormorantGaramond-Bold' }}>أكواد الخصم</Text>
+            <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'Cairo-Bold' }}>أكواد الخصم</Text>
           </View>
           <TouchableOpacity onPress={() => setShowForm(!showForm)}
             style={{ backgroundColor:C.gold, borderRadius:10, paddingHorizontal:14, paddingVertical:7 }}>

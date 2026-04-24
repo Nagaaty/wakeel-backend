@@ -82,7 +82,7 @@ export default function HomeTab() {
         {/* Categories Horizontal Slider */}
         <View style={{ marginBottom: 40 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 16 }}>
-            <Text style={{ color: '#1C1611', fontSize: 22, fontWeight: '800', fontFamily: 'CormorantGaramond-Bold' }}>تخصصات القانون</Text>
+            <Text style={{ color: '#1C1611', fontSize: 22, fontWeight: '800', fontFamily: 'Cairo-Bold' }}>تخصصات القانون</Text>
             <TouchableOpacity onPress={() => router.push('/lawyers' as any)}>
               <Text style={{ color: C.gold, fontWeight: '700', fontSize: 14 }}>عرض الكل ←</Text>
             </TouchableOpacity>
@@ -102,7 +102,7 @@ export default function HomeTab() {
         {/* Top Rated Lawyers Horizontal Slider */}
         <View style={{ marginBottom: 40, backgroundColor: '#FDF7E8', paddingVertical: 40, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#EADDCB' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 20 }}>
-            <Text style={{ color: '#1C1611', fontSize: 22, fontWeight: '800', fontFamily: 'CormorantGaramond-Bold' }}>أعلى المحامين تقييماً ⭐</Text>
+            <Text style={{ color: '#1C1611', fontSize: 22, fontWeight: '800', fontFamily: 'Cairo-Bold' }}>أعلى المحامين تقييماً ⭐</Text>
             <TouchableOpacity onPress={() => router.push('/lawyers' as any)}>
               <Text style={{ color: C.gold, fontWeight: '700', fontSize: 14 }}>بحث ←</Text>
             </TouchableOpacity>

@@ -41,7 +41,7 @@ export default function InstantScreen() {
       <View style={{ width:80, height:80, borderRadius:40, backgroundColor:C.green+'20', borderWidth:3, borderColor:C.green, alignItems:'center', justifyContent:'center', marginBottom:20 }}>
         <Text style={{ fontSize:36 }}>✅</Text>
       </View>
-      <Text style={{ color:C.text, fontWeight:'700', fontSize:20, marginBottom:8, fontFamily:'CormorantGaramond-Bold' }}>تم الاتصال!</Text>
+      <Text style={{ color:C.text, fontWeight:'700', fontSize:20, marginBottom:8, fontFamily:'Cairo-Bold' }}>تم الاتصال!</Text>
       <Btn C={C} full onPress={() => router.push(connected?.id ? `/messages?convId=${connected.id}` : '/messages/index' as any)}>💬 افتح المحادثة</Btn>
       <TouchableOpacity onPress={() => { setConnected(null); setSelected(null); setQuestion(''); }} style={{ marginTop:12 }}>
         <Text style={{ color:C.muted, fontSize:13 }}>عودة</Text>

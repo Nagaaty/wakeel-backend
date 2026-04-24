@@ -55,7 +55,7 @@ ${this.state.errorInfo?.componentStack}`;
     if (!this.state.hasError) return this.props.children;
 
     const C = LIGHT_C;
-    const serif = { fontFamily: "CormorantGaramond-Bold" };
+    const serif = { fontFamily: "Cairo-Bold" };
     const isRTL = false; // Safe default — i18n context may have crashed
 
     return (

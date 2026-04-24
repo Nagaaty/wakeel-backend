@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Modal, Animated, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Modal, Animated, TextInput, Image } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useTheme } from '../../src/theme';
 import { LawyerMap } from '../../src/components/LawyerMap';
@@ -60,7 +60,7 @@ function CalendarPicker({ C, selectedDate, onSelect, isRTL }: any) {
         <TouchableOpacity onPress={prevMonth} disabled={!canGoPrev} style={{ padding: 8, opacity: canGoPrev ? 1 : 0.3 }}>
           <Text style={{ color: C.gold, fontSize: 20, fontWeight: '700' }}>‹</Text>
         </TouchableOpacity>
-        <Text style={{ color: C.text, fontWeight: '700', fontSize: 16, fontFamily: 'CormorantGaramond-Bold' }}>
+        <Text style={{ color: C.text, fontWeight: '700', fontSize: 16, fontFamily: 'Cairo-Bold' }}>
           {isRTL ? AR_MONTHS[viewMonth] : EN_MONTHS[viewMonth]} {viewYear}
         </Text>
         <TouchableOpacity onPress={nextMonth} style={{ padding: 8 }}>
@@ -139,7 +139,7 @@ export default function LawyerProfileScreen() {
   useEffect(() => {
     if (!selectedDate || !id) return;
     setSlotsLoad(true);
-    lawyersAPI.getAvailability(Number(id), selectedDate)
+    lawyersAPI.getAvailability(id, selectedDate)
       .then((d: any) => setSlots(d.slots || []))
       .catch(() => setSlots([]))
       .finally(() => setSlotsLoad(false));
@@ -192,7 +192,7 @@ export default function LawyerProfileScreen() {
     if (!reviewRating) return;
     setSubmittingReview(true);
     try {
-      await lawyersAPI.review(Number(id), { rating: reviewRating, comment: reviewComment });
+      await lawyersAPI.review(id, { rating: reviewRating, comment: reviewComment });
       setReviews((prev: any[]) => [{
         id: Date.now(),
         client_name: 'أنت',
@@ -222,34 +222,45 @@ export default function LawyerProfileScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
 
-        {/* Header */}
-        <View style={{ backgroundColor: C.surface, paddingTop: insets.top, borderBottomWidth: 1, borderBottomColor: C.border }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 }}>
-            <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: C.text, fontSize: 18 }}>‹</Text>
-            </TouchableOpacity>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity onPress={handleShare} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 18 }}>📤</Text>
+        {/* Premium Header */}
+        <View style={{ backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border, paddingBottom: 24 }}>
+          {/* Cover Photo / Gradient Area */}
+          <View style={{ width: '100%', height: 140, backgroundColor: C.gold + '20', position: 'relative' }}>
+            <Image source={{ uri: 'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?auto=format&fit=crop&q=80&w=1000' }} style={{ width: '100%', height: '100%', opacity: 0.2 }} resizeMode="cover" />
+            
+            {/* Nav Row overlay */}
+            <View style={{ position: 'absolute', top: insets.top, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 }}>
+              <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 }}>
+                <Text style={{ color: C.text, fontSize: 18, fontWeight: '700' }}>‹</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={toggleSave} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 18 }}>{saved ? '❤️' : '🤍'}</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity onPress={handleShare} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 }}>
+                  <Text style={{ fontSize: 16 }}>📤</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={toggleSave} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 }}>
+                  <Text style={{ fontSize: 16 }}>{saved ? '❤️' : '🤍'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
-          {/* Profile info */}
-          <View style={{ padding: 20, alignItems: 'center', gap: 10 }}>
-            <CachedAvatar C={C} uri={lawyer.photo_url} initials={initials} size={80} />
-            <Text style={{ color: C.text, fontWeight: '800', fontSize: 20, fontFamily: 'CormorantGaramond-Bold' }}>{lawyer.name}</Text>
-            <Text style={{ color: C.muted, fontSize: 14 }}>{lawyer.specialization}</Text>
-            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-              {lawyer.is_verified && <Badge C={C} color={C.green}>✅ محامٍ موثق</Badge>}
-              <Badge C={C} color={C.muted}>📍 {lawyer.city}</Badge>
-              <Badge C={C} color={C.muted}>🏆 {lawyer.experience_years} سنة</Badge>
+          {/* Profile info (Absolute positioned avatar overlapping the cover) */}
+          <View style={{ paddingHorizontal: 20, marginTop: -50, alignItems: 'center' }}>
+            <View style={{ width: 104, height: 104, borderRadius: 52, backgroundColor: C.surface, padding: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 5 }}>
+              <CachedAvatar C={C} uri={lawyer.avatar_url} initials={initials} size={96} />
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            <Text style={{ color: C.text, fontWeight: '800', fontSize: 26, fontFamily: 'Cairo-Bold', marginTop: 12, textAlign: 'center' }}>{lawyer.name}</Text>
+            <Text style={{ color: C.gold, fontSize: 15, fontWeight: '600', marginTop: 4, textAlign: 'center' }}>{lawyer.specialization}</Text>
+            
+            <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap', justifyContent: 'center', marginTop: 12 }}>
+              {lawyer.is_verified && <Badge C={C} color={C.green}>✅ موثق</Badge>}
+              <Badge C={C} color={C.text}>📍 {lawyer.city}</Badge>
+              <Badge C={C} color={C.text}>🏆 {lawyer.experience_years} سنة خبرة</Badge>
+            </View>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, backgroundColor: C.bg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
               <Stars rating={parseFloat(lawyer.avg_rating) || 0} C={C} />
+              <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>{Number(lawyer.avg_rating || 0).toFixed(1)}</Text>
               <Text style={{ color: C.muted, fontSize: 13 }}>({lawyer.total_reviews || 0} تقييم)</Text>
             </View>
           </View>

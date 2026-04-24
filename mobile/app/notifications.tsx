@@ -4,7 +4,7 @@ const NOTIF_ROW_HEIGHT = 73;
 import { View, Text, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../src/theme';
-import { Spinner, Empty, ErrMsg } from '../src/components/ui';
+import { Spinner, Empty, ErrMsg, InitialsAvatar } from '../src/components/ui';
 import { notificationsAPI } from '../src/services/api';
 import { getNotificationPermissionStatus, registerForPushNotifications } from '../src/utils/notifications';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -69,7 +69,7 @@ export default function NotificationsScreen() {
             <TouchableOpacity onPress={() => router.back()}>
               <Text style={{ color: C.text, fontSize: 22 }}>‹</Text>
             </TouchableOpacity>
-            <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'CormorantGaramond-Bold' }}>الإشعارات</Text>
+            <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'Cairo-Bold' }}>الإشعارات</Text>
             {unreadCnt > 0 && (
               <View style={{ backgroundColor: C.red, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
                 <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{unreadCnt}</Text>
@@ -121,13 +121,18 @@ export default function NotificationsScreen() {
         ListEmptyComponent={!loading ? <Empty C={C} icon="🔔" title="لا توجد إشعارات" /> : <ListSkeleton C={C} count={6} type="notification" />}
         renderItem={({ item: n }) => {
           const read = !!n.read_at;
+          const isForum = n.type.startsWith('forum_') && n.data?.actorName;
           const icon = TYPE_ICONS[n.type] || '🔔';
           return (
             <TouchableOpacity onPress={() => { markRead(n.id); if (n.link) router.push(n.link); }}
               style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: read ? 'transparent' : C.gold + '08' }}>
-              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 22 }}>{icon}</Text>
-              </View>
+              {isForum ? (
+                <InitialsAvatar name={n.data.actorName} uri={n.data.actorAvatar} size={44} gold={C.card2} />
+              ) : (
+                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 22 }}>{icon}</Text>
+                </View>
+              )}
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <Text style={{ color: C.text, fontWeight: read ? '500' : '700', fontSize: 14, flex: 1 }}>{n.title}</Text>

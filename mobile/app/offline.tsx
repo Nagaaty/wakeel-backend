@@ -16,7 +16,7 @@ interface Props {
 export default function OfflineScreen({ onRetry, hasCache, cachedAt }: Props) {
   const C = useTheme();
   const { isRTL } = useI18n();
-  const serif = { fontFamily: "CormorantGaramond-Bold" };
+  const serif = { fontFamily: "Cairo-Bold" };
 
   const [retrying, setRetrying] = useState(false);
   const [retryResult, setRetryResult] = useState<"" | "still_offline" | "back_online">("");

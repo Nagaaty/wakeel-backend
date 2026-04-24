@@ -176,7 +176,7 @@ export default function VideoScreen() {
 
       {/* Top bar */}
       <View style={{ backgroundColor:'#111', padding:'10px 16px' as any, paddingHorizontal:16, paddingVertical:10, flexDirection:'row', justifyContent:'space-between', alignItems:'center', borderBottomWidth:1, borderBottomColor:'#222' }}>
-        <Text style={{ color:'#fff', fontFamily:'CormorantGaramond-Bold', fontSize:15, fontWeight:'700' }}>⚖️ استشارة قانونية</Text>
+        <Text style={{ color:'#fff', fontFamily:'Cairo-Bold', fontSize:15, fontWeight:'700' }}>⚖️ استشارة قانونية</Text>
         <View style={{ flexDirection:'row', alignItems:'center', gap:12 }}>
           <Text style={{ color:'#22C55E', fontSize:12, fontWeight:'700' }}>● {fmt(duration)}</Text>
           <TouchableOpacity onPress={() => setShowChat(!showChat)}

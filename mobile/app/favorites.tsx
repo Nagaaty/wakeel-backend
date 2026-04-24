@@ -39,7 +39,7 @@ export default function FavoritesScreen() {
     <View style={{ flex:1, backgroundColor:C.bg }}>
       <View style={{ backgroundColor:C.surface, paddingTop:insets.top+12, paddingHorizontal:16, paddingBottom:14, borderBottomWidth:1, borderBottomColor:C.border, flexDirection:'row', alignItems:'center', gap:10 }}>
         <TouchableOpacity onPress={() => router.back()}><Text style={{ color:C.text, fontSize:22 }}>‹</Text></TouchableOpacity>
-        <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'CormorantGaramond-Bold' }}>❤️ المحامون المحفوظون</Text>
+        <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'Cairo-Bold' }}>❤️ المحامون المحفوظون</Text>
       </View>
       {error ? <View style={{ padding:16 }}><ErrMsg C={C} msg={error} /></View> : null}
       <FlatList

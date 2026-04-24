@@ -30,6 +30,7 @@ const CITIES_AR     = ['','القاهرة','الإسكندرية','الجيزة'
 const CITIES_EN     = ['','Cairo','Alexandria','Giza','Mansoura','Tanta','Port Said','Luxor','Aswan'];
 // sort options: [value, arLabel, enLabel]
 const SORT_OPTS: [string,string,string][] = [
+  ['karma', '🔥 الأكثر تفاعلاً', '🔥 Top Contributors'],
   ['rating','⭐ الأعلى تقييماً','⭐ Top Rated'],
   ['price_asc','💰 السعر ↑','💰 Price ↑'],
   ['wins','🏆 الأكثر فوزاً','🏆 Most Wins'],
@@ -37,7 +38,7 @@ const SORT_OPTS: [string,string,string][] = [
 
 // Compact Grid LawyerCard
 const LawyerCardGrid = memo(function LawyerCardGrid({ lawyer, C, onBook, onProfile, isFav, onToggleFav }: any) {
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   return (
     <View style={{
@@ -61,7 +62,7 @@ const LawyerCardGrid = memo(function LawyerCardGrid({ lawyer, C, onBook, onProfi
 
       {/* Avatar */}
       <View style={{ position:'relative', marginBottom: 12 }}>
-        <CachedAvatar C={C} uri={lawyer.photo_url} initials={(lawyer.name||'').split(' ').map((w:string)=>w[0]).join('').slice(0,2).toUpperCase()} size={64} />
+        <CachedAvatar C={C} uri={lawyer.avatar_url} initials={(lawyer.name||'').split(' ').map((w:string)=>w[0]).join('').slice(0,2).toUpperCase()} size={64} />
         {lawyer.is_online && (
           <View style={{ position:'absolute', bottom:0, right:0, width:14, height:14, borderRadius:7, backgroundColor:C.green, borderWidth:2, borderColor:C.card }} />
         )}
@@ -106,7 +107,7 @@ const LawyerCardGrid = memo(function LawyerCardGrid({ lawyer, C, onBook, onProfi
 // Wide List LawyerCard
 const LawyerCardList = memo(function LawyerCardList({ lawyer, C, onBook, onProfile, isFav, onToggleFav }: any) {
   const sub = (lawyer as any).sub || 'basic';
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   return (
     <View style={{
@@ -131,7 +132,7 @@ const LawyerCardList = memo(function LawyerCardList({ lawyer, C, onBook, onProfi
       {/* Top row */}
       <View style={{ flexDirection:'row', gap:12, marginBottom:14 }}>
         <View style={{ position:'relative' }}>
-          <CachedAvatar C={C} uri={lawyer.photo_url} initials={(lawyer.name||'').split(' ').map((w:string)=>w[0]).join('').slice(0,2).toUpperCase()} size={54} />
+          <CachedAvatar C={C} uri={lawyer.avatar_url} initials={(lawyer.name||'').split(' ').map((w:string)=>w[0]).join('').slice(0,2).toUpperCase()} size={54} />
           {lawyer.is_online && (
             <View style={{ position:'absolute', bottom:0, right:0, width:14, height:14, borderRadius:7, backgroundColor:C.green, borderWidth:2, borderColor:C.card }} />
           )}
@@ -216,7 +217,7 @@ export default function LawyersTab() {
   const [search, setSearch]   = useState('');
   const [category, setCategory] = useState(params.cat || '');
   const [city, setCity]       = useState('');
-  const [sort, setSort]       = useState('rating');
+  const [sort, setSort]       = useState('karma');
   const [showSort, setShowSort] = useState(false);
   const [isGrid, setIsGrid]   = useState(true);
   const [page, setPage]       = useState(1);
@@ -252,7 +253,7 @@ export default function LawyersTab() {
     }
   };
 
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   return (
     <View style={{ flex:1, backgroundColor:C.bg }}>

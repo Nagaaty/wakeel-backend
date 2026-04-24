@@ -71,7 +71,7 @@ function StatChip({ value, label, color, icon, delay }: any) {
   return (
     <Animated.View style={{ flex: 1, alignItems: 'center', opacity: anim, transform: [{ scale: anim }] }}>
       <Text style={{ fontSize: 22 }}>{icon}</Text>
-      <Text style={{ color, fontSize: 22, fontWeight: '800', fontFamily: 'CormorantGaramond-Bold', marginTop: 4 }}>{value}</Text>
+      <Text style={{ color, fontSize: 22, fontWeight: '800', fontFamily: 'Cairo-Bold', marginTop: 4 }}>{value}</Text>
       <Text style={{ color: '#888', fontSize: 11, marginTop: 2, textAlign: 'center' }}>{label}</Text>
     </Animated.View>
   );
@@ -202,7 +202,7 @@ function ExpenseTracker({ C }: any) {
     <View style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 20, marginTop: 16 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Text style={{ color: C.text, fontSize: 15, fontWeight: '700' }}>💸 Case Expenses</Text>
-        <Text style={{ color: C.gold, fontWeight: '700', fontSize: 20, fontFamily: 'CormorantGaramond-Bold' }}>{total} EGP</Text>
+        <Text style={{ color: C.gold, fontWeight: '700', fontSize: 20, fontFamily: 'Cairo-Bold' }}>{total} EGP</Text>
       </View>
       {expenses.map(e => (
         <View key={e.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9, paddingHorizontal: 12, backgroundColor: C.card2, borderRadius: 9, marginBottom: 8 }}>
@@ -268,7 +268,7 @@ export default function ProfileTab() {
   const [savedLoading, setSavedLoading]   = useState(false);
   const [savedLoaded, setSavedLoaded]     = useState(false);
 
-  const serif     = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif     = { fontFamily: 'Cairo-Bold' };
   const activeCount = cases.filter(c => c.status === 'Active').length;
   const totalSpent  = DEMO_PAYMENTS.reduce((a, p) => a + p.amount, 0);
 
@@ -374,7 +374,7 @@ export default function ProfileTab() {
               <Image source={{ uri: user.avatar_url || user.avatar }} style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: C.bg }} />
             ) : (
               <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: C.gold + '30', borderWidth: 4, borderColor: C.bg, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 }}>
-                <Text style={{ fontSize: 30, fontWeight: '800', color: C.gold, fontFamily: 'CormorantGaramond-Bold' }}>
+                <Text style={{ fontSize: 30, fontWeight: '800', color: C.gold, fontFamily: 'Cairo-Bold' }}>
                   {initials || 'CL'}
                 </Text>
               </View>

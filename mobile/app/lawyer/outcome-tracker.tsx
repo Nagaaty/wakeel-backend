@@ -42,7 +42,7 @@ export default function OutcomeTrackerScreen() {
   const C      = useTheme();
   const insets = useSafeAreaInsets();
   const { isRTL } = useI18n();
-  const serif  = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif  = { fontFamily: 'Cairo-Bold' };
 
   const [outcomes, setOutcomes] = useState<OutcomeEntry[]>(INITIAL);
   const [showAdd,  setShowAdd]  = useState(false);

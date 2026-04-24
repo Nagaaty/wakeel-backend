@@ -106,7 +106,7 @@ export default function AdminSupportScreen() {
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={{ color:C.text, fontSize:22 }}>‹</Text>
           </TouchableOpacity>
-          <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'CormorantGaramond-Bold' }}>تذاكر الدعم</Text>
+          <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'Cairo-Bold' }}>تذاكر الدعم</Text>
         </View>
         <FlatList horizontal data={[['open','مفتوحة'],['in_progress','جارية'],['resolved','تم الحل'],['all','الكل']]}
           keyExtractor={item=>item[0]} showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap:8 }}

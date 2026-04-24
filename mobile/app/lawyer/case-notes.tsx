@@ -34,7 +34,7 @@ export default function CaseNotesScreen() {
   const C      = useTheme();
   const insets = useSafeAreaInsets();
   const { isRTL } = useI18n();
-  const serif  = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif  = { fontFamily: 'Cairo-Bold' };
 
   const [notes,    setNotes]    = useState<CaseNote[]>(DEMO_NOTES);
   const [showAdd,  setShowAdd]  = useState(false);

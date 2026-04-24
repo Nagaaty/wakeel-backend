@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   RefreshControl, Alert, ScrollView,
-  ActivityIndicator,
+  ActivityIndicator, Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
@@ -110,7 +110,15 @@ const FILTERS = [
 
 
 // ─── Lawyer Avatar ────────────────────────────────────────────────────────────
-function LawyerAvatar({ name, size = 46 }: { name: string; size?: number }) {
+function LawyerAvatar({ name, uri, size = 46 }: { name: string; uri?: string; size?: number }) {
+  if (uri) {
+    return (
+      <Image
+        source={{ uri }}
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#9A6F2A20' }}
+      />
+    );
+  }
   const initials = name
     ? name.trim().split(/\s+/).map((w: string) => w[0] || '').join('').slice(0, 2).toUpperCase()
     : '?';
@@ -144,6 +152,7 @@ function ConsultCard({
   const cfg    = STATUS_CFG[status] || STATUS_CFG.pending;
   const svc    = SVC_LABELS[(b.service_type || '').toLowerCase()] || SVC_LABELS.consultation;
   const name   = isLawyer ? b.client_name : b.lawyer_name;
+  const avatarUri = isLawyer ? b.client_avatar_url : b.lawyer_avatar_url;
   const lawyerId = b.lawyer_id || b.lawyer_user_id;
   const isPaid   = b.payment_status === 'paid' || status === 'confirmed' || status === 'completed';
   const isActioning  = actioning === b.id;
@@ -200,7 +209,7 @@ function ConsultCard({
       <View style={{ padding: 16 }}>
         {/* Avatar + Name row */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-          <LawyerAvatar name={name || ''} size={46} />
+          <LawyerAvatar name={name || ''} uri={avatarUri || undefined} size={46} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: C.text, fontWeight: '700', fontSize: 16 }}>
               {name || '—'}

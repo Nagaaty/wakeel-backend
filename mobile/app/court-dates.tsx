@@ -58,7 +58,7 @@ export default function CourtDatesScreen() {
           <View style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
             <TouchableOpacity onPress={() => router.back()}><Text style={{ color:C.text, fontSize:22 }}>‹</Text></TouchableOpacity>
             <View>
-              <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'CormorantGaramond-Bold' }}>مواعيد المحاكم</Text>
+              <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'Cairo-Bold' }}>مواعيد المحاكم</Text>
               <Text style={{ color:C.muted, fontSize:12, marginTop:2 }}>جلسات، مواعيد نهائية، واجتماعات</Text>
             </View>
           </View>

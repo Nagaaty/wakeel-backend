@@ -101,7 +101,7 @@ export default function DocVaultScreen() {
   const { t, isRTL } = useI18n();
   useScreenshotPrevention(); // Sensitive screen — block screenshots
   const insets = useSafeAreaInsets();
-  const serif  = { fontFamily: "CormorantGaramond-Bold" };
+  const serif  = { fontFamily: "Cairo-Bold" };
 
   const [docs,     setDocs]     = useState<any[]>([]);
   const [loading,  setLoading]  = useState(true);

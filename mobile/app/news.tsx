@@ -111,7 +111,7 @@ export default function NewsScreen() {
   const toggleSave = (id: number) =>
     setSaved(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   return (
     <View style={{ flex:1, backgroundColor:C.bg }}>

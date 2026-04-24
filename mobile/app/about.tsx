@@ -8,7 +8,7 @@ import { useI18n } from '../src/i18n';
 
 // ─── Sub-Component: Lawyer Hub ────────────────────────────────────────────────
 function LawyerHub({ C, insets, t, isRTL, user }: any) {
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -92,7 +92,7 @@ function LawyerHub({ C, insets, t, isRTL, user }: any) {
 
 // ─── Sub-Component: Client About (Legacy) ─────────────────────────────────────
 function ClientAbout({ C, insets, isRTL }: any) {
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>

@@ -603,7 +603,7 @@ function OverviewTab({ C, bookings, stats, TOOLS, setSubPage, changeStatus }: an
   const wins   = stats?.wins   || 287;
   const losses = stats?.losses || 25;
   const pct    = Math.round(wins / (wins + losses) * 100);
-  const serif  = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif  = { fontFamily: 'Cairo-Bold' };
   return (
     <>
       {/* Upcoming consultations */}
@@ -710,7 +710,7 @@ function EarningsTab({ C, stats, onPayout }: any) {
     month: parseFloat(stats?.stats?.earned_this_month || '3800'),
     year:  parseFloat(stats?.stats?.total_earned      || '42500'),
   };
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
   const DEMO_COMPLETED = [
     { client:'Mohammed Al-Said', date:'2025-03-05', fee:500 },
     { client:'Rana Hassan',      date:'2025-02-20', fee:500 },

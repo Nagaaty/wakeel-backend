@@ -60,13 +60,13 @@ export default function ReferralScreen() {
     <View style={{ flex:1, backgroundColor:C.bg }}>
       <View style={{ backgroundColor:C.surface, paddingTop:insets.top+12, paddingHorizontal:16, paddingBottom:14, borderBottomWidth:1, borderBottomColor:C.border, flexDirection:'row', alignItems:'center', gap:10 }}>
         <TouchableOpacity onPress={() => router.back()}><Text style={{ color:C.text, fontSize:22 }}>‹</Text></TouchableOpacity>
-        <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'CormorantGaramond-Bold' }}>🎁 برنامج الإحالة</Text>
+        <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'Cairo-Bold' }}>🎁 برنامج الإحالة</Text>
       </View>
       <ScrollView contentContainerStyle={{ padding:16, paddingBottom:80 }}>
         {/* Hero card */}
         <View style={{ backgroundColor:C.gold+'20', borderWidth:1, borderColor:C.gold+'40', borderRadius:20, padding:24, alignItems:'center', marginBottom:20 }}>
           <Text style={{ fontSize:52, marginBottom:10 }}>💰</Text>
-          <Text style={{ color:C.gold, fontWeight:'800', fontSize:30, fontFamily:'CormorantGaramond-Bold', marginBottom:6 }}>اكسب 100 جنيه</Text>
+          <Text style={{ color:C.gold, fontWeight:'800', fontSize:30, fontFamily:'Cairo-Bold', marginBottom:6 }}>اكسب 100 جنيه</Text>
           <Text style={{ color:C.muted, fontSize:14, textAlign:'center', lineHeight:22, marginBottom:22 }}>لكل صديق يكمل استشارته الأولى. صديقك يحصل على خصم 50 جنيه!</Text>
           {/* Code box */}
           <View style={{ backgroundColor:C.card, borderRadius:14, padding:'12px 16px' as any, paddingHorizontal:16, paddingVertical:12, flexDirection:'row', alignItems:'center', justifyContent:'space-between', width:'100%', marginBottom:14 }}>
@@ -90,7 +90,7 @@ export default function ReferralScreen() {
         <View style={{ flexDirection:'row', gap:10, marginBottom:20 }}>
           {[[data.referrals,'إحالات',C.muted],[data.referrals,'مكتملة',C.gold],[`${data.earnings} ج`,'مكسوبة',C.green]].map(([v,l,col])=>(
             <Card key={l as string} C={C} style={{ flex:1, alignItems:'center', padding:14 }}>
-              <Text style={{ color:col as string, fontWeight:'800', fontSize:22, fontFamily:'CormorantGaramond-Bold' }}>{v as any}</Text>
+              <Text style={{ color:col as string, fontWeight:'800', fontSize:22, fontFamily:'Cairo-Bold' }}>{v as any}</Text>
               <Text style={{ color:C.muted, fontSize:12, marginTop:3 }}>{l as string}</Text>
             </Card>
           ))}

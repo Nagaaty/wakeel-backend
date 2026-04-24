@@ -147,7 +147,7 @@ export default function NotificationSettingsScreen() {
   const C      = useTheme();
   const { isRTL } = useI18n();
   const insets = useSafeAreaInsets();
-  const serif  = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif  = { fontFamily: 'Cairo-Bold' };
 
   const [permStatus, setPermStatus] = useState<PermissionStatus>('undetermined');
   const [prefs,      setPrefs]      = useState<NotifPreferences>({

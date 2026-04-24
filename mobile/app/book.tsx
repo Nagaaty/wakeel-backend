@@ -112,7 +112,7 @@ function CalendarPicker({ C, selectedDate, onSelect, isRTL, availMap, overridesM
           style={{ padding: 8, opacity: canGoPrev ? 1 : 0.3 }}>
           <Text style={{ color: C.gold, fontSize: 20, fontWeight: '700' }}>‹</Text>
         </TouchableOpacity>
-        <Text style={{ color: C.text, fontWeight: '700', fontSize: 16, fontFamily: 'CormorantGaramond-Bold' }}>
+        <Text style={{ color: C.text, fontWeight: '700', fontSize: 16, fontFamily: 'Cairo-Bold' }}>
           {isRTL ? AR_MONTHS[viewMonth] : EN_MONTHS[viewMonth]} {viewYear}
         </Text>
         <TouchableOpacity onPress={nextMonth} style={{ padding: 8 }}>
@@ -165,7 +165,7 @@ export default function BookScreen() {
   const { isLoggedIn } = useAuth();
   const { lawyer: lawyerId } = useLocalSearchParams<{ lawyer?: string }>();
   const insets = useSafeAreaInsets();
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   const [step,       setStep]       = useState(1);
   const [lawyer,     setLawyer]     = useState<any>(null);

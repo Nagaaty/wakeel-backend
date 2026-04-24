@@ -187,7 +187,7 @@ export default function NotificationsScreen() {
             <TouchableOpacity onPress={() => router.back()}>
               <Text style={{ color: C.text, fontSize: 22 }}>‹</Text>
             </TouchableOpacity>
-            <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'CormorantGaramond-Bold' }}>الإشعارات</Text>
+            <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'Cairo-Bold' }}>الإشعارات</Text>
             {unreadCnt > 0 && (
               <View style={{ backgroundColor: '#e74c3c', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 }}>
                 <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{unreadCnt}</Text>

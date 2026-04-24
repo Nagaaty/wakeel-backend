@@ -120,7 +120,7 @@ export default function ResetPasswordScreen() {
           <Text style={{ fontSize: 48, marginBottom: 12 }}>
             {stage === 'email' ? '🔐' : stage === 'otp' ? '📧' : '🔑'}
           </Text>
-          <Text style={{ color: C.text, fontWeight: '700', fontSize: 24, fontFamily: 'CormorantGaramond-Bold', textAlign: 'center' }}>
+          <Text style={{ color: C.text, fontWeight: '700', fontSize: 24, fontFamily: 'Cairo-Bold', textAlign: 'center' }}>
             {done ? (isRTL ? 'تم تغيير كلمة المرور!' : 'Password Changed!') : TITLES[stage]}
           </Text>
           {stage === 'otp' && !done && (
@@ -154,7 +154,7 @@ export default function ResetPasswordScreen() {
           {done ? (
             <View style={{ alignItems: 'center', paddingVertical: 20 }}>
               <Text style={{ fontSize: 52, marginBottom: 12 }}>✅</Text>
-              <Text style={{ color: C.text, fontWeight: '700', fontSize: 18, marginBottom: 8, fontFamily: 'CormorantGaramond-Bold' }}>
+              <Text style={{ color: C.text, fontWeight: '700', fontSize: 18, marginBottom: 8, fontFamily: 'Cairo-Bold' }}>
                 {isRTL ? 'تم بنجاح!' : 'All done!'}
               </Text>
               <Text style={{ color: C.muted, fontSize: 13, textAlign: 'center', lineHeight: 22 }}>

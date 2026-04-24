@@ -142,7 +142,7 @@ export default function ReviewScreen() {
   const lawyerId   = params.lawyerId   || '';
   const lawyerName = params.lawyerName || '';
 
-  const serif   = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif   = { fontFamily: 'Cairo-Bold' };
   const textDir = { textAlign: (isRTL ? 'right' : 'left') as 'right' | 'left' };
 
   // Form state
@@ -398,7 +398,7 @@ export default function ReviewScreen() {
                 {t('review.viewAll')}
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={{ color: C.gold, fontWeight: '900', fontSize: 20, fontFamily: 'CormorantGaramond-Bold' }}>
+                <Text style={{ color: C.gold, fontWeight: '900', fontSize: 20, fontFamily: 'Cairo-Bold' }}>
                   {avgRating.toFixed(1)}
                 </Text>
                 <Stars rating={avgRating} C={C} size={13} />

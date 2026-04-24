@@ -44,7 +44,7 @@ export default function LeaderboardScreen() {
   const data = ALL_DATA[period];
   const top3 = data.slice(0, 3);
   const rest  = data.slice(3);
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   // Podium order: 2nd (left), 1st (center, tallest), 3rd (right)
   const podiumOrder = [top3[1], top3[0], top3[2]];

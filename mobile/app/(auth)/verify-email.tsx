@@ -70,7 +70,7 @@ export default function VerifyEmailScreen() {
   return (
     <View style={{ flex:1, backgroundColor:C.bg, justifyContent:'center', alignItems:'center', padding:24 }}>
       <Text style={{ fontSize:52, marginBottom:14 }}>📧</Text>
-      <Text style={{ color:C.text, fontWeight:'700', fontSize:24, fontFamily:'CormorantGaramond-Bold', marginBottom:8, textAlign:'center' }}>
+      <Text style={{ color:C.text, fontWeight:'700', fontSize:24, fontFamily:'Cairo-Bold', marginBottom:8, textAlign:'center' }}>
         {isRTL ? 'تحقق من بريدك' : 'Check your email'}
       </Text>
       <Text style={{ color:C.muted, fontSize:14, marginBottom:30, textAlign:'center', lineHeight:22 }}>

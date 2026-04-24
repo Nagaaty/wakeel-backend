@@ -40,7 +40,7 @@ export default function GlossaryScreen() {
   const [search,   setSearch]   = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const scrollRef = useRef<SectionList>(null);
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   const filtered = search
     ? TERMS.filter(t => t.ar.includes(search) || t.en.toLowerCase().includes(search.toLowerCase()) || t.cat.toLowerCase().includes(search.toLowerCase()))

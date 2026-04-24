@@ -42,7 +42,7 @@ export default function ClientCRMScreen() {
   const C      = useTheme();
   const insets = useSafeAreaInsets();
   const { isRTL } = useI18n();
-  const serif  = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif  = { fontFamily: 'Cairo-Bold' };
 
   const [search,   setSearch]   = useState('');
   const [selected, setSelected] = useState<Client | null>(null);

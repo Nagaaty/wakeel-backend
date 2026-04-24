@@ -267,7 +267,7 @@ export default function PostDetail() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Text style={{ fontSize: 28, color: C.text, lineHeight: 32 }}>‹</Text>
         </TouchableOpacity>
-        <Text style={{ color: C.text, fontWeight: '800', fontSize: 18, fontFamily: 'CormorantGaramond-Bold', flex: 1 }}>
+        <Text style={{ color: C.text, fontWeight: '800', fontSize: 18, fontFamily: 'Cairo-Bold', flex: 1 }}>
           المنشور
         </Text>
       </View>

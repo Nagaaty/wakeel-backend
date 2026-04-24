@@ -160,7 +160,7 @@ export default function RegisterLawyerScreen() {
               <Text style={{ fontSize: 24, color: C.text }}>×</Text>
             </TouchableOpacity>
           </View>
-          <Text style={{ fontSize: 26, fontWeight: '800', color: C.text, fontFamily: 'CormorantGaramond-Bold', marginBottom: 8 }}>
+          <Text style={{ fontSize: 26, fontWeight: '800', color: C.text, fontFamily: 'Cairo-Bold', marginBottom: 8 }}>
             {isRTL ? 'انضم إلى وكيل' : 'Join Wakeel'}
           </Text>
           <Text style={{ color: C.muted, fontSize: 13 }}>

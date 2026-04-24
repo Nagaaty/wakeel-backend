@@ -73,7 +73,7 @@ export default function JobsScreen() {
   return (
     <View style={{ flex:1, backgroundColor:C.bg }}>
       <View style={{ backgroundColor:C.surface, paddingTop:insets.top+12, paddingHorizontal:16, paddingBottom:12, borderBottomWidth:1, borderBottomColor:C.border }}>
-        <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'CormorantGaramond-Bold', marginBottom:10 }}>💼 وظائف قانونية</Text>
+        <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'Cairo-Bold', marginBottom:10 }}>💼 وظائف قانونية</Text>
         <View style={{ flexDirection:'row', backgroundColor:C.card2, borderWidth:1, borderColor:C.border, borderRadius:12, paddingHorizontal:12, paddingVertical:10, alignItems:'center', gap:8, marginBottom:10 }}>
           <Text>🔍</Text>
           <TextInput value={search} onChangeText={setSearch} onSubmitEditing={load} placeholder="ابحث..." placeholderTextColor={C.muted} style={{ flex:1, color:C.text, fontSize:14 }} />

@@ -78,7 +78,7 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
         </Gradient>
       </Animated.View>
       <Text style={{
-        fontFamily: 'CormorantGaramond-Bold', fontSize: 36,
+        fontFamily: 'Cairo-Bold', fontSize: 36,
         color: C.text, letterSpacing: -0.7, marginBottom: 5,
       }}>
         وكيل
@@ -168,14 +168,12 @@ if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 function RootLayout() {
   const [fontsLoaded] = ExpoFont.useFonts({
-    'CormorantGaramond-Bold':     'https://fonts.gstatic.com/s/cormorantgaramond/v22/co3YmX5slCNuHLi8bLeY9MK7whWMhyjQAllvuQ.ttf',
-    'CormorantGaramond-SemiBold': 'https://fonts.gstatic.com/s/cormorantgaramond/v22/co3YmX5slCNuHLi8bLeY9MK7whWMhyjQWlpvuQ.ttf',
+    'Cairo-Bold':                 'https://fonts.gstatic.com/s/cairo/v28/SLXgc1nY6HkvalIvTr0kTg.ttf',
+    'Cairo-SemiBold':             'https://fonts.gstatic.com/s/cairo/v28/SLXgc1nY6HkvalIvTqEmTg.ttf',
+    'Cairo-Regular':              'https://fonts.gstatic.com/s/cairo/v28/SLXgc1nY6HkvalIvTp0mTg.ttf',
     'DMSans-Regular':             'https://fonts.gstatic.com/s/dmsans/v15/rP2Hp2ywxg089UriCZa4ET-DNl0.ttf',
     'DMSans-Medium':              'https://fonts.gstatic.com/s/dmsans/v15/rP2Cp2ywxg089UriASitCBimCw.ttf',
     'DMSans-Bold':                'https://fonts.gstatic.com/s/dmsans/v15/rP2Cp2ywxg089UriAWCrCBimCw.ttf',
-    'Cairo-Regular':              'https://fonts.gstatic.com/s/cairo/v28/SLXgc1nY6HkvalIvTp0mTg.ttf',
-    'Cairo-Bold':                 'https://fonts.gstatic.com/s/cairo/v28/SLXgc1nY6HkvalIvTr0kTg.ttf',
-    'Cairo-SemiBold':             'https://fonts.gstatic.com/s/cairo/v28/SLXgc1nY6HkvalIvTqEmTg.ttf',
     'PlayfairDisplay-Bold':       'https://fonts.gstatic.com/s/playfairdisplay/v30/nuFiD-vYSZviVYUb_rj3ij__anPXDTzoY6HNmw.ttf',
   });
 

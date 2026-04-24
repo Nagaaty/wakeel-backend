@@ -226,7 +226,7 @@ export default function PaymentFlowScreen() {
     }
   };
 
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
   const textDir = { textAlign: (isRTL ? 'right' : 'left') as 'right' | 'left' };
 
   // ── STEP 3 — Result screen ─────────────────────────────────────────────────

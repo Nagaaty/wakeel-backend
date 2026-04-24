@@ -79,7 +79,7 @@ export default function RegisterScreen() {
       >
         <View style={{ alignItems: 'center', marginBottom: 28 }}>
           <Text style={{ fontSize: 48, marginBottom: 8 }}>⚖️</Text>
-          <Text style={{ fontSize: 26, fontWeight: '800', color: C.text, fontFamily: 'CormorantGaramond-Bold' }}>
+          <Text style={{ fontSize: 26, fontWeight: '800', color: C.text, fontFamily: 'Cairo-Bold' }}>
             {isRTL ? 'إنشاء حساب جديد' : 'Create Account'}
           </Text>
           <Text style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>

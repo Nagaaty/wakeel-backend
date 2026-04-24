@@ -108,7 +108,7 @@ function InputModal({
         style={{ flex: 1, backgroundColor: '#00000080', justifyContent: 'center', padding: 24 }}
       >
         <View style={{ backgroundColor: C.card, borderRadius: 20, padding: 24 }}>
-          <Text style={{ color: C.text, fontSize: 18, fontWeight: '700', marginBottom: 16, fontFamily: 'CormorantGaramond-Bold' }}>
+          <Text style={{ color: C.text, fontSize: 18, fontWeight: '700', marginBottom: 16, fontFamily: 'Cairo-Bold' }}>
             {title}
           </Text>
           <TextInput
@@ -156,7 +156,7 @@ export default function AccountSettingsScreen() {
   const { isRTL } = useI18n();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   const [modal, setModal] = useState<null | 'email' | 'password' | 'phone' | 'twofa'>(null);
   const [loading, setLoading] = useState(false);

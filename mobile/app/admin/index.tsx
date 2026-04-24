@@ -65,7 +65,7 @@ export default function AdminScreen() {
       <View style={{ backgroundColor: C.surface, paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <TouchableOpacity onPress={() => router.back()}><Text style={{ color: C.text, fontSize: 22 }}>‹</Text></TouchableOpacity>
-          <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'CormorantGaramond-Bold' }}>🛡️ لوحة المشرف</Text>
+          <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'Cairo-Bold' }}>🛡️ لوحة المشرف</Text>
         </View>
         <View style={{ flexDirection: 'row', backgroundColor: C.card, borderRadius: 10, padding: 3 }}>
           {(['overview', 'bookings', 'users'] as const).map(t => (

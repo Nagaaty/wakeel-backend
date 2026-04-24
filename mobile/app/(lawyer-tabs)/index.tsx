@@ -14,7 +14,7 @@ export default function LawyerDashboardIndex() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [bookings, setBookings] = useState<any[]>([]);
-  const [stats, setStats] = useState({ earnings: 0, done: 0, pending: 0, upcoming: 0 });
+  const [stats, setStats] = useState({ earnings: 0, done: 0, pending: 0, upcoming: 0, karmaScore: 0 });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'bookings' | 'earnings'>('overview');
 
@@ -33,10 +33,11 @@ export default function LawyerDashboardIndex() {
       if (analyticsRes.status === 'fulfilled') {
         const d = analyticsRes.value as any;
         setStats({
-          earnings: d?.total_earnings || 0,
-          done: d?.completed_sessions || 0,
-          pending: d?.pending_bookings || 0,
-          upcoming: d?.upcoming_sessions || 0,
+          earnings: d?.stats?.total_earned || d?.total_earnings || 0,
+          done: d?.stats?.completed || d?.completed_sessions || 0,
+          pending: d?.stats?.pending || d?.pending_bookings || 0,
+          upcoming: d?.stats?.upcoming_sessions || d?.upcoming_sessions || 0,
+          karmaScore: d?.stats?.karma_score || 0,
         });
       }
     } catch {} finally {
@@ -62,10 +63,10 @@ export default function LawyerDashboardIndex() {
   };
 
   const statCards = [
-    { val: stats.earnings > 0 ? `${stats.earnings.toLocaleString()}` : '0', label: isRTL ? 'EGP' : 'EGP', icon: '💰' },
+    { val: stats.karmaScore > 0 ? `${stats.karmaScore} 🔥` : '0', label: isRTL ? 'نقاط التفاعل' : 'Karma', icon: '🌟' },
     { val: stats.done > 0 ? `${stats.done}` : '0',           label: isRTL ? 'مكتمل' : 'Done',    icon: '✅' },
     { val: stats.pending > 0     ? `${stats.pending}`      : '0',           label: isRTL ? 'معلق' : 'Pending',        icon: '⏳' },
-    { val: stats.upcoming > 0    ? `${stats.upcoming}`     : '0',           label: isRTL ? 'قادم' : 'Upcoming',       icon: '📅' },
+    { val: stats.earnings > 0 ? `${stats.earnings.toLocaleString()}` : '0', label: isRTL ? 'EGP' : 'EGP', icon: '💰' },
   ];
 
   const pendingBookings = bookings.filter(b => b.status === 'pending');
@@ -213,11 +214,11 @@ export default function LawyerDashboardIndex() {
        <View style={{ flexDirection: 'row', gap: 14, marginBottom: 24 }}>
           <View style={{ flex: 1, backgroundColor: '#EFECE5', borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 20, alignItems: 'center' }}>
             <Text style={{ color: C.muted, fontSize: 13, marginBottom: 8, fontWeight: '600' }}>{isRTL ? 'Pending Payout' : 'Pending Payout'}</Text>
-            <Text style={{ color: '#16A34A', fontSize: 24, fontWeight: '700', fontFamily: 'CormorantGaramond-Bold' }}>EGP {pendingBookings.reduce((a,b)=>a+(b.amount||b.consultation_fee||500), 0)}</Text>
+            <Text style={{ color: '#16A34A', fontSize: 24, fontWeight: '700', fontFamily: 'Cairo-Bold' }}>EGP {pendingBookings.reduce((a,b)=>a+(b.amount||b.consultation_fee||500), 0)}</Text>
           </View>
           <View style={{ flex: 1, backgroundColor: '#EFECE5', borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 20, alignItems: 'center' }}>
             <Text style={{ color: C.muted, fontSize: 13, marginBottom: 8, fontWeight: '600' }}>{isRTL ? 'Total Earned' : 'Total Earned'}</Text>
-            <Text style={{ color: C.gold, fontSize: 24, fontWeight: '700', fontFamily: 'CormorantGaramond-Bold' }}>EGP {stats.earnings}</Text>
+            <Text style={{ color: C.gold, fontSize: 24, fontWeight: '700', fontFamily: 'Cairo-Bold' }}>EGP {stats.earnings}</Text>
           </View>
        </View>
 
@@ -249,7 +250,7 @@ export default function LawyerDashboardIndex() {
                 {statCards.map((s, i) => (
                 <View key={i} style={{ flex: 1, backgroundColor: '#EFECE5', borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 12, alignItems: 'center' }}>
                     <Text style={{ fontSize: 22, marginBottom: 6 }}>{s.icon}</Text>
-                    <Text style={{ color: C.gold, fontSize: 18, fontWeight: '700', fontFamily: 'CormorantGaramond-Bold', textAlign: 'center' }}>{s.val}</Text>
+                    <Text style={{ color: C.gold, fontSize: 18, fontWeight: '700', fontFamily: 'Cairo-Bold', textAlign: 'center' }}>{s.val}</Text>
                     <Text style={{ color: C.muted, fontSize: 11, marginTop: 4, textAlign: 'center' }}>{s.label}</Text>
                 </View>
                 ))}

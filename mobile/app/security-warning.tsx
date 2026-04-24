@@ -13,7 +13,7 @@ interface Props {
 export function SecurityWarningScreen({ onDismiss }: Props) {
   const C     = LIGHT_C;
   const fadeA = new Animated.Value(0);
-  const serif = { fontFamily: "CormorantGaramond-Bold" };
+  const serif = { fontFamily: "Cairo-Bold" };
 
   useEffect(() => {
     Animated.timing(fadeA, { toValue: 1, duration: 350, useNativeDriver: true }).start();

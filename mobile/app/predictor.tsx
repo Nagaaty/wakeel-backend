@@ -81,7 +81,7 @@ export default function PredictorScreen() {
             <Text style={{ color: C.text, fontSize: 22 }}>‹</Text>
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'CormorantGaramond-Bold' }}>🔮 محلل نتائج القضايا</Text>
+            <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'Cairo-Bold' }}>🔮 محلل نتائج القضايا</Text>
             <Text style={{ color: C.muted, fontSize: 12 }}>الخطوة {step} من 3: {STEPS[step - 1]}</Text>
           </View>
         </View>

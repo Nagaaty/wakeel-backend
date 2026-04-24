@@ -90,7 +90,7 @@ export default function PaymentWebViewScreen() {
     );
   };
 
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>

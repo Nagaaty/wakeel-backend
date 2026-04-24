@@ -2,7 +2,7 @@
 // Wraps expo-image for automatic disk + memory caching.
 // Falls back to initials avatar if image fails to load.
 import React, { useState } from "react";
-import { View, Text } from "react-native";
+import { View, Text, Image as RNImage } from "react-native";
 import { Image } from "expo-image";
 
 // Blurhash placeholder — generic silhouette
@@ -32,7 +32,7 @@ export function CachedAvatar({ uri, size, initials, C, borderRadius }: Props) {
         <Text style={{
           color: C.gold, fontWeight: "700",
           fontSize: size * 0.33,
-          fontFamily: "CormorantGaramond-Bold",
+          fontFamily: "Cairo-Bold",
         }}>
           {(initials || "?").slice(0, 2).toUpperCase()}
         </Text>
@@ -41,13 +41,9 @@ export function CachedAvatar({ uri, size, initials, C, borderRadius }: Props) {
   }
 
   return (
-    <Image
+    <RNImage
       source={{ uri }}
       style={{ width: size, height: size, borderRadius: br }}
-      placeholder={BLURHASH}
-      contentFit="cover"
-      transition={200}
-      cachePolicy="disk"           // persist to disk across app launches
       onError={() => setFailed(true)}
     />
   );

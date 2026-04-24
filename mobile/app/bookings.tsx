@@ -90,7 +90,7 @@ export default function BookingsScreen() {
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={{ color: C.text, fontSize: 22 }}>‹</Text>
           </TouchableOpacity>
-          <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'CormorantGaramond-Bold' }}>
+          <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'Cairo-Bold' }}>
             {isLawyer ? isRTL ? 'جلساتي' : 'My Sessions' : t('profile.myBookings')}
           </Text>
         </View>

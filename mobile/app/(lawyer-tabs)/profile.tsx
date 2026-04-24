@@ -17,7 +17,7 @@ const GOLD = '#C8A84B';
 function SectionHeader({ title, onAction, actionLabel, C }: any) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-      <Text style={{ fontSize: 18, fontWeight: '800', color: C.text, fontFamily: 'CormorantGaramond-Bold' }}>{title}</Text>
+      <Text style={{ fontSize: 18, fontWeight: '800', color: C.text, fontFamily: 'Cairo-Bold' }}>{title}</Text>
       {onAction && (
         <TouchableOpacity onPress={onAction}>
           <Text style={{ color: GOLD, fontSize: 13, fontWeight: '700' }}>{actionLabel}</Text>
@@ -166,7 +166,7 @@ export default function LawyerPublicProfile() {
             <View style={{ width: 96, height: 96, borderRadius: 48, borderWidth: 3, borderColor: GOLD, backgroundColor: '#1a2035', alignItems:'center', justifyContent:'center', shadowColor: GOLD, shadowOffset:{width:0,height:4}, shadowOpacity:0.4, shadowRadius:10, elevation:8 }}>
               {user?.avatar_url
                 ? <Image source={{ uri: user.avatar_url }} style={{ width:90,height:90,borderRadius:45 }} />
-                : <Text style={{ fontSize:32, fontWeight:'800', color: GOLD, fontFamily:'CormorantGaramond-Bold' }}>{initials}</Text>
+                : <Text style={{ fontSize:32, fontWeight:'800', color: GOLD, fontFamily:'Cairo-Bold' }}>{initials}</Text>
               }
               {/* Verified badge */}
               <View style={{ position:'absolute', bottom:0,right:0, backgroundColor: GOLD, borderRadius:10, width:22,height:22, alignItems:'center',justifyContent:'center', borderWidth:2, borderColor: C.bg }}>
@@ -190,7 +190,7 @@ export default function LawyerPublicProfile() {
           <View style={{ paddingHorizontal: 18 }}>
             {/* Name + Verified badge */}
             <View style={{ flexDirection:'row', alignItems:'center', gap: 8, marginBottom: 4 }}>
-              <Text style={{ fontSize:22, fontWeight:'900', color: C.text, fontFamily:'CormorantGaramond-Bold' }}>{user?.name || 'Dr. Lawyer'}</Text>
+              <Text style={{ fontSize:22, fontWeight:'900', color: C.text, fontFamily:'Cairo-Bold' }}>{user?.name || 'Dr. Lawyer'}</Text>
               <View style={{ backgroundColor: GOLD+'20', borderRadius:6, paddingHorizontal:7, paddingVertical:2, borderWidth:1, borderColor: GOLD+'50' }}>
                 <Text style={{ color: GOLD, fontSize:10, fontWeight:'800' }}>⚖️ {isRTL ? 'محامٍ معتمد' : 'Verified'}</Text>
               </View>
@@ -212,7 +212,7 @@ export default function LawyerPublicProfile() {
                 { val: `${wins}`, lbl: isRTL ? 'قضية فاز' : 'Cases Won' },
               ].map((s, i) => (
                 <TouchableOpacity key={i} style={{ alignItems:'center' }}>
-                  <Text style={{ color: GOLD, fontWeight:'900', fontSize:16, fontFamily:'CormorantGaramond-Bold' }}>{s.val}</Text>
+                  <Text style={{ color: GOLD, fontWeight:'900', fontSize:16, fontFamily:'Cairo-Bold' }}>{s.val}</Text>
                   <Text style={{ color: C.muted, fontSize:11 }}>{s.lbl}</Text>
                 </TouchableOpacity>
               ))}
@@ -274,7 +274,7 @@ export default function LawyerPublicProfile() {
           <SectionHeader title={isRTL ? `تقييمات العملاء (${totalReviews})` : `Client Reviews (${totalReviews})`} C={C} />
           {/* Rating summary */}
           <View style={{ flexDirection:'row', alignItems:'center', gap:14, backgroundColor: C.card, borderRadius:14, padding:14, marginBottom:16, borderWidth:1, borderColor: C.border }}>
-            <Text style={{ fontSize:46, fontWeight:'900', color: GOLD, fontFamily:'CormorantGaramond-Bold' }}>{Number(avgRating).toFixed(1)}</Text>
+            <Text style={{ fontSize:46, fontWeight:'900', color: GOLD, fontFamily:'Cairo-Bold' }}>{Number(avgRating).toFixed(1)}</Text>
             <View>
               <Stars rating={Number(avgRating)} size={18} />
               <Text style={{ color: C.muted, fontSize:12, marginTop:4 }}>{isRTL ? `من ${totalReviews} تقييم` : `From ${totalReviews} reviews`}</Text>

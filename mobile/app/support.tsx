@@ -197,7 +197,7 @@ function MsgBubble({ m, C, isRTL, onChip, onThumb }: any) {
 
 // ─── Phase 1: Topic Picker ────────────────────────────────────────────────────
 function TopicPicker({ C, isRTL, onSelect }: any) {
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
   const topics = TOPICS(isRTL);
   return (
     <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
@@ -516,7 +516,7 @@ function AgentChat({ C, isRTL, topic, history, user }: any) {
       <View style={{ width: 100, height: 100, borderRadius: 50, backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center', marginBottom: 24, borderWidth: 2, borderColor: '#334155' }}>
         <Text style={{ fontSize: 44 }}>👩‍💼</Text>
       </View>
-      <Text style={{ color: C.text, fontWeight: '800', fontSize: 22, fontFamily: 'CormorantGaramond-Bold', marginBottom: 8, textAlign: 'center' }}>
+      <Text style={{ color: C.text, fontWeight: '800', fontSize: 22, fontFamily: 'Cairo-Bold', marginBottom: 8, textAlign: 'center' }}>
         {isRTL ? 'جاري توصيلك بوكيل...' : 'Connecting you to an agent...'}
       </Text>
       <Text style={{ color: C.muted, fontSize: 13, textAlign: 'center', marginBottom: 28, lineHeight: 20 }}>
@@ -617,7 +617,7 @@ export default function SupportScreen() {
   const insets = useSafeAreaInsets();
   const { isRTL } = useI18n();
   const user = useSelector(selUser);
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   const [phase, setPhase] = useState<Phase>('topic');
   const [topic, setTopic] = useState<any>(null);

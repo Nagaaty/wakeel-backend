@@ -345,7 +345,7 @@ export default function MessagesScreen() {
     );
   }, [isRTL, sendAttachment]);
 
-  const serif = { fontFamily: 'CormorantGaramond-Bold' };
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   // ── Conversation list view ────────────────────────────────────────────────
   if (!active) {

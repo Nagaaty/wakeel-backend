@@ -131,7 +131,7 @@ export default function AdminVerificationScreen() {
       <View style={{ backgroundColor:C.surface, paddingTop:insets.top+12, paddingHorizontal:16, paddingBottom:12, borderBottomWidth:1, borderBottomColor:C.border }}>
         <View style={{ flexDirection:'row', alignItems:'center', gap:10, marginBottom:12 }}>
           <TouchableOpacity onPress={() => router.back()}><Text style={{ color:C.text, fontSize:22 }}>‹</Text></TouchableOpacity>
-          <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'CormorantGaramond-Bold' }}>توثيق المحامين</Text>
+          <Text style={{ color:C.text, fontWeight:'700', fontSize:20, fontFamily:'Cairo-Bold' }}>توثيق المحامين</Text>
         </View>
         <View style={{ flexDirection:'row', gap:8 }}>
           {[['pending','انتظار'],['approved','موثقون'],['rejected','مرفوضون'],['all','الكل']].map(([f,lb])=>{
