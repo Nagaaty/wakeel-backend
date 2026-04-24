@@ -18,6 +18,47 @@ import type { AppDispatch } from '../../src/store';
 import { useI18n } from '../../src/i18n';
 import { recordCompletedConsultation } from '../../src/utils/storeReview';
 
+// ─── Live clock — updates every 30s, shared across all cards ─────────────────
+function useNow() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
+// Returns 'locked' | 'open' | 'past'
+function getJoinState(bookingDate: string, startTime: string, now: Date): 'locked' | 'open' | 'past' {
+  if (!bookingDate || !startTime) return 'locked';
+  try {
+    const dt = new Date(`${bookingDate}T${startTime.slice(0, 5)}:00`);
+    const diffMin = (dt.getTime() - now.getTime()) / 60000;
+    if (diffMin > 15)   return 'locked'; // more than 15 min away
+    if (diffMin < -90)  return 'past';   // ended more than 90 min ago
+    return 'open';
+  } catch { return 'locked'; }
+}
+
+// Returns human-readable Arabic countdown string
+function getCountdown(bookingDate: string, startTime: string, now: Date): string {
+  if (!bookingDate || !startTime) return '';
+  try {
+    const dt = new Date(`${bookingDate}T${startTime.slice(0, 5)}:00`);
+    const diffMs  = dt.getTime() - now.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin <= 0 && diffMin > -90) return '🔴 جارية الآن';
+    if (diffMin <= 0) return '';
+    if (diffMin < 60) return `تبدأ بعد ${diffMin} دقيقة`;
+    const hrs  = Math.floor(diffMin / 60);
+    const mins = diffMin % 60;
+    if (hrs < 24) return mins > 0 ? `تبدأ بعد ${hrs} ساعة و ${mins} دقيقة` : `تبدأ بعد ${hrs} ساعة`;
+    const days = Math.floor(hrs / 24);
+    const remH = hrs % 24;
+    return remH > 0 ? `تبدأ بعد ${days} يوم و ${remH} ساعة` : `تبدأ بعد ${days} يوم`;
+  } catch { return ''; }
+}
+
 // ─── Status config ────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<string, {
   color: string; bg: string; icon: string;
@@ -67,23 +108,6 @@ const FILTERS = [
   { key: 'cancelled', label: '❌ ملغي' },
 ];
 
-// ─── Helper: is consultation happening "now" (within 30 min) ─────────────────
-function isHappeningNow(bookingDate: string, startTime: string): boolean {
-  if (!bookingDate || !startTime) return false;
-  try {
-    const dt = new Date(`${bookingDate}T${startTime}`);
-    const now = new Date();
-    const diffMin = (dt.getTime() - now.getTime()) / 60000;
-    return diffMin >= -60 && diffMin <= 30; // 30 min before → 60 min after
-  } catch { return false; }
-}
-
-function isUpcoming(bookingDate: string): boolean {
-  if (!bookingDate) return false;
-  try {
-    return new Date(bookingDate) >= new Date(new Date().toDateString());
-  } catch { return false; }
-}
 
 // ─── Consultation Card ────────────────────────────────────────────────────────
 function ConsultCard({
@@ -95,9 +119,16 @@ function ConsultCard({
   const name   = isLawyer ? b.client_name : b.lawyer_name;
   const lawyerId = b.lawyer_id || b.lawyer_user_id;
   const isPaid   = b.payment_status === 'paid' || status === 'confirmed' || status === 'completed';
-  const upcoming = isUpcoming(b.booking_date);
-  const happeningNow = isHappeningNow(b.booking_date, b.start_time);
   const isActioning  = actioning === b.id;
+  const now          = useNow();
+  const joinState    = (status === 'confirmed' && ['video','chat','phone'].includes((b.service_type||'').toLowerCase()))
+    ? getJoinState(b.booking_date, b.start_time, now)
+    : null;
+  const countdown    = getCountdown(b.booking_date, b.start_time, now);
+  const upcoming     = (() => {
+    try { return new Date(b.booking_date) >= new Date(new Date().toDateString()); }
+    catch { return false; }
+  })();
 
   return (
     <View style={{
@@ -187,9 +218,9 @@ function ConsultCard({
         {/* ── Action Buttons ── */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
 
-          {/* 📹 JOIN NOW — shown when confirmed + time is near */}
-          {!isLawyer && status === 'confirmed' && (b.service_type === 'video' || b.service_type === 'chat' || b.service_type === 'phone') && (
-            happeningNow ? (
+          {/* ── 📹 JOIN BUTTON — 3 states ── */}
+          {!isLawyer && joinState !== null && joinState !== 'past' && (
+            joinState === 'open' ? (
               <TouchableOpacity
                 onPress={() => router.push({ pathname: '/video', params: { booking: b.id } } as any)}
                 style={{
@@ -197,18 +228,29 @@ function ConsultCard({
                   paddingVertical: 14, borderRadius: 12,
                   alignItems: 'center', justifyContent: 'center',
                   flexDirection: 'row', gap: 8,
+                  shadowColor: C.gold, shadowOpacity: 0.45,
+                  shadowRadius: 10, elevation: 5,
                 }}
               >
                 <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>📹 انضم الآن</Text>
               </TouchableOpacity>
             ) : (
+              // LOCKED state
               <View style={{
-                flex: 1, backgroundColor: C.gold + '20', borderWidth: 1,
-                borderColor: C.gold + '50', paddingVertical: 12,
-                borderRadius: 12, alignItems: 'center',
-                flexDirection: 'row', justifyContent: 'center', gap: 8,
+                flex: 1, borderWidth: 1, borderColor: C.border,
+                backgroundColor: C.surface, borderRadius: 12,
+                paddingVertical: 10, paddingHorizontal: 8,
+                alignItems: 'center',
               }}>
-                <Text style={{ color: C.gold, fontWeight: '700', fontSize: 13 }}>⏰ قريباً · {b.start_time?.slice(0, 5)}</Text>
+                <Text style={{ fontSize: 16, marginBottom: 2 }}>🔒</Text>
+                <Text style={{ color: C.muted, fontSize: 11, fontWeight: '600', textAlign: 'center' }}>
+                  يفتح قبل 15 دقيقة من الموعد
+                </Text>
+                {countdown ? (
+                  <Text style={{ color: C.gold, fontSize: 11, fontWeight: '700', marginTop: 2 }}>
+                    {countdown}
+                  </Text>
+                ) : null}
               </View>
             )
           )}
