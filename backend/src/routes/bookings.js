@@ -62,7 +62,8 @@ router.post('/', requireAuth, async (req, res, next) => {
       `INSERT INTO bookings
          (client_id, lawyer_id, scheduled_at,
           type, status, amount, notes)
-       VALUES ($1,$2,$3::TIMESTAMP,$4,'pending',$5,$6) RETURNING *`,
+       VALUES ($1,$2,$3::TIMESTAMP,$4,'pending',$5,$6) 
+       RETURNING *, TO_CHAR(scheduled_at, 'YYYY-MM-DD') AS booking_date, TO_CHAR(scheduled_at, 'HH24:MI') AS start_time, LOWER(type) AS service_type`,
       [req.user.id, lawyerId, scheduledAt, dbType, fee, notes||null]
     );
 
@@ -101,23 +102,28 @@ router.get('/', requireAuth, async (req, res, next) => {
 
     let q = `
       SELECT b.*,
+        b.amount AS fee,
+        CASE WHEN b.status IN ('confirmed','completed') THEN 'paid' ELSE 'pending' END AS payment_status,
+        TO_CHAR(b.scheduled_at, 'YYYY-MM-DD') AS booking_date,
+        TO_CHAR(b.scheduled_at, 'HH24:MI') AS start_time,
+        LOWER(b.type) AS service_type,
         cu.name AS client_name, cu.email AS client_email, cu.phone AS client_phone,
         lu.name AS lawyer_name, lu.email AS lawyer_email,
         lp.specialization, lp.avg_rating, lp.is_verified,
-        cr.room_url AS video_url
+        lp.user_id AS lawyer_profile_id,
+        lu.id AS lawyer_user_id
       FROM bookings b
       JOIN users cu ON cu.id = b.client_id
       JOIN users lu ON lu.id = b.lawyer_id
       LEFT JOIN lawyer_profiles lp ON lp.user_id = b.lawyer_id
-      LEFT JOIN consultation_rooms cr ON cr.booking_id = b.id
       WHERE ${isLawyer ? 'b.lawyer_id' : 'b.client_id'} = $1
     `;
     const params = [req.user.id];
 
     if (status)   { params.push(status);                    q += ` AND b.status=$${params.length}`; }
-    if (upcoming) { q += ` AND b.booking_date >= CURRENT_DATE`; }
+    if (upcoming) { q += ` AND b.scheduled_at >= CURRENT_DATE`; }
 
-    q += ' ORDER BY b.booking_date DESC, b.start_time DESC LIMIT 100';
+    q += ' ORDER BY b.scheduled_at DESC LIMIT 100';
 
     const { rows } = await pool.query(q, params);
     res.json({ bookings: rows });
@@ -134,6 +140,9 @@ router.patch('/:id/status', requireAuth, async (req, res, next) => {
 
     const { rows: [booking] } = await pool.query(
       `SELECT b.*,
+              TO_CHAR(b.scheduled_at, 'YYYY-MM-DD') AS booking_date,
+              TO_CHAR(b.scheduled_at, 'HH24:MI') AS start_time,
+              LOWER(b.type) AS service_type,
               cu.name AS client_name, cu.email AS client_email, cu.phone AS client_phone,
               lu.name AS lawyer_name
        FROM bookings b
@@ -149,7 +158,8 @@ router.patch('/:id/status', requireAuth, async (req, res, next) => {
     if (!canUpdate) return res.status(403).json({ message: 'Not authorized' });
 
     const { rows: [updated] } = await pool.query(
-      `UPDATE bookings SET status=$1 WHERE id=$2 RETURNING *`,
+      `UPDATE bookings SET status=$1 WHERE id=$2 
+       RETURNING *, TO_CHAR(scheduled_at, 'YYYY-MM-DD') AS booking_date, TO_CHAR(scheduled_at, 'HH24:MI') AS start_time, LOWER(type) AS service_type`,
       [status, req.params.id]
     );
 
@@ -214,13 +224,16 @@ router.post('/:id/cancel', requireAuth, async (req, res, next) => {
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const { rows: [booking] } = await pool.query(
-      `SELECT b.*, cu.name AS client_name, lu.name AS lawyer_name, lu.email AS lawyer_email,
-              lp.specialization, cr.room_url AS video_url
+      `SELECT b.*, 
+              TO_CHAR(b.scheduled_at, 'YYYY-MM-DD') AS booking_date,
+              TO_CHAR(b.scheduled_at, 'HH24:MI') AS start_time,
+              LOWER(b.type) AS service_type,
+              cu.name AS client_name, lu.name AS lawyer_name, lu.email AS lawyer_email,
+              lp.specialization
        FROM bookings b
        JOIN users cu ON cu.id=b.client_id
        JOIN users lu ON lu.id=b.lawyer_id
        LEFT JOIN lawyer_profiles lp ON lp.user_id=b.lawyer_id
-       LEFT JOIN consultation_rooms cr ON cr.booking_id=b.id
        WHERE b.id=$1 AND (b.client_id=$2 OR b.lawyer_id=$2 OR $3='admin')`,
       [req.params.id, req.user.id, req.user.role]
     );
