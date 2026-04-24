@@ -10,13 +10,13 @@ import { TopNav } from '../../src/components/TopNav';
 // Tab bar: 🏠 Home | 🔍 Lawyers | [✦ AI special] | 🔔 Notifications | 👤 Profile
 function TabIcon({ icon, label, focused, C }: any) {
   return (
-    <View style={{ alignItems:'center', gap:1, paddingTop:3, width: 78 }}>
-      <Text style={{ fontSize:focused?22:20, lineHeight:24, color:focused?C.gold:'#888' }}>{icon}</Text>
+    <View style={{ alignItems:'center', gap:1, paddingTop:2, width: 76 }}>
+      <Text style={{ fontSize:focused?20:18, lineHeight:22, color:focused?C.gold:'#888' }}>{icon}</Text>
       <Text
         numberOfLines={1}
         adjustsFontSizeToFit
-        minimumFontScale={0.6}
-        style={{ fontSize: 11, color:focused?C.gold:'#888', fontWeight:focused?'700':'400', textAlign:'center', width:'100%' }}
+        minimumFontScale={0.7}
+        style={{ fontSize: 10, color:focused?C.gold:'#888', fontWeight:focused?'700':'400', textAlign:'center', width:'100%' }}
       >
         {label}
       </Text>
@@ -42,7 +42,7 @@ export default function TabsLayout() {
             backgroundColor: C.surface,
             borderTopColor: C.border,
             borderTopWidth: 1,
-            height: 62 + insets.bottom,
+            height: 56 + insets.bottom,
             paddingBottom: insets.bottom,
             elevation: 0,
             shadowColor: 'transparent',
