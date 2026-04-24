@@ -326,23 +326,6 @@ function ConsultCard({
             </TouchableOpacity>
           )}
 
-          {/* Message */}
-          <TouchableOpacity
-            onPress={() => router.push(
-              b.conversation_id
-                ? (`/messages?convId=${b.conversation_id}` as any)
-                : ('/messages/index' as any)
-            )}
-            style={{
-              borderWidth: 1, borderColor: C.border,
-              backgroundColor: C.surface, paddingHorizontal: 14,
-              paddingVertical: 10, borderRadius: 10,
-              flexDirection: 'row', alignItems: 'center', gap: 6,
-            }}
-          >
-            <Text style={{ color: C.text, fontWeight: '600', fontSize: 13 }}>💬 رسالة</Text>
-          </TouchableOpacity>
-
           {/* Download Receipt (completed + paid) */}
           {!isLawyer && status === 'completed' && isPaid && (
             <TouchableOpacity
@@ -433,6 +416,18 @@ function ConsultCard({
             </TouchableOpacity>
           )}
         </View>
+
+        {/* ── Message link — demoted to secondary text link ── */}
+        <TouchableOpacity
+          onPress={() => router.push(
+            b.conversation_id
+              ? (`/messages?convId=${b.conversation_id}` as any)
+              : ('/messages/index' as any)
+          )}
+          style={{ marginTop: 10, alignSelf: 'flex-end', paddingVertical: 4, paddingHorizontal: 2 }}
+        >
+          <Text style={{ color: C.muted, fontSize: 12, textDecorationLine: 'underline' }}>💬 راسل المحامي</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -597,8 +592,9 @@ export default function MyConsultationsScreen() {
               key={key}
               onPress={() => setFilter(key)}
               style={{
-                paddingHorizontal: 16, paddingVertical: 8,
+                paddingHorizontal: 14, paddingVertical: 8,
                 borderRadius: 20, borderWidth: 1,
+                minWidth: 70,
                 borderColor: filter === key ? C.gold : C.border,
                 backgroundColor: filter === key ? C.gold : 'transparent',
               }}
@@ -606,6 +602,7 @@ export default function MyConsultationsScreen() {
               <Text style={{
                 color: filter === key ? '#fff' : C.text,
                 fontSize: 12, fontWeight: filter === key ? '700' : '400',
+                textAlign: 'center',
               }}>
                 {label}
               </Text>
