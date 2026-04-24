@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   RefreshControl, Alert, ScrollView,
-  ActivityIndicator, Image,
+  ActivityIndicator, Image, Linking,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
@@ -166,6 +166,9 @@ function ConsultCard({
     catch { return false; }
   })();
 
+  const isChatService = (b.service_type || '').toLowerCase() === 'chat';
+  const isMessagingActive = isChatService;
+
   return (
     <View style={{
       backgroundColor: C.card,
@@ -256,6 +259,32 @@ function ConsultCard({
             #{String(b.id).slice(-6).toUpperCase()}
           </Text>
         </View>
+
+        {/* ── Location Row (For In-Person Only) ── */}
+        {(b.service_type || '').toLowerCase() === 'inperson' && (
+          <View style={{
+            flexDirection: 'row', alignItems: 'center', gap: 10,
+            marginBottom: 14, padding: 12, borderRadius: 12,
+            backgroundColor: C.card2, borderWidth: 1, borderColor: C.border
+          }}>
+            <Text style={{ fontSize: 24 }}>📍</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.text, fontWeight: '700', fontSize: 13 }}>
+                {b.lawyer_office || b.lawyer_city || 'عنوان المكتب غير متوفر'}
+              </Text>
+              {(b.lawyer_office || b.lawyer_city) && (
+                <TouchableOpacity
+                  onPress={() => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(b.lawyer_office || b.lawyer_city)}`)}
+                  style={{ marginTop: 4 }}
+                >
+                  <Text style={{ color: C.gold, fontSize: 12, textDecorationLine: 'underline' }}>
+                    🗺️ فتح في الخرائط
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
 
         {/* ── Action Buttons ── */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -426,17 +455,21 @@ function ConsultCard({
           )}
         </View>
 
-        {/* ── Message link — demoted to secondary text link ── */}
-        <TouchableOpacity
-          onPress={() => router.push(
-            b.conversation_id
-              ? (`/messages?convId=${b.conversation_id}` as any)
-              : ('/messages/index' as any)
-          )}
-          style={{ marginTop: 10, alignSelf: 'flex-end', paddingVertical: 4, paddingHorizontal: 2 }}
-        >
-          <Text style={{ color: C.muted, fontSize: 12, textDecorationLine: 'underline' }}>💬 راسل المحامي</Text>
-        </TouchableOpacity>
+        {/* ── Message link — conditional based on service type & time ── */}
+        {isMessagingActive && (
+          <TouchableOpacity
+            onPress={() => router.push(
+              b.conversation_id
+                ? (`/messages?convId=${b.conversation_id}` as any)
+                : (`/messages/index?newChatWith=${isLawyer ? b.client_id : lawyerId}&bookingRef=${b.id}` as any)
+            )}
+            style={{ marginTop: 10, alignSelf: 'flex-end', paddingVertical: 4, paddingHorizontal: 2 }}
+          >
+            <Text style={{ color: C.muted, fontSize: 12, textDecorationLine: 'underline' }}>
+              {isLawyer ? '💬 راسل العميل' : '💬 راسل المحامي'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

@@ -189,6 +189,8 @@ if (process.env.NODE_ENV !== 'test') {
 
   // Bookings
   db.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS documents JSONB DEFAULT \'[]\'').catch(() => {});
+  // Drop the strict type constraint so we can use INPERSON and DOCUMENT
+  db.query('ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_type_check').catch(() => {});
 
   // Notifications: add link and data columns if missing
   db.query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link TEXT DEFAULT \'#\'').catch(() => {});
