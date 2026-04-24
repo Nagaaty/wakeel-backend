@@ -6,7 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, user_id, type, title, body, link, is_read, created_at
+      `SELECT id, user_id, type, title, body, link, data, is_read, created_at
        FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 60`,
       [req.user.id]
     );

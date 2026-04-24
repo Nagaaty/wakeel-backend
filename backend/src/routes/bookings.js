@@ -107,8 +107,8 @@ router.get('/', requireAuth, async (req, res, next) => {
         TO_CHAR(b.scheduled_at, 'YYYY-MM-DD') AS booking_date,
         TO_CHAR(b.scheduled_at, 'HH24:MI') AS start_time,
         LOWER(b.type) AS service_type,
-        cu.name AS client_name, cu.email AS client_email, cu.phone AS client_phone,
-        lu.name AS lawyer_name, lu.email AS lawyer_email,
+        cu.name AS client_name, cu.email AS client_email, cu.phone AS client_phone, cu.avatar_url AS client_avatar_url,
+        lu.name AS lawyer_name, lu.email AS lawyer_email, lu.avatar_url AS lawyer_avatar_url,
         lp.specialization, lp.avg_rating, lp.is_verified,
         lp.user_id AS lawyer_profile_id,
         lu.id AS lawyer_user_id
