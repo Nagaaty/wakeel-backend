@@ -2,12 +2,12 @@ const router = require('express').Router();
 const pool   = require('../config/db');
 
 // Diagnostic Ping to verify deployment
-router.get('/ping-deploy', (req, res) => res.json({ deploy_version: 'service-pricing-flow-v2' }));
+router.get('/ping-deploy', (req, res) => res.json({ deploy_version: 'four-types-office-coords-v3' }));
 
 const { requireAuth, requireRole } = require('../middleware/auth');
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const VALID_SERVICE_TYPES = ['video', 'text', 'phone', 'inperson', 'document'];
+const VALID_SERVICE_TYPES = ['video', 'text', 'inperson', 'document'];
 function sanitizeServiceTypes(arr) {
   if (!Array.isArray(arr)) return [];
   return [...new Set(arr.filter(t => typeof t === 'string' && VALID_SERVICE_TYPES.includes(t)))];
@@ -116,14 +116,15 @@ router.get('/:id', async (req, res, next) => {
     );
     if (!lawyer) return res.status(404).json({ message: 'Lawyer not found' });
 
-    // Normalize service_prices: handle JSONB stored as string AND legacy 'voice'→'phone'
+    // Normalize service_prices: handle JSONB stored as string AND drop legacy
+    // 'voice' / 'phone' keys (no longer supported as of migration 004).
     if (lawyer.service_prices) {
       let sp = lawyer.service_prices;
       if (typeof sp === 'string') {
         try { sp = JSON.parse(sp); } catch { sp = {}; }
       }
-      if (sp.voice && !sp.phone) sp.phone = sp.voice;
       delete sp.voice;
+      delete sp.phone;
       lawyer.service_prices = sp;
     }
 
@@ -171,7 +172,7 @@ router.get('/:id/availability', async (req, res, next) => {
       CREATE TABLE IF NOT EXISTS lawyer_service_defaults (
         lawyer_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         day_of_week   SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
-        service_types JSONB NOT NULL DEFAULT '["video","text","phone","inperson","document"]'::jsonb,
+        service_types JSONB NOT NULL DEFAULT '["video","text","inperson","document"]'::jsonb,
         updated_at    TIMESTAMPTZ DEFAULT NOW(),
         PRIMARY KEY (lawyer_id, day_of_week)
       )
@@ -205,7 +206,7 @@ router.get('/:id/availability', async (req, res, next) => {
     const bookedTimes = new Set(booked.map(b => b.start_time?.slice(0,5)));
 
     // ─── Resolve enabled service types for this date ─────────────────────────
-    let enabledServices = ['video','text','phone','inperson','document'];
+    let enabledServices = ['video','text','inperson','document'];
     try {
       const { rows: [resolved] } = await pool.query(
         `SELECT resolve_lawyer_services($1, $2::date) AS services`,
@@ -230,15 +231,15 @@ router.get('/:id/availability', async (req, res, next) => {
       let sp = pr?.service_prices;
       if (typeof sp === 'string') { try { sp = JSON.parse(sp); } catch { sp = null; } }
       if (sp && typeof sp === 'object') {
-        // Migrate legacy 'voice' → 'phone'
-        if (sp.voice && !sp.phone) sp.phone = sp.voice;
+        // Drop legacy 'voice' and 'phone' keys (deprecated in migration 004)
         delete sp.voice;
+        delete sp.phone;
         servicePrices = sp;
       }
       // Fill in any missing types from consultation_fee × multiplier
       const base = Number(pr?.consultation_fee) || 400;
-      const FALLBACK_MUL = { text: 0.5, phone: 1, video: 1.5, inperson: 2, document: 0.8 };
-      for (const t of ['text','phone','video','inperson','document']) {
+      const FALLBACK_MUL = { text: 0.5, video: 1.5, inperson: 2, document: 0.8 };
+      for (const t of ['text','video','inperson','document']) {
         if (!servicePrices[t]) servicePrices[t] = Math.round(base * FALLBACK_MUL[t]);
       }
     } catch (e) {
@@ -316,22 +317,63 @@ router.get('/me/profile', requireAuth, async (req, res, next) => {
 // POST /api/lawyers/me/profile — save profile
 router.post('/me/profile', requireAuth, async (req, res, next) => {
   try {
-    const { specialization, city, consultation_fee, experience_years, bio, bar_number, service_prices } = req.body;
+    // Defensive: ensure new office_lat/lng columns exist on first run
+    await pool.query(`
+      ALTER TABLE lawyer_profiles
+      ADD COLUMN IF NOT EXISTS office_lat NUMERIC(10, 7),
+      ADD COLUMN IF NOT EXISTS office_lng NUMERIC(10, 7)
+    `).catch(() => {});
+
+    const {
+      specialization, city, consultation_fee, experience_years, bio, bar_number,
+      service_prices,
+      // NEW: office address + coordinates for the map preview
+      office, office_lat, office_lng,
+    } = req.body;
+
+    // Sanitize service_prices: only allow the 4 supported types
+    let cleanPrices = null;
+    if (service_prices && typeof service_prices === 'object') {
+      cleanPrices = {};
+      for (const t of ['video','text','inperson','document']) {
+        const v = Number(service_prices[t]);
+        if (Number.isFinite(v) && v >= 0) cleanPrices[t] = Math.round(v);
+      }
+    }
+
     const { rows: [profile] } = await pool.query(
-      `INSERT INTO lawyer_profiles (user_id, specialization, city, consultation_fee, experience_years, bio, bar_number, service_prices, is_visible)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true)
+      `INSERT INTO lawyer_profiles (
+         user_id, specialization, city, consultation_fee, experience_years,
+         bio, bar_number, service_prices, office, office_lat, office_lng,
+         is_visible
+       )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true)
        ON CONFLICT (user_id) DO UPDATE SET
-         specialization   = EXCLUDED.specialization,
-         city             = EXCLUDED.city,
-         consultation_fee = EXCLUDED.consultation_fee,
-         experience_years = EXCLUDED.experience_years,
-         bio              = EXCLUDED.bio,
-         bar_number       = EXCLUDED.bar_number,
-         service_prices   = COALESCE(EXCLUDED.service_prices, lawyer_profiles.service_prices),
+         specialization   = COALESCE(EXCLUDED.specialization,   lawyer_profiles.specialization),
+         city             = COALESCE(EXCLUDED.city,             lawyer_profiles.city),
+         consultation_fee = COALESCE(EXCLUDED.consultation_fee, lawyer_profiles.consultation_fee),
+         experience_years = COALESCE(EXCLUDED.experience_years, lawyer_profiles.experience_years),
+         bio              = COALESCE(EXCLUDED.bio,              lawyer_profiles.bio),
+         bar_number       = COALESCE(EXCLUDED.bar_number,       lawyer_profiles.bar_number),
+         service_prices   = COALESCE(EXCLUDED.service_prices,   lawyer_profiles.service_prices),
+         office           = COALESCE(EXCLUDED.office,           lawyer_profiles.office),
+         office_lat       = COALESCE(EXCLUDED.office_lat,       lawyer_profiles.office_lat),
+         office_lng       = COALESCE(EXCLUDED.office_lng,       lawyer_profiles.office_lng),
          is_visible       = true
        RETURNING *`,
-      [req.user.id, specialization, city, consultation_fee, experience_years, bio, bar_number,
-       service_prices ? JSON.stringify(service_prices) : null]
+      [
+        req.user.id,
+        specialization || null,
+        city || null,
+        consultation_fee !== undefined ? consultation_fee : null,
+        experience_years !== undefined ? experience_years : null,
+        bio || null,
+        bar_number || null,
+        cleanPrices ? JSON.stringify(cleanPrices) : null,
+        office || null,
+        (office_lat !== undefined && office_lat !== null) ? Number(office_lat) : null,
+        (office_lng !== undefined && office_lng !== null) ? Number(office_lng) : null,
+      ]
     );
     res.json(profile);
   } catch (err) { next(err); }
@@ -518,7 +560,7 @@ router.get('/me/service-availability', requireAuth, async (req, res, next) => {
       CREATE TABLE IF NOT EXISTS lawyer_service_defaults (
         lawyer_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         day_of_week   SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
-        service_types JSONB NOT NULL DEFAULT '["video","text","phone","inperson","document"]'::jsonb,
+        service_types JSONB NOT NULL DEFAULT '["video","text","inperson","document"]'::jsonb,
         updated_at    TIMESTAMPTZ DEFAULT NOW(),
         PRIMARY KEY (lawyer_id, day_of_week)
       )
@@ -567,7 +609,7 @@ router.post('/me/service-availability', requireAuth, async (req, res, next) => {
       CREATE TABLE IF NOT EXISTS lawyer_service_defaults (
         lawyer_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         day_of_week   SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
-        service_types JSONB NOT NULL DEFAULT '["video","text","phone","inperson","document"]'::jsonb,
+        service_types JSONB NOT NULL DEFAULT '["video","text","inperson","document"]'::jsonb,
         updated_at    TIMESTAMPTZ DEFAULT NOW(),
         PRIMARY KEY (lawyer_id, day_of_week)
       )
