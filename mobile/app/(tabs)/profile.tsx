@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  RefreshControl, Alert, Platform, FlatList, Switch, Animated, ActivityIndicator,
+  RefreshControl, Alert, Platform, FlatList, Switch, Animated, ActivityIndicator, Modal, I18nManager,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme, toggleTheme, isDark } from '../../src/theme';
@@ -12,7 +12,7 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { Avatar, Tag, Btn, Section, Card, Spinner } from '../../src/components/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../../src/i18n';
-import { forumAPI } from '../../src/services/api';
+import { forumAPI, bookingsAPI, favoritesAPI } from '../../src/services/api';
 
 // ─── Demo data ────────────────────────────────────────────────────────────────
 const DEMO_CASES: any[] = [
@@ -258,19 +258,23 @@ export default function ProfileTab() {
   const { user, isLawyer, isAdmin, logout, initials } = useAuth();
   const insets = useSafeAreaInsets();
 
-  const [tab, setTab]                     = useState<'cases' | 'messages' | 'payments' | 'saved'>('cases');
-  const [cases, setCases]                 = useState(DEMO_CASES);
-  const [expandedCase, setExpandedCase]   = useState<number | null>(null);
-  const [caseSubTab, setCaseSubTab]       = useState<Record<number, 'timeline' | 'checklist' | 'expenses'>>({});
-  const [cancelConfirm, setCancelConfirm] = useState<number | null>(null);
-  const [refreshing, setRefreshing]       = useState(false);
-  const [savedPosts, setSavedPosts]       = useState<any[]>([]);
-  const [savedLoading, setSavedLoading]   = useState(false);
-  const [savedLoaded, setSavedLoaded]     = useState(false);
+  const [refreshing, setRefreshing]         = useState(false);
 
-  const serif     = { fontFamily: 'Cairo-Bold' };
-  const activeCount = cases.filter(c => c.status === 'Active').length;
-  const totalSpent  = DEMO_PAYMENTS.reduce((a, p) => a + p.amount, 0);
+  const [savedPosts, setSavedPosts]         = useState<any[]>([]);
+  const [savedLoaded, setSavedLoaded]       = useState(false);
+
+  const [myPosts, setMyPosts]               = useState<any[]>([]);
+  const [myPostsLoading, setMyPostsLoading] = useState(false);
+  const [myPostsLoaded, setMyPostsLoaded]   = useState(false);
+
+  const [upcomingBooking, setUpcomingBooking] = useState<any>(null);
+  const [consultCount, setConsultCount]       = useState(0);
+  const [favLawyers, setFavLawyers]           = useState<any[]>([]);
+
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+
+  const serif = { fontFamily: 'Cairo-Bold' };
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -281,22 +285,50 @@ export default function ProfileTab() {
 
   const loadSavedPosts = useCallback(async () => {
     if (savedLoaded) return;
-    setSavedLoading(true);
     try {
       const res: any = await forumAPI.getSavedPosts();
       setSavedPosts(res?.questions || []);
       setSavedLoaded(true);
-    } catch {
-      setSavedPosts([]);
-    } finally {
-      setSavedLoading(false);
-    }
+    } catch { setSavedPosts([]); }
   }, [savedLoaded]);
 
-  // Load saved posts when tab is switched to 'saved'
+  const loadMyPosts = useCallback(async () => {
+    if (myPostsLoaded || !user?.id) return;
+    setMyPostsLoading(true);
+    try {
+      const res: any = await forumAPI.getUserPosts(user.id);
+      setMyPosts(res?.questions || []);
+      setMyPostsLoaded(true);
+    } catch { setMyPosts([]); }
+    finally { setMyPostsLoading(false); }
+  }, [myPostsLoaded, user?.id]);
+
+  const loadBookings = useCallback(async () => {
+    try {
+      const res: any = await bookingsAPI.list();
+      const all: any[] = res?.bookings || res || [];
+      setConsultCount(all.length);
+      const now = Date.now();
+      const upcoming = all
+        .filter((b: any) => ['confirmed','pending'].includes(b.status) && new Date(b.scheduled_at || b.date).getTime() > now)
+        .sort((a: any, b: any) => new Date(a.scheduled_at || a.date).getTime() - new Date(b.scheduled_at || b.date).getTime());
+      setUpcomingBooking(upcoming[0] || null);
+    } catch { setUpcomingBooking(null); }
+  }, []);
+
+  const loadFavLawyers = useCallback(async () => {
+    try {
+      const res: any = await favoritesAPI.list();
+      setFavLawyers(res?.favorites || res || []);
+    } catch { setFavLawyers([]); }
+  }, []);
+
   useEffect(() => {
-    if (tab === 'saved') loadSavedPosts();
-  }, [tab, loadSavedPosts]);
+    loadSavedPosts();
+    loadMyPosts();
+    loadBookings();
+    loadFavLawyers();
+  }, [loadSavedPosts, loadMyPosts, loadBookings, loadFavLawyers]);
 
   const handleUnsave = async (id: number) => {
     setSavedPosts(prev => prev.filter(p => p.id !== id));
@@ -305,7 +337,9 @@ export default function ProfileTab() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await new Promise(r => setTimeout(r, 800));
+    setSavedLoaded(false);
+    setMyPostsLoaded(false);
+    await Promise.all([loadBookings(), loadFavLawyers()]);
     setRefreshing(false);
   };
 
@@ -338,340 +372,305 @@ export default function ProfileTab() {
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── HERO COVER ── */}
+        {/* ── HERO COVER + AVATAR (Facebook style) ── */}
         <View>
-          {/* Gold gradient cover band */}
-          <View style={{ height: 140, backgroundColor: C.gold, overflow: 'hidden' }}>
+          <View style={{ height: 150, backgroundColor: C.gold, overflow: 'hidden' }}>
             {user?.cover_url ? (
-               <Image source={{ uri: user.cover_url }} style={{ width: '100%', height: '100%', position: 'absolute' }} />
+              <Image source={{ uri: user.cover_url }} style={{ width: '100%', height: '100%', position: 'absolute' }} />
             ) : (
               <>
-                <View style={{ position: 'absolute', right: -40, top: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: '#fff', opacity: 0.06 }} />
-                <View style={{ position: 'absolute', right: 40, top: -20, width: 100, height: 100, borderRadius: 50, backgroundColor: '#fff', opacity: 0.05 }} />
-                <View style={{ position: 'absolute', left: -30, bottom: -30, width: 120, height: 120, borderRadius: 60, backgroundColor: '#000', opacity: 0.08 }} />
+                <View style={{ position: 'absolute', right: -40, top: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: '#fff', opacity: 0.07 }} />
+                <View style={{ position: 'absolute', right: 60, top: -10, width: 120, height: 120, borderRadius: 60, backgroundColor: '#fff', opacity: 0.05 }} />
+                <View style={{ position: 'absolute', left: -20, bottom: -30, width: 140, height: 140, borderRadius: 70, backgroundColor: '#000', opacity: 0.07 }} />
               </>
             )}
-            {/* Top-right action buttons */}
-            <View style={{ position: 'absolute', top: insets.top + 12, right: 16, flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity
-                onPress={() => Share.share({ title: `${user?.name || 'وكيل'} على تطبيق وكيل`, message: `🏛️ تواصل مع ${user?.name || 'مستخدم وكيل'} عبر منصة وكيل للمحامين المعتمدين في مصر.\nhttps://wakeel-api.onrender.com` })}
-                style={{ backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 5 }}
-              >
-                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>📤 Share</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => router.push('/edit-profile' as any)}
-                style={{ backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 5 }}
-              >
-                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>✏️ Edit</Text>
+            <View style={{ position: 'absolute', top: insets.top + 12, right: 16 }}>
+              <TouchableOpacity onPress={() => setSettingsVisible(true)}
+                style={{ backgroundColor: 'rgba(0,0,0,0.35)', width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 18 }}>⚙️</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Avatar overlapping cover */}
-          <View style={{ position: 'absolute', bottom: -44, left: 20 }}>
+          {/* Avatar — physical left, Facebook style */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => {
+              const uri = user?.avatar_url || user?.avatar;
+              if (uri) setAvatarModalVisible(true);
+              else router.push('/edit-profile' as any);
+            }}
+            style={{
+              position: 'absolute',
+              bottom: -44,
+              right: isRTL ? 16 : undefined,
+              left: isRTL ? undefined : 16,
+            }}>
             {user?.avatar_url || user?.avatar ? (
-              <Image source={{ uri: user.avatar_url || user.avatar }} style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: C.bg }} />
+              <Image source={{ uri: user.avatar_url || user.avatar }}
+                style={{ width: 90, height: 90, borderRadius: 45, borderWidth: 4, borderColor: C.bg }} />
             ) : (
-              <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: C.gold + '30', borderWidth: 4, borderColor: C.bg, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 }}>
-                <Text style={{ fontSize: 30, fontWeight: '800', color: C.gold, fontFamily: 'Cairo-Bold' }}>
-                  {initials || 'CL'}
-                </Text>
+              <View style={{ width: 90, height: 90, borderRadius: 45, backgroundColor: C.gold, borderWidth: 4, borderColor: C.bg, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#000', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10 }}>
+                <Text style={{ fontSize: 30, fontWeight: '800', color: '#fff', fontFamily: 'Cairo-Bold' }}>{initials || 'CL'}</Text>
               </View>
             )}
-          </View>
+          </TouchableOpacity>
         </View>
 
-        {/* ── NAME + SUBTITLE ── */}
-        <View style={{ paddingTop: 56, paddingHorizontal: 20, paddingBottom: 20, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
-          <Text style={{ ...serif, color: C.text, fontSize: 24, fontWeight: '800' }}>{user?.name || 'مستخدم وكيل'}</Text>
-          <Text style={{ color: C.muted, fontSize: 13, marginTop: 3 }}>
-            {isRTL ? 'عميل مسجل · منصة وكيل للمحامين' : 'Registered Client · Wakeel Legal Platform'}
-          </Text>
-
-          {/* ── STAT CHIPS ── */}
-          <View style={{ flexDirection: 'row', marginTop: 24, paddingTop: 20, borderTopWidth: 1, borderTopColor: C.border }}>
-            <StatChip value={cases.length}     label={isRTL ? 'القضايا' : 'Cases'}         color={C.gold}    icon="📋" delay={0}   />
-            <View style={{ width: 1, backgroundColor: C.border, marginHorizontal: 4 }} />
-            <StatChip value={activeCount}      label={isRTL ? 'نشطة' : 'Active'}           color={C.green}   icon="⚡" delay={80}  />
-            <View style={{ width: 1, backgroundColor: C.border, marginHorizontal: 4 }} />
-            <StatChip value={`${totalSpent}₩`} label={isRTL ? 'المدفوعات' : 'Spent (EGP)'} color={C.accent}  icon="💳" delay={160} />
+        {/* ── IDENTITY CARD ── */}
+        <View style={{ paddingTop: 56, paddingHorizontal: 20, paddingBottom: 18, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
+          {/* direction:'ltr' wrapper forces physical-left layout regardless of RTL */}
+          <View style={{ direction: 'ltr' } as any}>
+            <Text style={{ color: C.text, fontSize: 22, fontWeight: '800', fontFamily: 'Cairo-Bold', letterSpacing: -0.3 }}>{user?.name || 'مستخدم وكيل'}</Text>
           </View>
-        </View>
 
-        {/* ── PILL TABS ── */}
-        <View style={{ flexDirection: 'row', gap: 6, marginHorizontal: 16, marginTop: 16, flexWrap: 'wrap' }}>
-          {([['cases', '📋', isRTL ? 'القضايا' : 'Cases'], ['messages', '💬', isRTL ? 'الرسائل' : 'Messages'], ['payments', '💳', isRTL ? 'المدفوعات' : 'Payments'], ['saved', '🔖', isRTL ? 'المحفوظات' : 'Saved']] as const).map(([id, icon, label]) => (
-            <TouchableOpacity key={id} onPress={() => setTab(id as any)}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 24, backgroundColor: tab === id ? C.gold : C.card, borderWidth: 1, borderColor: tab === id ? C.gold : C.border }}>
-              <Text style={{ fontSize: 13 }}>{icon}</Text>
-              <Text style={{ color: tab === id ? '#fff' : C.muted, fontSize: 12, fontWeight: '700' }}>{label}</Text>
+          {/* Action pills */}
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+            <TouchableOpacity onPress={() => router.push('/edit-profile' as any)}
+              style={{ flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: C.gold, borderWidth: 1.5, borderColor: C.gold }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#000' }}>{isRTL ? 'تعديل الملف' : 'Edit Profile'}</Text>
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => { const msg = `${isRTL ? 'ملفي الشخصي على وكيل' : 'My profile on Wakeel'}: ${user?.name || ''}`; require('react-native').Share.share({ message: msg }); }}
+              style={{ flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: C.border }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: C.text }}>{isRTL ? 'مشاركة الملف' : 'Share Profile'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/saved-posts' as any)}
+              style={{ flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 1.5, borderColor: C.border }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: C.text }}>{isRTL ? 'المحفوظات' : 'Saved Posts'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── STATS BAR — numbers only, no emoji ── */}
+        <View style={{ flexDirection: 'row', backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
+          {[
+            { value: myPosts.length,    label: isRTL ? 'منشوراتي' : 'Posts' },
+            { value: consultCount,      label: isRTL ? 'استشارات' : 'Consults' },
+            { value: savedPosts.length, label: isRTL ? 'محفوظات'  : 'Saved' },
+          ].map((s, i) => (
+            <View key={i} style={{ flex: 1, alignItems: 'center', paddingVertical: 16,
+              borderRightWidth: i < 2 ? 1 : 0, borderRightColor: C.border }}>
+              <Text style={{ color: C.gold, fontSize: 22, fontWeight: '800', fontFamily: 'Cairo-Bold' }}>{s.value}</Text>
+              <Text style={{ color: C.muted, fontSize: 11, marginTop: 2, fontWeight: '500' }}>{s.label}</Text>
+            </View>
           ))}
         </View>
 
-        <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
-
-          {/* ══ CASES TAB ══ */}
-          {tab === 'cases' && (
-            <View style={{ gap: 14 }}>
-              {cases.map(c => {
-                const expanded  = expandedCase === c.id;
-                const subTab    = caseSubTab[c.id] || 'timeline';
-                const canCancel = c.nextSession ? (new Date(c.nextSession).getTime() - Date.now()) / 3_600_000 > 12 : false;
-                const isActive  = c.status === 'Active';
-                const isDone    = c.status === 'Completed';
-                return (
-                  <View key={c.id} style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 16, overflow: 'hidden' }}>
-                    {/* Status bar accent */}
-                    <View style={{ height: 4, backgroundColor: isActive ? C.green : isDone ? C.gold : C.border }} />
-                    <View style={{ padding: 20 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
-                        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                          <Avatar C={C} initials={c.lawyerInitials} size={46} />
-                          <View>
-                            <Text style={{ color: C.text, fontWeight: '700', fontSize: 15 }}>{c.type}</Text>
-                            <Text style={{ color: C.muted, fontSize: 13, marginTop: 1 }}>{c.lawyerName}</Text>
-                            <Tag C={C} color={isActive ? C.green : C.accent} style={{ marginTop: 4 }}>{c.status}</Tag>
-                          </View>
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={{ color: C.muted, fontSize: 12 }}>Started: {c.date}</Text>
-                          {c.nextSession && <Text style={{ color: C.gold, fontSize: 12, marginTop: 2 }}>Next: {c.nextSession}</Text>}
-                        </View>
-                      </View>
-                      <View style={{ backgroundColor: C.card2, borderRadius: 10, padding: 12, marginBottom: 14 }}>
-                        <Text style={{ color: C.muted, fontSize: 13, lineHeight: 19 }}>{c.notes}</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', gap: 7, flexWrap: 'wrap' }}>
-                        <Btn C={C} variant="ghost" size="sm" onPress={() => router.push(c.convId ? `/messages?convId=${c.convId}` : '/messages/index' as any)}>💬 Message</Btn>
-                        {isActive && <Btn C={C} variant="accent" size="sm" onPress={() => router.push('/video' as any)}>📹 Join Call</Btn>}
-                        {isDone && <Btn C={C} variant="ghost" size="sm">⭐ Review</Btn>}
-                        <Btn C={C} variant="dark" size="sm" onPress={() => setExpandedCase(expanded ? null : c.id)}>
-                          {expanded ? '▲ Hide' : '▼ Details'}
-                        </Btn>
-                        {isActive && c.nextSession && (() => {
-                          if (cancelConfirm === c.id) return (
-                            <View style={{ width: '100%', backgroundColor: `${C.red}08`, borderWidth: 1.5, borderColor: C.red, borderRadius: 10, padding: 14, marginTop: 4 }}>
-                              <Text style={{ color: C.red, fontWeight: '600', fontSize: 13, marginBottom: 6 }}>Cancel this booking and get a full refund?</Text>
-                              <Text style={{ color: C.muted, fontSize: 12, marginBottom: 12, lineHeight: 18 }}>Refund within 3-5 business days.</Text>
-                              <View style={{ flexDirection: 'row', gap: 8 }}>
-                                <TouchableOpacity onPress={() => { setCases(prev => prev.map(x => x.id === c.id ? { ...x, status: 'Cancelled' } : x)); setCancelConfirm(null); }}
-                                  style={{ flex: 1, backgroundColor: C.red, borderRadius: 8, padding: 10, alignItems: 'center' }}>
-                                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Yes, Cancel & Refund</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={() => setCancelConfirm(null)}
-                                  style={{ flex: 1, backgroundColor: 'transparent', borderWidth: 1, borderColor: C.border, borderRadius: 8, padding: 10, alignItems: 'center' }}>
-                                  <Text style={{ color: C.muted, fontSize: 13 }}>Keep Booking</Text>
-                                </TouchableOpacity>
-                              </View>
-                            </View>
-                          );
-                          return (
-                            <Btn C={C} variant={canCancel ? 'danger' : 'ghost'} size="sm"
-                              onPress={() => { if (!canCancel) { Alert.alert('❌', 'Cannot cancel within 12 hours.'); return; } setCancelConfirm(c.id); }}
-                              style={{ opacity: canCancel ? 1 : 0.5 }}>
-                              {canCancel ? '🔴 Cancel & Refund' : '⏱ <12h No Refund'}
-                            </Btn>
-                          );
-                        })()}
-                      </View>
-                    </View>
-                    {expanded && (
-                      <View style={{ paddingHorizontal: 20, paddingBottom: 20, borderTopWidth: 1, borderTopColor: C.border }}>
-                        <View style={{ flexDirection: 'row', gap: 3, marginTop: 16, marginBottom: 4, backgroundColor: C.bg, borderRadius: 10, padding: 3 }}>
-                          {([['timeline', '📍 Timeline'], ['checklist', '📋 Checklist'], ['expenses', '💸 Expenses']] as const).map(([id, label]) => (
-                            <TouchableOpacity key={id} onPress={() => setCaseSubTab(prev => ({ ...prev, [c.id]: id }))}
-                              style={{ flex: 1, backgroundColor: subTab === id ? C.card : 'transparent', borderWidth: 1, borderColor: subTab === id ? C.border : 'transparent', borderRadius: 8, paddingVertical: 7, alignItems: 'center' }}>
-                              <Text style={{ color: subTab === id ? C.text : C.muted, fontSize: 12, fontWeight: subTab === id ? '700' : '400' }}>{label}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                        {subTab === 'timeline'  && <CaseTimeline  caseData={c} C={C} />}
-                        {subTab === 'checklist' && <DocChecklist  caseId={c.lawyerId} C={C} />}
-                        {subTab === 'expenses'  && <ExpenseTracker C={C} />}
-                      </View>
-                    )}
+        {/* ── UPCOMING CONSULTATION ── */}
+        {upcomingBooking && (() => {
+          const d = new Date(upcomingBooking.scheduled_at || upcomingBooking.date);
+          const dateStr = d.toLocaleDateString('ar-EG', { weekday: 'long', month: 'short', day: 'numeric' });
+          const timeStr = d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+          const minsUntil = (d.getTime() - Date.now()) / 60000;
+          const lawyerInitial = (upcomingBooking.lawyer_name || 'م').charAt(0).toUpperCase();
+          return (
+            <View style={{ marginHorizontal: 16, marginTop: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 16, overflow: 'hidden' }}>
+              <View style={{ height: 3, backgroundColor: C.gold }} />
+              <View style={{ padding: 16 }}>
+                <Text style={{ color: C.muted, fontSize: 11, fontWeight: '600', letterSpacing: 0.8, marginBottom: 10 }}>
+                  {isRTL ? 'الجلسة القادمة' : 'UPCOMING SESSION'}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.gold, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: '#000', fontSize: 17, fontWeight: '800' }}>{lawyerInitial}</Text>
                   </View>
-                );
-              })}
-            </View>
-          )}
-
-          {/* ══ MESSAGES TAB ══ */}
-          {tab === 'messages' && (
-            <View style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 16, overflow: 'hidden' }}>
-              {DEMO_MESSAGES.map((m: { lawyerId: number; lawyerName: string; lawyerInitials: string; lastMsg: string; time: string; unread: number; convId?: string }) => (
-                <TouchableOpacity key={m.lawyerId} onPress={() => router.push(m.convId ? `/messages?convId=${m.convId}` : '/messages/index' as any)}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                  <Avatar C={C} initials={m.lawyerInitials} size={44} />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
-                      <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>{m.lawyerName}</Text>
-                      <Text style={{ color: C.muted, fontSize: 11 }}>{m.time}</Text>
-                    </View>
-                    <Text style={{ color: C.muted, fontSize: 12 }} numberOfLines={1}>{m.lastMsg}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: C.text, fontWeight: '700', fontSize: 15 }}>{upcomingBooking.lawyer_name || (isRTL ? 'المحامي' : 'Lawyer')}</Text>
+                    <Text style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{dateStr}  ·  {timeStr}</Text>
                   </View>
-                  {m.unread > 0 && (
-                    <View style={{ backgroundColor: C.gold, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 }}>
-                      <Text style={{ color: '#000', fontSize: 11, fontWeight: '700' }}>{m.unread}</Text>
-                    </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+                  {minsUntil < 30 && (
+                    <TouchableOpacity onPress={() => router.push('/video' as any)}
+                      style={{ flex: 1, backgroundColor: C.gold, borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}>
+                      <Text style={{ color: '#000', fontWeight: '800', fontSize: 13 }}>{isRTL ? 'انضم للجلسة' : 'Join Session'}</Text>
+                    </TouchableOpacity>
                   )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {/* ══ PAYMENTS TAB ══ */}
-          {tab === 'payments' && (
-            <View style={{ gap: 10 }}>
-              {DEMO_PAYMENTS.map(p => (
-                <View key={p.id} style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 16 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
-                    <View>
-                      <Text style={{ color: C.text, fontWeight: '700', fontSize: 15 }}>{p.lawyer}</Text>
-                      <Text style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{p.date} • {p.method}</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                      <Text style={{ ...serif, color: C.gold, fontWeight: '700', fontSize: 20 }}>{p.amount} EGP</Text>
-                      <Tag C={C} color={C.green}>✓ {p.status}</Tag>
-                    </View>
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                    <Btn C={C} variant="ghost" size="sm" style={{ flex: 1 }}>🖨️ Receipt</Btn>
-                    <Btn C={C} variant="danger" size="sm" style={{ flex: 1 }}>💸 Refund</Btn>
-                  </View>
-                </View>
-              ))}
-              <View style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ color: C.muted, fontSize: 14 }}>Total Spent</Text>
-                <Text style={{ ...serif, color: C.gold, fontWeight: '700', fontSize: 20 }}>{totalSpent} EGP</Text>
-              </View>
-            </View>
-          )}
-
-          {/* ══ SAVED TAB ══ */}
-          {tab === 'saved' && (
-            <View style={{ gap: 10 }}>
-              {savedLoading ? (
-                <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                  <ActivityIndicator color={C.gold} size="large" />
-                  <Text style={{ color: C.muted, marginTop: 10, fontSize: 13 }}>جاري تحميل المحفوظات…</Text>
-                </View>
-              ) : savedPosts.length === 0 ? (
-                <View style={{ alignItems: 'center', paddingVertical: 48, gap: 10 }}>
-                  <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: C.gold + '15', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.gold + '30' }}>
-                    <Text style={{ fontSize: 36 }}>🔖</Text>
-                  </View>
-                  <Text style={{ color: C.text, fontWeight: '700', fontSize: 16 }}>لا توجد منشورات محفوظة</Text>
-                  <Text style={{ color: C.muted, fontSize: 13, textAlign: 'center' }}>احفظ المقالات المفيدة من منتدى وكيل للرجوع إليها لاحقاً</Text>
-                  <TouchableOpacity
-                    onPress={() => router.push('/(tabs)/forum' as any)}
-                    style={{ backgroundColor: C.gold, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 10 }}>
-                    <Text style={{ color: '#000', fontWeight: '800', fontSize: 14 }}>تصفح المنتدى</Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/consults' as any)}
+                    style={{ flex: 1, borderWidth: 1.5, borderColor: C.gold, borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}>
+                    <Text style={{ color: C.gold, fontWeight: '700', fontSize: 13 }}>{isRTL ? 'عرض التفاصيل' : 'View Details'}</Text>
                   </TouchableOpacity>
                 </View>
-              ) : (
-                savedPosts.map((p: any) => (
-                  <TouchableOpacity
-                    key={p.id}
-                    activeOpacity={0.88}
-                    onPress={() => router.push({ pathname: '/post/[id]', params: { id: p.id } } as any)}
-                    style={{ backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14, borderLeftWidth: 3, borderLeftColor: C.gold }}
-                  >
-                    {/* Author row */}
-                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.gold + '20', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.gold + '40' }}>
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: C.gold }}>{(p.asked_by || 'م').charAt(0)}</Text>
-                      </View>
-                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: C.text }}>{p.asked_by || 'مستخدم'}</Text>
-                          {p.user_flair && (
-                            <View style={{ backgroundColor: C.gold + '20', borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1 }}>
-                              <Text style={{ color: C.gold, fontSize: 9, fontWeight: '700' }}>{p.user_flair}</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={{ fontSize: 10, color: C.muted }}>{p.category}</Text>
-                      </View>
-                    </View>
-                    {/* Post text */}
-                    <Text style={{ color: C.text, fontSize: 13, lineHeight: 19, textAlign: 'right' }} numberOfLines={3}>{p.question}</Text>
-                    {/* Footer */}
-                    <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.border }}>
-                      <View style={{ flexDirection: 'row-reverse', gap: 10 }}>
-                        {(p.likes_count || 0) > 0 && <Text style={{ fontSize: 11, color: C.muted }}>👍 {p.likes_count}</Text>}
-                        {(p.answer_count || 0) > 0 && <Text style={{ fontSize: 11, color: C.muted }}>💬 {p.answer_count}</Text>}
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => handleUnsave(p.id)}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.gold + '15', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: C.gold + '30' }}>
-                        <Text style={{ fontSize: 12, color: C.gold }}>🔖</Text>
-                        <Text style={{ fontSize: 11, color: C.gold, fontWeight: '600' }}>حذف</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                ))
-              )}
-            </View>
-          )}
-
-          {/* ══ SETTINGS SECTION ══ */}
-          <View style={{ marginTop: 32, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 16, overflow: 'hidden' }}>
-            <TouchableOpacity onPress={() => router.push('/account-settings' as any)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <Text style={{ ...serif, color: C.text, fontSize: 16, fontWeight: '700' }}>
-                ⚙️ {isRTL ? 'الإعدادات' : 'Settings'}
-              </Text>
-              <Text style={{ color: C.muted }}>›</Text>
-            </TouchableOpacity>
-            {/* Dark mode */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <Text style={{ fontSize: 22 }}>{dark ? '🌙' : '☀️'}</Text>
-                <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>{dark ? (isRTL ? 'الوضع الداكن' : 'Dark Mode') : (isRTL ? 'الوضع الفاتح' : 'Light Mode')}</Text>
               </View>
-              <Switch value={dark} onValueChange={() => { toggleTheme(); setDark(!dark); hapticSelect(); }} trackColor={{ true: C.gold }} thumbColor="#fff" />
             </View>
-            {/* Account Settings */}
-            <TouchableOpacity onPress={() => router.push('/account-settings' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <Text style={{ fontSize: 22 }}>🛡️</Text>
-              <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{isRTL ? 'إعدادات الحساب' : 'Account Settings'}</Text>
-              <Text style={{ color: C.muted }}>›</Text>
-            </TouchableOpacity>
-            {/* Notification Settings */}
-            <TouchableOpacity onPress={() => router.push('/notification-settings' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <Text style={{ fontSize: 22 }}>🔔</Text>
-              <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{isRTL ? 'إعدادات الإشعارات' : 'Notification Settings'}</Text>
-              <Text style={{ color: C.muted }}>›</Text>
-            </TouchableOpacity>
-            {/* Edit Profile */}
-            <TouchableOpacity onPress={() => router.push('/edit-profile' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <Text style={{ fontSize: 22 }}>✏️</Text>
-              <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{isRTL ? 'تعديل الملف الشخصي' : 'Edit Profile'}</Text>
-              <Text style={{ color: C.muted }}>›</Text>
-            </TouchableOpacity>
-            {/* Referral */}
-            <TouchableOpacity onPress={() => router.push('/referral' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <Text style={{ fontSize: 22 }}>🎁</Text>
-              <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{isRTL ? 'الإحالات والمكافآت' : 'Referrals & Rewards'}</Text>
-              <Text style={{ color: C.muted }}>›</Text>
-            </TouchableOpacity>
-            {/* Support */}
-            <TouchableOpacity onPress={() => router.push('/support' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <Text style={{ fontSize: 22 }}>💬</Text>
-              <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{isRTL ? 'الدعم الفني' : 'Support'}</Text>
-              <Text style={{ color: C.muted }}>›</Text>
-            </TouchableOpacity>
-            {/* Sign out */}
-            <TouchableOpacity onPress={handleLogout} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
-              <Text style={{ fontSize: 22 }}>🚪</Text>
-              <Text style={{ color: C.red, fontSize: 14, fontWeight: '700', flex: 1 }}>{isRTL ? 'تسجيل الخروج' : 'Sign Out'}</Text>
-            </TouchableOpacity>
+          );
+        })()}
+
+        {/* ── ACTIVITY — LinkedIn style ── */}
+        <View style={{ backgroundColor: C.surface, borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.border, marginTop: 8 }}>
+
+          {/* Section header */}
+          <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <View style={{ alignItems: 'flex-end', justifyContent: 'center', height: 32 }}>
+                <Text style={{ color: C.text, fontSize: 20, fontWeight: '800', fontFamily: 'Cairo-Bold' }}>{isRTL ? 'النشاط' : 'Activity'}</Text>
+              </View>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/forum' as any)} style={{ borderWidth: 1, borderColor: C.gold, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6 }}>
+                <Text style={{ color: C.gold, fontSize: 14, fontWeight: '700' }}>{isRTL ? 'إنشاء منشور' : 'Create a post'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
+          {myPostsLoading ? (
+            <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+              <ActivityIndicator color={C.gold} size="large" />
+            </View>
+          ) : (() => {
+            // ── Smart content extraction ──────────────────────────────────────
+            const posts = myPosts
+              .map((p: any) => {
+                let origData: any = null;
+                try {
+                  origData = p.original_post_data
+                    ? (typeof p.original_post_data === 'string' ? JSON.parse(p.original_post_data) : p.original_post_data)
+                    : null;
+                } catch { origData = null; }
+
+                const isRepostStr = p.question?.includes('[إعادة نشر من') || false;
+                const isRepost = !!origData || p.question === 'مشاركة' || isRepostStr;
+
+                // Strip out all chained repost tags like "[إعادة نشر من lawyer 1]:"
+                const cleanCaption = p.question ? p.question.replace(/\[إعادة نشر من.*?\]:\s*/g, '').trim() : '';
+                
+                // If the user just typed "." or nothing, consider it empty so we show original post
+                const userCaption = (cleanCaption && cleanCaption !== '.' && cleanCaption !== 'مشاركة') ? cleanCaption : null;
+                const originalText = origData?.question ? origData.question.replace(/\[إعادة نشر من.*?\]:\s*/g, '').trim() : null;
+                
+                const displayText = userCaption || originalText;
+
+                return { ...p, _isRepost: isRepost, _userCaption: userCaption, _origData: origData, _displayText: displayText };
+              })
+              .filter((p: any) => p._displayText && p._displayText.trim().length > 0);
+
+            if (posts.length === 0) return (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <Text style={{ color: C.muted, fontSize: 14, textAlign: 'center' }}>
+                  {isRTL ? 'لا يوجد نشاط بعد · اطرح سؤالاً في المنتدى' : 'No activity yet · Ask a question in the forum'}
+                </Text>
+                <TouchableOpacity onPress={() => router.push('/(tabs)/forum' as any)}
+                  style={{ marginTop: 14, backgroundColor: C.gold, borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 }}>
+                  <Text style={{ color: '#000', fontWeight: '800', fontSize: 13 }}>{isRTL ? 'انتقل للمنتدى' : 'Go to Forum'}</Text>
+                </TouchableOpacity>
+              </View>
+            );
+
+            return (
+              <>
+                {posts.slice(0, 3).map((p: any, idx: number) => {
+                  const diff = Date.now() - new Date(p.created_at).getTime();
+                  const days = Math.floor(diff / 86400000);
+                  const hours = Math.floor(diff / 3600000);
+                  const mins = Math.floor(diff / 60000);
+                  let ago = '';
+                  if (days > 30) ago = Math.floor(days / 30) + (isRTL ? 'ش' : 'mo');
+                  else if (days > 0) ago = days + (isRTL ? 'ي' : 'd');
+                  else if (hours > 0) ago = hours + (isRTL ? 'س' : 'h');
+                  else ago = mins + (isRTL ? 'د' : 'm');
+
+                  const actionText = p._isRepost
+                    ? (isRTL ? 'أعاد نشر هذا' : 'reposted this')
+                    : (isRTL ? 'نشر هذا' : 'posted this');
+
+                  return (
+                    <TouchableOpacity key={p.id} activeOpacity={0.7}
+                      onPress={() => router.push({ pathname: '/post/[id]', params: { id: p.id } } as any)}
+                      style={{ paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: idx === 0 ? 0 : 1, borderTopColor: C.border }}>
+
+                      {/* Action label + timestamp — LinkedIn style */}
+                      <View style={{ flexDirection: 'row-reverse', justifyContent: 'flex-start', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                        <Text style={{ color: C.text, fontSize: 14, fontWeight: '700' }}>
+                          {user?.name || ''} <Text style={{ color: C.muted, fontWeight: 'normal', fontSize: 13 }}>{actionText} • {ago}</Text>
+                        </Text>
+                      </View>
+
+                      {/* Content preview — clean text */}
+                      <Text style={{ color: C.text, fontSize: 15, lineHeight: 22, textAlign: 'right', fontFamily: 'Cairo-Regular' }} numberOfLines={3}>
+                        {p._displayText}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+
+                {/* Show all button — LinkedIn "Show all →" */}
+                <TouchableOpacity
+                  onPress={() => router.push('/all-activity' as any)}
+                  style={{ borderTopWidth: 1, borderTopColor: C.border, paddingVertical: 14, alignItems: 'center' }}>
+                  <Text style={{ color: C.text, fontSize: 15, fontWeight: '700' }}>
+                    {isRTL ? 'عرض الكل ←' : 'Show all →'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            );
+          })()}
+
         </View>
+
       </ScrollView>
+
+
+      {/* ══ AVATAR FULLSCREEN MODAL ══ */}
+      <Modal visible={avatarModalVisible} transparent animationType="fade" onRequestClose={() => setAvatarModalVisible(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' }}
+          activeOpacity={1} onPress={() => setAvatarModalVisible(false)}>
+          {(user?.avatar_url || user?.avatar) && (
+            <Image
+              source={{ uri: user.avatar_url || user.avatar }}
+              style={{ width: 300, height: 300, borderRadius: 150 }}
+              resizeMode="cover"
+            />
+          )}
+          <Text style={{ color: '#fff', marginTop: 24, fontSize: 13, opacity: 0.6 }}>
+            {isRTL ? 'اضغط في أي مكان للإغلاق' : 'Tap anywhere to close'}
+          </Text>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ══ SETTINGS MODAL ══ */}
+      <Modal visible={settingsVisible} animationType="slide" transparent={true} onRequestClose={() => setSettingsVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: insets.bottom + 20 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ ...serif, color: C.text, fontSize: 20, fontWeight: '800' }}>{isRTL ? 'الإعدادات' : 'Settings'}</Text>
+              <TouchableOpacity onPress={() => setSettingsVisible(false)} style={{ backgroundColor: C.card, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: C.text, fontSize: 20, fontWeight: '800' }}>×</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 16, overflow: 'hidden' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Text style={{ fontSize: 20 }}>{dark ? '🌙' : '☀️'}</Text>
+                  <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>{dark ? (isRTL ? 'الوضع الداكن' : 'Dark Mode') : (isRTL ? 'الوضع الفاتح' : 'Light Mode')}</Text>
+                </View>
+                <Switch value={dark} onValueChange={() => { toggleTheme(); setDark(!dark); hapticSelect(); }} trackColor={{ true: C.gold }} thumbColor="#fff" />
+              </View>
+              {[
+                { icon: '🛡️', label: isRTL ? 'إعدادات الحساب' : 'Account Settings', route: '/account-settings' },
+                { icon: '🔔', label: isRTL ? 'إعدادات الإشعارات' : 'Notifications',    route: '/notification-settings' },
+                { icon: '✏️', label: isRTL ? 'تعديل الملف الشخصي' : 'Edit Profile',    route: '/edit-profile' },
+                { icon: '🎁', label: isRTL ? 'الإحالات والمكافآت' : 'Referrals',        route: '/referral' },
+                { icon: '💬', label: isRTL ? 'الدعم الفني' : 'Support',                 route: '/support' },
+              ].map((item, i, arr) => (
+                <TouchableOpacity
+                  key={item.route}
+                  onPress={() => { setSettingsVisible(false); router.push(item.route as any); }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: i < arr.length - 1 ? 1 : 1, borderBottomColor: C.border }}
+                >
+                  <Text style={{ fontSize: 20 }}>{item.icon}</Text>
+                  <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', flex: 1 }}>{item.label}</Text>
+                  <Text style={{ color: C.muted, fontSize: 18 }}>›</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity onPress={() => { setSettingsVisible(false); handleLogout(); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
+                <Text style={{ fontSize: 20 }}>🚪</Text>
+                <Text style={{ color: C.red, fontSize: 14, fontWeight: '700', flex: 1 }}>{isRTL ? 'تسجيل الخروج' : 'Sign Out'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
+

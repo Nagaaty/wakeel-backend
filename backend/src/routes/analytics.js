@@ -72,7 +72,8 @@ router.get('/lawyer', requireAuth, requireRole('lawyer'), async (req, res, next)
         COUNT(*) FILTER (WHERE status='pending') AS pending,
         COALESCE(SUM(fee) FILTER (WHERE status='completed'),0) AS total_earned,
         COALESCE(SUM(fee) FILTER (WHERE status='completed' AND created_at>NOW()-INTERVAL '30 days'),0) AS earned_this_month,
-        COALESCE(AVG(fee) FILTER (WHERE status='completed'),0) AS avg_fee
+        COALESCE(AVG(fee) FILTER (WHERE status='completed'),0) AS avg_fee,
+        (SELECT karma_score FROM lawyer_profiles WHERE user_id=$1) AS karma_score
         FROM bookings WHERE lawyer_id=$1`, [lawyerId]),
 
       pool.query(`SELECT

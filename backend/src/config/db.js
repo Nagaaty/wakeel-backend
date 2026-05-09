@@ -26,21 +26,33 @@ pool.on('error', (err) => {
 });
 
 // 🗄️ Database Agent: Query Profiling Interceptor
+// Threshold: 2500ms — Neon cloud DB has ~1000-1400ms baseline RTT.
+// Anything under 2500ms is normal network overhead, not a real slow query.
+// Schema migration queries are excluded from warnings (expected to be slow on first boot).
+const SLOW_QUERY_MS = 2500;
+const SKIP_PATTERNS = ['schema_migrations', 'CREATE TABLE IF NOT EXISTS schema_migrations'];
+
 const originalQuery = pool.query.bind(pool);
 pool.query = async function (text, params) {
   const start = Date.now();
+  const queryText = typeof text === 'string' ? text : (text?.text || '');
   try {
     const res = await originalQuery(text, params);
     const duration = Date.now() - start;
-    if (duration > 500) {
-      console.warn(`[DB Agent] ⚠️ Slow query detected (${duration}ms):`, typeof text === 'string' ? text.substring(0, 100) : text);
+    const isInfra = SKIP_PATTERNS.some(p => queryText.includes(p));
+    if (duration > SLOW_QUERY_MS && !isInfra) {
+      console.warn(`[DB Agent] ⚠️ Slow query detected (${duration}ms):`, queryText.substring(0, 120));
     }
     return res;
   } catch (error) {
     const duration = Date.now() - start;
-    console.error(`[DB Agent] ❌ Query failed after ${duration}ms:`, typeof text === 'string' ? text.substring(0, 100) : text);
+    const isInfra = SKIP_PATTERNS.some(p => queryText.includes(p));
+    if (!isInfra) {
+      console.error(`[DB Agent] ❌ Query failed after ${duration}ms:`, queryText.substring(0, 120));
+    }
     throw error;
   }
 };
+
 
 module.exports = pool;

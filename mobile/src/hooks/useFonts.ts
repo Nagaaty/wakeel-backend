@@ -14,7 +14,7 @@ export function useFonts() {
   useEffect(() => {
     if (_loaded) return;
     Font.loadAsync({
-      'CormorantGaramond-Bold':         require('../../assets/fonts/CormorantGaramond-Bold.ttf'),
+      'Cairo-Bold':         require('../../assets/fonts/Cairo-Bold.ttf'),
       'CormorantGaramond-SemiBold':     require('../../assets/fonts/CormorantGaramond-SemiBold.ttf'),
       'DMSans-Regular':                 require('../../assets/fonts/DMSans-Regular.ttf'),
       'DMSans-Medium':                  require('../../assets/fonts/DMSans-Medium.ttf'),
@@ -34,7 +34,7 @@ export function useFonts() {
 
 // Font style helpers matching reference exactly
 export const SERIF = (size: number, weight: '600'|'700' = '700') => ({
-  fontFamily: _loaded ? 'CormorantGaramond-Bold' : 'serif',
+  fontFamily: _loaded ? 'Cairo-Bold' : 'serif',
   fontSize: size,
   fontWeight: weight,
 });

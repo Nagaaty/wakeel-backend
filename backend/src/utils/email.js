@@ -170,7 +170,7 @@ const wrap = (content) => `
 </div></body></html>
 `;
 
-// ── Booking confirmation ───────────────────────────────────────────────────
+// ── Booking confirmation (Client) ───────────────────────────────────────────
 async function sendBookingConfirmation({ to, clientName, lawyerName, date, time, serviceType, fee, bookingId }) {
   const subject = `✅ تأكيد حجزك مع ${lawyerName} — Wakeel`;
   const html = wrap(`
@@ -187,6 +187,26 @@ async function sendBookingConfirmation({ to, clientName, lawyerName, date, time,
     <p>ستتلقى تذكيراً قبل 30 دقيقة من موعدك.</p>
     <a href="${BASE_URL}/bookings" class="btn">عرض حجزي</a>
     <p style="color:#999;font-size:12px;">إذا أردت الإلغاء أو إعادة الجدولة، يمكنك ذلك حتى ساعتين قبل الموعد.</p>
+  `);
+  return sendEmail({ to, subject, html });
+}
+
+// ── Booking notification (Lawyer) ──────────────────────────────────────────
+async function sendLawyerBookingNotification({ to, lawyerName, clientName, date, time, serviceType, fee, bookingId }) {
+  const subject = `📅 حجز جديد من ${clientName} — Wakeel`;
+  const html = wrap(`
+    <h2>مرحباً أ. ${lawyerName}،</h2>
+    <p>لقد تلقيت حجزاً جديداً مدفوعاً بنجاح!</p>
+    <div class="highlight">
+      <p><strong>👤 العميل:</strong> ${clientName}</p>
+      <p><strong>📅 التاريخ:</strong> ${date}</p>
+      <p><strong>⏰ الوقت:</strong> ${time}</p>
+      <p><strong>🗂️ نوع الخدمة:</strong> ${serviceType}</p>
+      <p><strong>💰 المبلغ المستلم:</strong> ${fee} جنيه</p>
+      <p><strong>🔖 رقم الحجز:</strong> WK-${String(bookingId).padStart(6,'0')}</p>
+    </div>
+    <p>يرجى الاستعداد للموعد في الوقت المحدد.</p>
+    <a href="${BASE_URL}/lawyer/dashboard" class="btn">عرض الحجز</a>
   `);
   return sendEmail({ to, subject, html });
 }
@@ -310,6 +330,7 @@ async function sendSupportReply({ to, name, ticketId, reply }) {
 module.exports = {
   sendEmail,
   sendBookingConfirmation,
+  sendLawyerBookingNotification,
   sendBookingReminder,
   sendOTPEmail,
   sendWelcomeEmail,

@@ -5,6 +5,8 @@ import {
   ActivityIndicator, Image, Linking,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import { Feather } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchBookings, updateBooking,
@@ -28,14 +30,27 @@ function useNow() {
   return now;
 }
 
+// ─── Helper: Parse Booking Time (handles DD-MM-YYYY gracefully) ────────────
+function parseBookingTime(dateStr: string, timeStr: string): number {
+  if (!dateStr) return NaN;
+  let d = dateStr;
+  const p = d.split('-');
+  if (p.length === 3 && p[0].length === 2 && p[2].length === 4) {
+    d = `${p[2]}-${p[1]}-${p[0]}`; // Convert DD-MM-YYYY to YYYY-MM-DD
+  }
+  return new Date(`${d}T${(timeStr || '23:59').slice(0, 5)}:00`).getTime();
+}
+
 // Returns 'locked' | 'open' | 'past'
 function getJoinState(bookingDate: string, startTime: string, now: Date): 'locked' | 'open' | 'past' {
   if (!bookingDate || !startTime) return 'locked';
   try {
-    const dt = new Date(`${bookingDate}T${startTime.slice(0, 5)}:00`);
-    const diffMin = (dt.getTime() - now.getTime()) / 60000;
-    if (diffMin > 15)   return 'locked'; // more than 15 min away
-    if (diffMin < -90)  return 'past';   // ended more than 90 min ago
+    const timeMs = parseBookingTime(bookingDate, startTime);
+    if (isNaN(timeMs)) return 'locked';
+    // TEMPORARY UNLOCK FOR TESTING
+    // const diffMin = (timeMs - now.getTime()) / 60000;
+    // if (diffMin > 15)   return 'locked'; // more than 15 min away
+    // if (diffMin < -90)  return 'past';   // ended more than 90 min ago
     return 'open';
   } catch { return 'locked'; }
 }
@@ -44,10 +59,11 @@ function getJoinState(bookingDate: string, startTime: string, now: Date): 'locke
 function getCountdown(bookingDate: string, startTime: string, now: Date): string {
   if (!bookingDate || !startTime) return '';
   try {
-    const dt = new Date(`${bookingDate}T${startTime.slice(0, 5)}:00`);
-    const diffMs  = dt.getTime() - now.getTime();
+    const timeMs = parseBookingTime(bookingDate, startTime);
+    if (isNaN(timeMs)) return '';
+    const diffMs  = timeMs - now.getTime();
     const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin <= 0 && diffMin > -90) return '🔴 جارية الآن';
+    if (diffMin <= 0 && diffMin > -90) return 'جارية الآن';
     if (diffMin <= 0) return '';
     if (diffMin < 60) return `تبدأ بعد ${diffMin} دقيقة`;
     const hrs  = Math.floor(diffMin / 60);
@@ -66,46 +82,46 @@ const STATUS_CFG: Record<string, {
 }> = {
   pending: {
     color: '#D97706', bg: '#FEF3C7',
-    icon: '⏳', label: 'قيد المراجعة',
+    icon: 'clock', label: 'قيد المراجعة',
     desc: 'حجزك تحت المراجعة · سيتم التأكيد قريباً',
   },
   confirmed: {
     color: '#2563EB', bg: '#EFF6FF',
-    icon: '✅', label: 'مؤكد',
+    icon: 'check-circle', label: 'مؤكد',
     desc: 'حجزك مؤكد · موعدك محجوز ومدفوع',
   },
   completed: {
     color: '#16A34A', bg: '#F0FDF4',
-    icon: '🏆', label: 'مكتمل',
+    icon: 'award', label: 'مكتمل',
     desc: 'انتهت الجلسة · شاركنا رأيك بتقييم',
   },
   cancelled: {
     color: '#DC2626', bg: '#FEF2F2',
-    icon: '❌', label: 'ملغي',
+    icon: 'x-circle', label: 'ملغي',
     desc: 'تم إلغاء هذا الحجز',
   },
   rejected: {
     color: '#DC2626', bg: '#FEF2F2',
-    icon: '🚫', label: 'مرفوض',
+    icon: 'slash', label: 'مرفوض',
     desc: 'لم يتمكن المحامي من قبول الحجز · يمكنك الحجز مجدداً',
   },
 };
 
 const SVC_LABELS: Record<string, { icon: string; label: string }> = {
-  video:       { icon: '📹', label: 'استشارة فيديو' },
-  chat:        { icon: '💬', label: 'استشارة نصية' },
-  phone:       { icon: '📞', label: 'مكالمة صوتية' },
-  inperson:    { icon: '🏛️', label: 'لقاء شخصي' },
-  document:    { icon: '📄', label: 'مراجعة وثيقة' },
-  consultation:{ icon: '⚖️', label: 'استشارة قانونية' },
+  video:       { icon: 'video', label: 'استشارة فيديو' },
+  chat:        { icon: 'message-circle', label: 'استشارة نصية' },
+  phone:       { icon: 'phone', label: 'مكالمة صوتية' },
+  inperson:    { icon: 'map-pin', label: 'لقاء شخصي' },
+  document:    { icon: 'file-text', label: 'مراجعة وثيقة' },
+  consultation:{ icon: 'briefcase', label: 'استشارة قانونية' },
 };
 
 const FILTERS = [
   { key: 'all',       label: 'الكل' },
-  { key: 'confirmed', label: '✅ مؤكد' },
-  { key: 'pending',   label: '⏳ انتظار' },
-  { key: 'completed', label: '🏆 مكتمل' },
-  { key: 'cancelled', label: '❌ ملغي' },
+  { key: 'confirmed', label: 'مؤكد' },
+  { key: 'pending',   label: 'انتظار' },
+  { key: 'completed', label: 'مكتمل' },
+  { key: 'cancelled', label: 'ملغي' },
 ];
 
 
@@ -184,27 +200,29 @@ function ConsultCard({
     }}>
       {/* ── Status Banner ── */}
       <View style={{
-        backgroundColor: cfg.bg,
+        backgroundColor: C.card,
         paddingHorizontal: 16,
-        paddingVertical: 10,
+        paddingVertical: 12,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
         borderBottomWidth: 1,
-        borderBottomColor: cfg.color + '30',
+        borderBottomColor: C.border,
       }}>
-        <Text style={{ fontSize: 18 }}>{cfg.icon}</Text>
+        <Feather name={cfg.icon as any} size={20} color={cfg.color} />
         <View style={{ flex: 1 }}>
           <Text style={{ color: cfg.color, fontWeight: '700', fontSize: 13 }}>{cfg.label}</Text>
-          <Text style={{ color: cfg.color + 'CC', fontSize: 11, marginTop: 1 }}>{cfg.desc}</Text>
+          <Text style={{ color: C.muted, fontSize: 11, marginTop: 1 }}>{cfg.desc}</Text>
         </View>
         <View style={{
-          backgroundColor: cfg.color + '20',
+          borderWidth: 1,
+          borderColor: C.border,
+          backgroundColor: C.surface,
           paddingHorizontal: 10,
           paddingVertical: 4,
           borderRadius: 20,
         }}>
-          <Text style={{ color: cfg.color, fontSize: 11, fontWeight: '700' }}>{svc.icon} {svc.label}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Feather name={svc.icon as any} size={12} color={C.text} /><Text style={{ color: C.text, fontSize: 11, fontWeight: '700' }}>{svc.label}</Text></View>
         </View>
       </View>
 
@@ -224,16 +242,8 @@ function ConsultCard({
         </View>
 
         <View style={{ flexDirection: 'row', gap: 16, marginBottom: 12 }}>
-          {b.booking_date ? (
-            <Text style={{ color: C.muted, fontSize: 13 }}>
-              📅 {b.booking_date}
-            </Text>
-          ) : null}
-          {b.start_time ? (
-            <Text style={{ color: C.muted, fontSize: 13 }}>
-              ⏰ {b.start_time?.slice(0, 5)}
-            </Text>
-          ) : null}
+          {b.booking_date ? (<View style={{flexDirection: 'row', alignItems:'center', gap:6}}><Feather name='calendar' size={14} color={C.muted}/><Text style={{ color: C.muted, fontSize: 13 }}>{b.booking_date}</Text></View>) : null}
+          {b.start_time ? (<View style={{flexDirection: 'row', alignItems:'center', gap:6}}><Feather name='clock' size={14} color={C.muted}/><Text style={{ color: C.muted, fontSize: 13 }}>{b.start_time?.slice(0, 5)}</Text></View>) : null}
         </View>
 
         {/* ── Payment Row ── */}
@@ -252,7 +262,7 @@ function ConsultCard({
             backgroundColor: isPaid ? '#16A34A20' : '#D9770620',
           }}>
             <Text style={{ color: isPaid ? '#16A34A' : '#D97706', fontWeight: '700', fontSize: 12 }}>
-              {isPaid ? '💳 مدفوع' : '💳 غير مدفوع'}
+              {isPaid ? 'مدفوع' : 'غير مدفوع'}
             </Text>
           </View>
           <Text style={{ color: C.muted, fontSize: 11, marginLeft: 'auto' }}>
@@ -267,7 +277,7 @@ function ConsultCard({
             marginBottom: 14, padding: 12, borderRadius: 12,
             backgroundColor: C.card2, borderWidth: 1, borderColor: C.border
           }}>
-            <Text style={{ fontSize: 24 }}>📍</Text>
+            <Feather name='map-pin' size={20} color={C.gold} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: C.text, fontWeight: '700', fontSize: 13 }}>
                 {b.lawyer_office || b.lawyer_city || 'عنوان المكتب غير متوفر'}
@@ -293,17 +303,15 @@ function ConsultCard({
           {!isLawyer && joinState !== null && joinState !== 'past' && (
             joinState === 'open' ? (
               <TouchableOpacity
-                onPress={() => router.push({ pathname: '/video', params: { booking: b.id } } as any)}
+                onPress={() => Linking.openURL(`https://meet.jit.si/wakeel-consultation-${b.id}`)}
                 style={{
                   flex: 1, backgroundColor: C.gold,
                   paddingVertical: 14, borderRadius: 12,
                   alignItems: 'center', justifyContent: 'center',
                   flexDirection: 'row', gap: 8,
-                  shadowColor: C.gold, shadowOpacity: 0.45,
-                  shadowRadius: 10, elevation: 5,
                 }}
               >
-                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>📹 انضم الآن</Text>
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}><Feather name='video' size={16} color='#fff' /> فتح غرفة الفيديو</Text>
               </TouchableOpacity>
             ) : (
               // LOCKED state
@@ -336,7 +344,7 @@ function ConsultCard({
                 flexDirection: 'row', alignItems: 'center', gap: 6,
               }}
             >
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>💳 إتمام الدفع</Text>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}><Feather name='credit-card' size={14} color='#fff' /> إتمام الدفع</Text>
             </TouchableOpacity>
           )}
 
@@ -351,15 +359,15 @@ function ConsultCard({
                 ])
               }
               style={{
-                borderWidth: 1, borderColor: '#DC262640',
-                backgroundColor: '#DC262610', paddingHorizontal: 14,
+                borderWidth: 1, borderColor: C.border,
+                backgroundColor: C.surface, paddingHorizontal: 14,
                 paddingVertical: 10, borderRadius: 10,
                 flexDirection: 'row', alignItems: 'center', gap: 6,
                 opacity: isActioning ? 0.5 : 1,
               }}
             >
-              <Text style={{ color: '#DC2626', fontWeight: '600', fontSize: 13 }}>
-                {isActioning ? '⏳' : '❌ إلغاء'}
+              <Text style={{ color: C.text, fontWeight: '600', fontSize: 13 }}>
+                {isActioning ? '⏳' : 'إلغاء'}
               </Text>
             </TouchableOpacity>
           )}
@@ -375,7 +383,7 @@ function ConsultCard({
                 flexDirection: 'row', alignItems: 'center', gap: 6,
               }}
             >
-              <Text style={{ color: C.text, fontWeight: '600', fontSize: 13 }}>🧾 إيصال</Text>
+              <Text style={{ color: C.text, fontWeight: '600', fontSize: 13 }}><Feather name='file-text' size={14} color={C.text} /> إيصال</Text>
             </TouchableOpacity>
           )}
 
@@ -390,7 +398,7 @@ function ConsultCard({
                 flexDirection: 'row', alignItems: 'center', gap: 6,
               }}
             >
-              <Text style={{ color: C.gold, fontWeight: '700', fontSize: 13 }}>⭐ قيّم</Text>
+              <Text style={{ color: C.gold, fontWeight: '700', fontSize: 13 }}><Feather name='star' size={14} color={C.gold} /> قيّم</Text>
             </TouchableOpacity>
           )}
 
@@ -405,7 +413,7 @@ function ConsultCard({
                 flexDirection: 'row', alignItems: 'center', gap: 6,
               }}
             >
-              <Text style={{ color: C.gold, fontWeight: '600', fontSize: 13 }}>🔄 احجز مجدداً</Text>
+              <Text style={{ color: C.gold, fontWeight: '600', fontSize: 13 }}><Feather name='refresh-cw' size={14} color={C.gold} /> احجز مجدداً</Text>
             </TouchableOpacity>
           )}
 
@@ -479,7 +487,7 @@ function ConsultCard({
 function EmptyState({ C, isLawyer }: any) {
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 32 }}>
-      <Text style={{ fontSize: 64, marginBottom: 16 }}>📅</Text>
+      <Feather name='calendar' size={48} color={C.muted} style={{marginBottom: 16}} />
       <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, textAlign: 'center', marginBottom: 8 }}>
         {isLawyer ? 'لا توجد جلسات بعد' : 'لا توجد استشارات بعد'}
       </Text>
@@ -497,7 +505,7 @@ function EmptyState({ C, isLawyer }: any) {
             borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 8,
           }}
         >
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>🔍 ابحث عن محامٍ</Text>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}><Feather name='search' size={16} color='#fff' /> ابحث عن محامٍ</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -527,7 +535,11 @@ export default function MyConsultationsScreen() {
       .catch((e: any) => setError(e?.message || 'تعذر تحميل الاستشارات'));
   }, [dispatch]);
 
-  useEffect(() => { load(); }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -561,19 +573,32 @@ export default function MyConsultationsScreen() {
   const now0 = new Date();
   const upcomingList = (filter === 'all' ? bookings : filtered).filter((b: any) => {
     if (['cancelled','rejected','completed'].includes(b.status)) return false;
-    try { return new Date(`${b.booking_date}T${(b.start_time||'23:59').slice(0,5)}:00`).getTime() > now0.getTime() - 5400000; }
-    catch { return true; }
+    const t = parseBookingTime(b.booking_date, b.start_time);
+    if (isNaN(t)) return true; // Show unparseable dates just in case
+    return t > now0.getTime() - 5400000;
+  }).sort((a: any, b: any) => {
+    const ta = parseBookingTime(a.booking_date, a.start_time);
+    const tb = parseBookingTime(b.booking_date, b.start_time);
+    if (isNaN(ta) || isNaN(tb)) return 0;
+    return ta - tb; // ASCENDING: closest date first
   });
+
   const pastList = (filter === 'all' ? bookings : filtered).filter((b: any) => {
     if (['cancelled','rejected','completed'].includes(b.status)) return true;
-    try { return new Date(`${b.booking_date}T${(b.start_time||'23:59').slice(0,5)}:00`).getTime() <= now0.getTime() - 5400000; }
-    catch { return false; }
+    const t = parseBookingTime(b.booking_date, b.start_time);
+    if (isNaN(t)) return false; // Hide unparseable dates from past to avoid duplicates
+    return t <= now0.getTime() - 5400000;
+  }).sort((a: any, b: any) => {
+    const ta = parseBookingTime(a.booking_date, a.start_time);
+    const tb = parseBookingTime(b.booking_date, b.start_time);
+    if (isNaN(ta) || isNaN(tb)) return 0;
+    return tb - ta; // DESCENDING: most recent past first
   });
   const showSections = filter === 'all';
   const listData: any[] = showSections
     ? [
-        ...(upcomingList.length > 0 ? [{ _sectionHeader: '📅 القادمة', _id: '__upcoming__' }, ...upcomingList] : []),
-        ...(pastList.length > 0    ? [{ _sectionHeader: '📚 السابقة', _id: '__past__' },    ...pastList    ] : []),
+        ...(upcomingList.length > 0 ? [{ _sectionHeader: 'القادمة', _id: '__upcoming__' }, ...upcomingList] : []),
+        ...(pastList.length > 0    ? [{ _sectionHeader: 'السابقة', _id: '__past__' },    ...pastList    ] : []),
       ]
     : filtered;
 
@@ -597,7 +622,7 @@ export default function MyConsultationsScreen() {
           color: C.text, fontWeight: '800', fontSize: 22,
           fontFamily: 'Cairo-Bold', marginBottom: 4,
         }}>
-          {isLawyer ? '⚖️ جلساتي' : '📋 استشاراتي'}
+          {isLawyer ? 'جلساتي' : 'استشاراتي'}
         </Text>
 
         {/* Stats Row */}

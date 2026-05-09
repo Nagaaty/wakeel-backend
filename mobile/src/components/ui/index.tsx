@@ -121,7 +121,7 @@ export function Avatar({ C: Cprop, initials, size = 48, color, url }: any) {
   if (!color) {
     return (
       <Gradient colors={[C.gold, C.goldD]} style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <Text style={{ fontFamily: 'CormorantGaramond-Bold', color: '#000', fontWeight: '700', fontSize: Math.round(size * 0.34) }}>
+        <Text style={{ fontFamily: 'Cairo-Bold', color: '#000', fontWeight: '700', fontSize: Math.round(size * 0.34) }}>
           {initials}
         </Text>
       </Gradient>
@@ -136,7 +136,7 @@ export function Avatar({ C: Cprop, initials, size = 48, color, url }: any) {
       <Text style={{
         color: '#000', fontWeight: '700',
         fontSize: Math.round(size * 0.34),
-        fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'CormorantGaramond-Bold',
+        fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'Cairo-Bold',
       }}>{initials}</Text>
     </View>
   );
@@ -225,6 +225,26 @@ export function ErrMsg({ C, msg }: any) {
   return (
     <View style={{ backgroundColor: `${C.red}12`, borderWidth: 1, borderColor: `${C.red}30`, borderRadius: 10, padding: 12, marginBottom: 12 }}>
       <Text style={{ color: C.red, fontSize: 13 }}>⚠️ {msg}</Text>
+    </View>
+  );
+}
+
+// ─── InitialsAvatar ───────────────────────────────────────────────────────────
+export function InitialsAvatar({ name, uri, size = 44, gold }: { name?: string; uri?: string; size?: number; gold: string }) {
+  if (uri) {
+    return (
+      <Image
+        source={{ uri }}
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: gold + '20', borderWidth: 1.5, borderColor: gold + '60' }}
+      />
+    );
+  }
+  const ini = (name || '؟')
+    .split(' ').map((w: string) => w[0] || '').join('').slice(0, 2).toUpperCase();
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: gold + '20',
+      borderWidth: 1.5, borderColor: gold + '60', alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: gold, fontWeight: '800', fontSize: size * 0.35 }}>{ini}</Text>
     </View>
   );
 }

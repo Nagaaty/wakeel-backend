@@ -86,7 +86,7 @@ export const authAPI = {
 export const lawyersAPI = {
   list:            (params?: any) => api.get('/lawyers', { params }),
   get:             (id: string | number)   => api.get(`/lawyers/${id}`),
-  getAvailability: (id: number, date: string) => api.get(`/lawyers/${id}/availability`, { params: { date } }),
+  getAvailability: (id: string | number, date: string) => api.get(`/lawyers/${id}/availability`, { params: { date } }),
   getMyProfile:    ()             => api.get('/lawyers/me/profile'),
   saveProfile:     (data: any)    => api.post('/lawyers/me/profile', data),
   getRawAvailability: ()          => api.get('/lawyers/me/availability'),
@@ -95,7 +95,7 @@ export const lawyersAPI = {
   saveOverrides:   (data: any)    => api.post('/lawyers/me/overrides', data),
   getMyReviews:    ()             => api.get('/lawyers/me/reviews'),
   getMyClients:    ()             => api.get('/lawyers/me/clients'),
-  review:          (id: number, data: any) => api.post(`/lawyers/${id}/review`, data),
+  review:          (id: string | number, data: any) => api.post(`/lawyers/${id}/review`, data),
 };
 
 export const bookingsAPI = {
@@ -218,14 +218,14 @@ export const adminAPI = {
 export const forumAPI = {
   getQuestions: (params?: { sort?: string; cat?: string; search?: string; tag?: string }) =>
     api.get('/forum/questions', { params }),
+  getUserPosts: (userId: number | string) =>
+    api.get('/forum/questions', { params: { user_id: userId } }),
   getQuestion: (id: string | number) =>
     api.get(`/forum/questions/${id}`),
   createQuestion: (data: { question: string; category: string; anonymous?: boolean; image_url?: string; original_post_id?: number; original_post_data?: any }) =>
     api.post('/forum/questions', data),
   getAnswers: (id: string | number) =>
     api.get(`/forum/questions/${id}/answers`),
-  createAnswer: (id: string | number, answer: string) =>
-    api.post(`/forum/questions/${id}/answers`, { answer }),
   likeQuestion: (id: string | number) =>
     api.post(`/forum/questions/${id}/like`),
   sharePost: (id: string | number, body?: { repost_id?: number | string }) =>
@@ -244,6 +244,8 @@ export const forumAPI = {
   // Comment likes
   likeAnswer: (id: string | number) =>
     api.post(`/forum/answers/${id}/like`),
+  dislikeAnswer: (id: string | number) =>
+    api.post(`/forum/answers/${id}/dislike`),
   // Nested comment replies
   getReplies: (answerId: string | number) =>
     api.get(`/forum/answers/${answerId}/replies`),

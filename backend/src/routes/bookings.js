@@ -6,6 +6,18 @@ const { sendBookingConfirmation }    = require('../utils/email');
 const { sendBookingConfirmationWA, sendLawyerNewBookingWA } = require('../utils/sms');
 const { notifyNewBooking, notifyBookingConfirmed }          = require('../utils/push');
 
+// ─── Type mapping ────────────────────────────────────────────────────────────
+// Mobile app sends lowercase service types (video / text / phone / inperson /
+// document). Database stores uppercase. 'chat' is a legacy alias for 'text'.
+const SERVICE_TYPE_MAP = {
+  video:    'VIDEO',
+  text:     'TEXT',
+  chat:     'CHAT',     // legacy
+  phone:    'PHONE',
+  inperson: 'INPERSON',
+  document: 'DOCUMENT',
+};
+
 // POST /api/bookings — create booking
 router.post('/', requireAuth, async (req, res, next) => {
   try {
@@ -36,6 +48,37 @@ router.post('/', requireAuth, async (req, res, next) => {
     );
     if (clash) return res.status(409).json({ message: 'This time slot is already booked' });
 
+    // ─── NEW: Service-type validation ────────────────────────────────────────
+    // Reject bookings where the lawyer has marked this consultation type as
+    // unavailable for the requested date (via weekly default or per-date
+    // override). Falls through silently if migration 003 hasn't run yet.
+    {
+      const requestedType = (serviceType || 'video').toLowerCase();
+      if (!SERVICE_TYPE_MAP[requestedType]) {
+        return res.status(400).json({ message: 'Invalid service type' });
+      }
+      // 'chat' is a legacy alias for 'text' — same availability bucket
+      const checkType = requestedType === 'chat' ? 'text' : requestedType;
+      try {
+        const { rows: [resolved] } = await pool.query(
+          `SELECT resolve_lawyer_services($1, $2::date) AS services`,
+          [lawyerId, bookingDate]
+        );
+        const allowed = Array.isArray(resolved?.services) ? resolved.services : [];
+        if (allowed.length > 0 && !allowed.includes(checkType)) {
+          return res.status(409).json({
+            message: 'This consultation type is not offered by the lawyer on this date',
+            message_ar: 'المحامي لا يقبل هذا النوع من الاستشارات في هذا التاريخ',
+            enabled_services: allowed,
+          });
+        }
+      } catch (e) {
+        // resolve_lawyer_services missing → migration 003 hasn't run yet.
+        // Don't block the booking; just log and proceed (legacy behavior).
+        console.warn('[bookings] service-type resolver missing; skipping check:', e.message);
+      }
+    }
+
     // Get or create conversation
     let { rows: [conv] } = await pool.query(
       `SELECT id FROM conversations WHERE client_id=$1 AND lawyer_id=$2`,
@@ -49,13 +92,14 @@ router.post('/', requireAuth, async (req, res, next) => {
       conv = newConv;
     }
 
-    const dbType = (serviceType || 'video').toUpperCase();
+    // Use the explicit map so all 5 (now 6 incl. legacy CHAT) types persist correctly
+    const dbType = SERVICE_TYPE_MAP[(serviceType || 'video').toLowerCase()] || 'VIDEO';
 
     const { rows: [booking] } = await pool.query(
       `INSERT INTO bookings
          (client_id, lawyer_id, scheduled_at,
           type, status, amount, notes)
-       VALUES ($1,$2,$3::TIMESTAMP,$4,'pending',$5,$6) 
+       VALUES ($1,$2,$3::TIMESTAMP,$4,'pending',$5,$6)
        RETURNING *, TO_CHAR(scheduled_at, 'YYYY-MM-DD') AS booking_date, TO_CHAR(scheduled_at, 'HH24:MI') AS start_time, LOWER(type) AS service_type`,
       [req.user.id, lawyerId, scheduledAt, dbType, fee, notes||null]
     );
@@ -88,6 +132,8 @@ router.post('/', requireAuth, async (req, res, next) => {
 });
 
 // GET /api/bookings — list bookings
+// Index hint: ensure bookings(client_id, scheduled_at) and bookings(lawyer_id, scheduled_at)
+// exist for fast lookups (created once via migrate.js migration 013).
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const { status, upcoming } = req.query;
@@ -120,9 +166,14 @@ router.get('/', requireAuth, async (req, res, next) => {
     q += ' ORDER BY b.scheduled_at DESC LIMIT 100';
 
     const { rows } = await pool.query(q, params);
+
+    // Allow mobile client to cache this response for 30 seconds.
+    // Prevents 4 identical requests firing on every "My Consultations" screen mount.
+    res.set('Cache-Control', 'private, max-age=30');
     res.json({ bookings: rows });
   } catch (err) { next(err); }
 });
+
 
 // PATCH /api/bookings/:id/status — lawyer accepts/rejects
 router.patch('/:id/status', requireAuth, async (req, res, next) => {
@@ -152,7 +203,7 @@ router.patch('/:id/status', requireAuth, async (req, res, next) => {
     if (!canUpdate) return res.status(403).json({ message: 'Not authorized' });
 
     const { rows: [updated] } = await pool.query(
-      `UPDATE bookings SET status=$1 WHERE id=$2 
+      `UPDATE bookings SET status=$1 WHERE id=$2
        RETURNING *, TO_CHAR(scheduled_at, 'YYYY-MM-DD') AS booking_date, TO_CHAR(scheduled_at, 'HH24:MI') AS start_time, LOWER(type) AS service_type`,
       [status, req.params.id]
     );
@@ -218,7 +269,7 @@ router.post('/:id/cancel', requireAuth, async (req, res, next) => {
 router.get('/:id', requireAuth, async (req, res, next) => {
   try {
     const { rows: [booking] } = await pool.query(
-      `SELECT b.*, 
+      `SELECT b.*,
               TO_CHAR(b.scheduled_at, 'YYYY-MM-DD') AS booking_date,
               TO_CHAR(b.scheduled_at, 'HH24:MI') AS start_time,
               LOWER(b.type) AS service_type,

@@ -3,7 +3,7 @@ const pool     = require('../config/db');
 const { validate, rules } = require('../middleware/validate');
 const { requireAuth } = require('../middleware/auth');
 const { initiatePayment, verifyWebhook } = require('../utils/paymob');
-const { sendPaymentReceipt, sendBookingConfirmation } = require('../utils/email');
+const { sendPaymentReceipt, sendBookingConfirmation, sendLawyerBookingNotification } = require('../utils/email');
 const { sendPaymentReceiptWA } = require('../utils/sms');
 const { notifyPaymentReceived, notifyNewBooking } = require('../utils/push');
 
@@ -76,8 +76,20 @@ router.post('/initiate', requireAuth, async (req, res, next) => {
     ).catch(console.error);
 
     // 4. Email + DB notification → Lawyer
-    await sendBookingConfirmation({
+    await sendLawyerBookingNotification({
       to: booking.lawyer_email,
+      clientName: booking.client_name,
+      lawyerName: booking.lawyer_name,
+      date: formattedDate,
+      time: formattedTime,
+      serviceType: booking.type || 'VIDEO',
+      fee: amount,
+      bookingId,
+    }).catch(console.error);
+
+    // 5. Booking Confirmation → Client
+    await sendBookingConfirmation({
+      to: booking.client_email,
       clientName: booking.client_name,
       lawyerName: booking.lawyer_name,
       date: formattedDate,

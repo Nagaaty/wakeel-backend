@@ -3,7 +3,8 @@ const pool    = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { uploadFile, multerMiddleware } = require('../utils/storage');
 
-const upload = multerMiddleware({ maxSize: 10 * 1024 * 1024 });
+// Support up to 200MB to allow video uploads natively
+const upload = multerMiddleware({ maxSize: 200 * 1024 * 1024 });
 
 // POST /api/upload — upload a file
 router.post('/', requireAuth, upload.single('file'), async (req, res, next) => {

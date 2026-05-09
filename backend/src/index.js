@@ -48,10 +48,33 @@ app.use(cors({
   credentials: true,
 }));
 
-// ── Rate limiting ──────────────────────────────────────────────────────────────
-const generalLimit = rateLimit({ windowMs: 15*60*1000, max: 200, standardHeaders: true, legacyHeaders: false });
-const authLimit    = rateLimit({ windowMs: 15*60*1000, max: 20,  message: { message: 'Too many auth attempts' } });
-const aiLimit      = rateLimit({ windowMs: 60*1000,    max: 10,  message: { message: 'AI rate limit — wait 1 minute' } });
+// Skip rate limits for localhost / LAN in development
+const skipForLocalDev = (req) => {
+  if (process.env.NODE_ENV === 'production') return false;
+  const ip = req.ip || req.socket?.remoteAddress || '';
+  return ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip.startsWith('10.');
+};
+
+const generalLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000,          // 5x increase — covers heavy forum usage
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipForLocalDev,
+  message: { message: 'Too many requests, please try again later.' },
+});
+const authLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,            // was 20 — more forgiving for dev
+  skip: skipForLocalDev,
+  message: { message: 'Too many auth attempts' },
+});
+const aiLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,            // was 10 — doubled
+  skip: skipForLocalDev,
+  message: { message: 'AI rate limit — wait 1 minute' },
+});
 
 app.use(generalLimit);
 app.use('/api/auth', authLimit);
@@ -130,77 +153,12 @@ if (process.env.NODE_ENV !== 'test') {
   console.log(`📲 Firebase: ${process.env.FIREBASE_PROJECT_ID ? '✅ configured' : '⚠️  not configured'}`);
   console.log(`☁️  R2 Storage: ${process.env.R2_ACCOUNT_ID ? '✅ configured' : '⚠️  local storage'}`);
 
-  const db = require('./config/db');
-
-  // Core auth/profile columns
-  db.query('ALTER TABLE otp_codes ALTER COLUMN phone TYPE VARCHAR(255)').catch(() => {});
-  db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_url TEXT').catch(() => {});
-  db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT').catch(() => {});
-  db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT').catch(() => {});
-  db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ').catch(() => {});
-  db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT false').catch(() => {});
-  db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ').catch(() => {});
-
-  // Lawyer profile columns
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS consultation_fee INTEGER DEFAULT 400').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS avg_rating NUMERIC(3,2) DEFAULT 0').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS total_reviews INTEGER DEFAULT 0').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS experience_years INTEGER DEFAULT 0').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS wins INTEGER DEFAULT 0').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS losses INTEGER DEFAULT 0').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS bar_number VARCHAR(50)').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS response_time_hours INTEGER').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT true').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS subscription_plan VARCHAR(20) DEFAULT \'basic\'').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS service_prices JSONB').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS has_set_schedule BOOLEAN DEFAULT false').catch(() => {});
-  
-  // Reputation Agent columns
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS karma_score INTEGER DEFAULT 0').catch(() => {});
-  db.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS accepted_answers INTEGER DEFAULT 0').catch(() => {});
-
-  // Business Intelligence Agent table
-  db.query(`CREATE TABLE IF NOT EXISTS market_trends (
-    id SERIAL PRIMARY KEY,
-    category VARCHAR(255) NOT NULL,
-    post_count INTEGER DEFAULT 0,
-    likes_count INTEGER DEFAULT 0,
-    recorded_at TIMESTAMPTZ DEFAULT NOW()
-  )`).catch(() => {});
-
-  // Forum social columns
-  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS likes_count INTEGER DEFAULT 0').catch(() => {});
-  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS shares_count INTEGER DEFAULT 0').catch(() => {});
-  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)').catch(() => {});
-  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS liked_by JSONB DEFAULT \'[]\' ').catch(() => {});
-  // Repost support — link shared posts to originals
-  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS original_post_id INTEGER').catch(() => {});
-  db.query('ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS original_post_data JSONB').catch(() => {});
-  // Hashtag system — store extracted #tags as a JSONB array
-  db.query("ALTER TABLE forum_questions ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'").catch(() => {});
-  // Nested comments — replies reference a parent answer
-  db.query('ALTER TABLE forum_answers ADD COLUMN IF NOT EXISTS parent_answer_id INT REFERENCES forum_answers(id)').catch(() => {});
-
-
-  // Reviews
-  db.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS outcome VARCHAR(50)').catch(() => {});
-  db.query('ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT true').catch(() => {});
-
-  // Bookings
-  db.query('ALTER TABLE bookings ADD COLUMN IF NOT EXISTS documents JSONB DEFAULT \'[]\'').catch(() => {});
-  // Drop the strict type constraint so we can use INPERSON and DOCUMENT
-  db.query('ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_type_check').catch(() => {});
-
-  // Notifications: add link and data columns if missing
-  db.query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link TEXT DEFAULT \'#\'').catch(() => {});
-  db.query('ALTER TABLE notifications ADD COLUMN IF NOT EXISTS data JSONB').catch(() => {});
-
-  // Fix ghost lawyers
-  db.query("UPDATE lawyer_profiles SET is_visible=true WHERE is_visible IS NULL").catch(() => {});
+  // ── Unified DB migrations (runs once, tracked in schema_migrations table) ──
+  const { runMigrations } = require('./migrate');
+  runMigrations().catch(err => console.error('❌ Migration error:', err.message));
 
   // ── Auto-Expiration of Pending Bookings ─────────────────────────────────────
-  // Runs every hour to sweep and reject any pending booking older than 24 hours
+  const db = require('./config/db');
   setInterval(() => {
     db.query(`
       UPDATE bookings 
@@ -209,20 +167,6 @@ if (process.env.NODE_ENV !== 'test') {
       RETURNING id, client_id, lawyer_id
     `).catch(err => console.error('Booking Expiration Error:', err.message));
   }, 60 * 60 * 1000);
-
-  // Ensure consultation_rooms table exists for video conferencing
-  db.query(`CREATE TABLE IF NOT EXISTS consultation_rooms (
-    id           SERIAL PRIMARY KEY,
-    booking_id   INTEGER UNIQUE NOT NULL,
-    provider     VARCHAR(20) DEFAULT 'daily',
-    room_name    VARCHAR(200),
-    room_url     TEXT,
-    token_client TEXT,
-    token_lawyer TEXT,
-    ended_at     TIMESTAMPTZ,
-    duration_min INTEGER,
-    created_at   TIMESTAMPTZ DEFAULT NOW()
-  )`).catch(() => {});
 
   // Start cron scheduler
   try {

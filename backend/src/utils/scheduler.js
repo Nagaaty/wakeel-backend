@@ -32,9 +32,7 @@ function startScheduler() {
         JOIN users lu ON lu.id = b.lawyer_id
         WHERE b.status = 'confirmed'
           AND b.reminder_sent = false
-          AND (
-            COALESCE(b.scheduled_at, b.booking_date::timestamptz)
-          ) BETWEEN NOW() + INTERVAL '29 minutes' AND NOW() + INTERVAL '31 minutes'
+          AND b.scheduled_at BETWEEN NOW() + INTERVAL '29 minutes' AND NOW() + INTERVAL '31 minutes'
       `);
 
       for (const booking of rows) {
@@ -101,8 +99,8 @@ function startScheduler() {
       const { rows } = await pool.query(`
         SELECT s.*, u.email, u.name
         FROM subscriptions s
-        JOIN users u ON u.id = s.user_id
-        WHERE s.status = 'active'
+        JOIN users u ON u.id = s.lawyer_id
+        WHERE s.is_active = true
           AND s.expires_at BETWEEN NOW() AND NOW() + INTERVAL '7 days'
           AND s.renewal_warning_sent = false
       `);

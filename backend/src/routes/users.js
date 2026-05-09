@@ -72,6 +72,39 @@ router.get('/online', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/users/search?q=… — autocomplete people search for forum top bar.
+// Returns up to 10 matches (lawyers + clients), prioritizing lawyers and
+// verified accounts. Matches are case-insensitive on the user's name.
+//
+// Used by: ForumSearchBar component (forum top of feed).
+router.get('/search', async (req, res, next) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) {
+      return res.json({ users: [] });
+    }
+    // Limit query length to prevent abuse
+    const safeQ = q.slice(0, 64);
+    const { rows } = await pool.query(
+      `SELECT u.id, u.name, u.avatar_url, u.role,
+              lp.specialization, lp.city, lp.is_verified,
+              CASE
+                WHEN u.role = 'lawyer' AND lp.is_verified THEN 3
+                WHEN u.role = 'lawyer' THEN 2
+                ELSE 1
+              END AS rank
+       FROM users u
+       LEFT JOIN lawyer_profiles lp ON lp.user_id = u.id
+       WHERE u.deleted_at IS NULL
+         AND u.name ILIKE $1
+       ORDER BY rank DESC, u.name ASC
+       LIMIT 10`,
+      [`%${safeQ}%`]
+    );
+    res.json({ users: rows });
+  } catch (err) { next(err); }
+});
+
 // GET /api/users/:id — public user profile
 router.get('/:id', async (req, res, next) => {
   try {

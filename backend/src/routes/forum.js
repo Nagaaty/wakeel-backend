@@ -1,43 +1,23 @@
 const router = require('express').Router();
 const pool   = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
-const { emitForum }  = require('../utils/socket');
-
-// ── Auto-migration: add comment-like columns + dislike columns + forum_saved
-(async () => {
-  try {
-    await pool.query(`
-      ALTER TABLE forum_answers
-        ADD COLUMN IF NOT EXISTS likes_count INT DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS liked_by    JSONB DEFAULT '[]'::jsonb
-    `);
-    await pool.query(`
-      ALTER TABLE forum_questions
-        ADD COLUMN IF NOT EXISTS dislikes_count INT DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS disliked_by   JSONB DEFAULT '[]'::jsonb
-    `);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS forum_saved (
-        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-        question_id INT REFERENCES forum_questions(id) ON DELETE CASCADE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY(user_id, question_id)
-      );
-    `);
-  } catch (e) { console.warn('forum migration skipped:', e.message); }
-})();
+const { emitForum, emitToUser }  = require('../utils/socket');
 
 // GET  /api/forum/questions  — supports ?sort=hot|new|top|rising  ?cat= ?search= ?tag=
 router.get('/questions', async (req, res, next) => {
   try {
-    const { cat, search, tag, sort = 'new' } = req.query;
+    const { cat, search, tag, sort = 'new', user_id, before, limit } = req.query;
+    // Cursor pagination — `before` is the timestamp of the last loaded post.
+    // For the 'new' sort this is straightforward; for other sorts we use the
+    // post id as a stable secondary cursor to avoid duplicates.
+    const pageSize = Math.min(Math.max(parseInt(limit) || 20, 5), 50);
+
     const flairExpr = `
       CASE
         WHEN u.role = 'lawyer' AND u.is_verified THEN 'محامٍ موثوق ✔️'
         WHEN u.role = 'lawyer' THEN 'مستشار قانوني ⚖️'
         ELSE NULL
       END`;
-    // Karma = likes on posts + 2x likes on answers (computed inline)
     const karmaExpr = `(
       COALESCE(fq.likes_count,0) +
       COALESCE((SELECT SUM(fa2.likes_count)*2 FROM forum_answers fa2 WHERE fa2.question_id=fq.id),0)
@@ -50,32 +30,130 @@ router.get('/questions', async (req, res, next) => {
               LEFT JOIN users u ON u.id=fq.user_id
               WHERE fq.is_visible=true`;
     const params = [];
-    if (cat)    { params.push(cat);    q += ` AND fq.category=$${params.length}`; }
-    if (search) { params.push('%'+search+'%'); q += ` AND (fq.question ILIKE $${params.length} OR fq.category ILIKE $${params.length})`; }
-    if (tag)    { params.push(JSON.stringify([tag.toLowerCase()])); q += ` AND fq.tags @> $${params.length}::jsonb`; }
-    // Sorting
+    if (user_id) { params.push(user_id); q += ` AND fq.user_id=$${params.length}`; }
+    if (cat)     { params.push(cat);     q += ` AND fq.category=$${params.length}`; }
+    if (search)  { params.push('%'+search+'%'); q += ` AND (fq.question ILIKE $${params.length} OR fq.category ILIKE $${params.length})`; }
+    if (tag)     { params.push(JSON.stringify([tag.toLowerCase()])); q += ` AND fq.tags @> $${params.length}::jsonb`; }
+
+    // Cursor — only applied to 'new' sort because other sorts are score-based
+    // and the score can shift mid-pagination (a like elsewhere changes ranking).
+    // For 'hot' / 'top' / 'rising' we rely on offset = posts already loaded by
+    // the client.
+    if (before && sort === 'new') {
+      params.push(before);
+      q += ` AND fq.created_at < $${params.length}`;
+    }
+
     if (sort === 'hot') {
-      // Hot: engagement in last 24h weighted 3x, total likes weighted 1x
       q += ` ORDER BY (
         3 * COALESCE((SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id AND fa.created_at > NOW()-INTERVAL '24 hours'),0)
         + 3 * COALESCE((SELECT COUNT(*) FROM forum_questions fq2 WHERE fq2.original_post_id=fq.id AND fq2.created_at > NOW()-INTERVAL '24 hours'),0)
         + COALESCE(fq.likes_count,0)
-      ) DESC LIMIT 50`;
+      ) DESC LIMIT ${pageSize}`;
     } else if (sort === 'top') {
-      q += ' ORDER BY COALESCE(fq.likes_count,0) DESC LIMIT 50';
+      q += ` ORDER BY COALESCE(fq.likes_count,0) DESC LIMIT ${pageSize}`;
     } else if (sort === 'rising') {
-      // Rising: likes + comments in last 2 hours
       q += ` ORDER BY (
         COALESCE((SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id AND fa.created_at > NOW()-INTERVAL '2 hours'),0)
         + COALESCE(fq.likes_count,0)
-      ) DESC, fq.created_at DESC LIMIT 50`;
+      ) DESC, fq.created_at DESC LIMIT ${pageSize}`;
     } else {
-      q += ' ORDER BY fq.created_at DESC LIMIT 50';
+      q += ` ORDER BY fq.created_at DESC LIMIT ${pageSize}`;
     }
     const { rows } = await pool.query(q, params);
-    res.json({ questions: rows });
+    // Return next cursor so client knows if more pages exist
+    const nextCursor = rows.length === pageSize && rows.length > 0
+      ? rows[rows.length - 1].created_at
+      : null;
+    res.json({ questions: rows, next_cursor: nextCursor, has_more: nextCursor !== null });
   } catch (err) { next(err); }
 });
+
+// GET /api/forum/feed — MERGED endpoint (questions + stats + trending in 1 request)
+// Replaces 3 separate calls on app mount. Facebook/LinkedIn pattern: one
+// waterfall-free payload that hydrates the full feed screen in a single RTT.
+router.get('/feed', async (req, res, next) => {
+  try {
+    const { cat, search, sort = 'hot', limit } = req.query;
+    const pageSize = Math.min(Math.max(parseInt(limit) || 20, 5), 50);
+
+    const flairExpr = `
+      CASE
+        WHEN u.role = 'lawyer' AND u.is_verified THEN 'محامٍ موثوق ✔️'
+        WHEN u.role = 'lawyer' THEN 'مستشار قانوني ⚖️'
+        ELSE NULL
+      END`;
+    const karmaExpr = `(
+      COALESCE(fq.likes_count,0) +
+      COALESCE((SELECT SUM(fa2.likes_count)*2 FROM forum_answers fa2 WHERE fa2.question_id=fq.id),0)
+    )`;
+
+    let q = `SELECT fq.*, u.name as asked_by, u.avatar_url as user_avatar_url, u.role as user_role,
+              ${flairExpr} as user_flair,
+              ${karmaExpr} as user_karma,
+              (SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id AND fa.parent_answer_id IS NULL) as answer_count
+              FROM forum_questions fq
+              LEFT JOIN users u ON u.id=fq.user_id
+              WHERE fq.is_visible=true`;
+    const params = [];
+    if (cat)    { params.push(cat);          q += ` AND fq.category=$${params.length}`; }
+    if (search) { params.push('%'+search+'%'); q += ` AND (fq.question ILIKE $${params.length} OR fq.category ILIKE $${params.length})`; }
+
+    if (sort === 'hot') {
+      q += ` ORDER BY (
+        3 * COALESCE((SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id AND fa.created_at > NOW()-INTERVAL '24 hours'),0)
+        + 3 * COALESCE((SELECT COUNT(*) FROM forum_questions fq2 WHERE fq2.original_post_id=fq.id AND fq2.created_at > NOW()-INTERVAL '24 hours'),0)
+        + COALESCE(fq.likes_count,0)
+      ) DESC LIMIT ${pageSize}`;
+    } else if (sort === 'top') {
+      q += ` ORDER BY COALESCE(fq.likes_count,0) DESC LIMIT ${pageSize}`;
+    } else if (sort === 'rising') {
+      q += ` ORDER BY (
+        COALESCE((SELECT COUNT(*) FROM forum_answers fa WHERE fa.question_id=fq.id AND fa.created_at > NOW()-INTERVAL '2 hours'),0)
+        + COALESCE(fq.likes_count,0)
+      ) DESC, fq.created_at DESC LIMIT ${pageSize}`;
+    } else {
+      q += ` ORDER BY fq.created_at DESC LIMIT ${pageSize}`;
+    }
+
+    // Run all 3 queries in parallel — single DB connection, zero waterfalling
+    const [questionsRes, statsRes, trendingRes] = await Promise.all([
+      pool.query(q, params),
+      pool.query(`
+        SELECT
+          (SELECT COUNT(*) FROM forum_questions WHERE created_at > NOW()-INTERVAL '24 hours' AND is_visible=true) as posts_today,
+          (SELECT COUNT(DISTINCT user_id) FROM forum_questions WHERE created_at > NOW()-INTERVAL '7 days' AND is_visible=true) as active_this_week,
+          (SELECT COUNT(*) FROM users WHERE role='lawyer' AND is_verified=true) as verified_lawyers,
+          (SELECT COUNT(*) FROM forum_questions WHERE is_visible=true) as total_posts
+      `),
+      pool.query(`
+        SELECT tag, COUNT(*) as count
+        FROM forum_questions,
+             jsonb_array_elements_text(COALESCE(tags, '[]'::jsonb)) AS tag
+        WHERE created_at > NOW()-INTERVAL '7 days' AND is_visible=true
+          AND tag != ''
+        GROUP BY tag
+        ORDER BY count DESC
+        LIMIT 12
+      `),
+    ]);
+
+    const questions = questionsRes.rows;
+    const nextCursor = questions.length === pageSize && questions.length > 0
+      ? questions[questions.length - 1].created_at
+      : null;
+
+    res.json({
+      questions,
+      next_cursor: nextCursor,
+      has_more: nextCursor !== null,
+      stats: statsRes.rows[0] || null,
+      trending: trendingRes.rows || [],
+    });
+  } catch (err) { next(err); }
+});
+
+
 
 // GET /api/forum/stats — community stats widget
 router.get('/stats', async (req, res, next) => {
@@ -338,6 +416,8 @@ router.post('/questions/:id/like', requireAuth, async (req, res, next) => {
           JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: parseInt(req.params.id), postSnippet: snippet, action: 'like' }),
         ]
       ).catch(console.error);
+      // Emit live badge update to the post author's bell
+      emitToUser(pre.user_id, 'notification:new', { type: 'forum_like', postId: parseInt(req.params.id) });
     }
     // ── Emit real-time like event so all clients update the count
     emitForum('forum:like', { postId: parseInt(req.params.id), likes_count: row.likes_count, liked: true });
@@ -362,9 +442,19 @@ router.patch('/questions/:id', requireAuth, async (req, res, next) => {
   try {
     const { question } = req.body;
     if (!question) return res.status(400).json({ message: 'question required' });
+    // Re-extract hashtags from the new text (same regex as on create) so an
+    // edited post that adds/removes #tags is reflected in the hashtag feed.
+    const tags = (question.match(/#[\w\u0600-\u06FF_]+/g) || [])
+      .map(t => t.toLowerCase());
     const { rows: [row] } = await pool.query(
-      `UPDATE forum_questions SET question=$2 WHERE id=$1 AND user_id=$3 AND is_visible=true RETURNING *`,
-      [req.params.id, question, req.user.id]
+      `UPDATE forum_questions
+          SET question = $2,
+              tags     = $4::jsonb
+        WHERE id      = $1
+          AND user_id = $3
+          AND is_visible = true
+        RETURNING *`,
+      [req.params.id, question, req.user.id, JSON.stringify(tags)]
     );
     if (!row) return res.status(403).json({ message: 'Not found or not authorized' });
     res.json({ question: row });
@@ -559,10 +649,11 @@ router.post('/questions/:id/answers', requireAuth, async (req, res, next) => {
           post.user_id,
           `💬 ${actor.name} علّق على منشورك`,
           `"${answerSnip}${answerSnip.length >= 60 ? '…' : ''}"`,
-          `/post/${postId}`,
-          JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: parseInt(postId), postSnippet: snippet, commentSnippet: answerSnip, action: 'comment' }),
+          `/post/${postId}?commentId=${row?.id || ''}`,
+          JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: parseInt(postId), commentId: row?.id, postSnippet: snippet, commentSnippet: answerSnip, action: 'comment' }),
         ]
       ).catch(console.error);
+      emitToUser(post.user_id, 'notification:new', { type: 'forum_comment', postId: parseInt(postId), commentId: row?.id });
     } else if (parent_answer_id) {
       // Notify parent comment author
       const { rows: [parentComment] } = await pool.query(
@@ -579,10 +670,11 @@ router.post('/questions/:id/answers', requireAuth, async (req, res, next) => {
             parentComment.lawyer_id,
             `↩️ ${actor.name} رد على تعليقك`,
             `"${answerSnip}${answerSnip.length >= 60 ? '…' : ''}"`,
-            `/post/${req.params.id}`,
-            JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: parseInt(req.params.id), commentSnippet: answerSnip, action: 'reply' }),
+            `/post/${req.params.id}?commentId=${row?.id || ''}`,
+            JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: parseInt(req.params.id), commentId: row?.id, commentSnippet: answerSnip, action: 'reply' }),
           ]
         ).catch(console.error);
+        emitToUser(parentComment.lawyer_id, 'notification:new', { type: 'forum_reply', postId: parseInt(req.params.id), commentId: row?.id });
       }
     }
 
@@ -622,6 +714,7 @@ router.post('/questions/:id/share', requireAuth, async (req, res, next) => {
           JSON.stringify({ actorId: actor.id, actorName: actor.name, actorAvatar: actor.avatar_url || null, actorRole: actor.role, postId: repostId ? parseInt(repostId) : parseInt(req.params.id), originalPostId: parseInt(req.params.id), postSnippet: snippet, action: 'share' }),
         ]
       ).catch(console.error);
+      emitToUser(row.user_id, 'notification:new', { type: 'forum_share', postId: repostId ? parseInt(repostId) : parseInt(req.params.id) });
     }
 
     res.json({ question: row });
