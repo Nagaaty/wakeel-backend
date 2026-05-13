@@ -7,17 +7,20 @@ const { requireAuth } = require('../middleware/auth');
 router.get('/conversations', requireAuth, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT c.*,
+      `SELECT c.id, c.client_id, c.lawyer_id, c.created_at,
          CASE WHEN c.client_id=$1 THEN lu.name ELSE cu.name END AS other_name,
+         CASE WHEN c.client_id=$1 THEN lu.avatar_url ELSE cu.avatar_url END AS other_photo,
          CASE WHEN c.client_id=$1 THEN lu.avatar_url ELSE cu.avatar_url END AS other_avatar,
-         CASE WHEN c.client_id=$1 THEN c.lawyer_id ELSE c.client_id END AS other_id,
-         CASE WHEN c.client_id=$1 THEN lu.is_online ELSE cu.is_online END AS other_online,
+         CASE WHEN c.client_id=$1 THEN c.lawyer_id  ELSE c.client_id  END AS other_id,
+         CASE WHEN c.client_id=$1 THEN lu.is_online  ELSE cu.is_online  END AS other_online,
+         (SELECT m.text FROM messages m WHERE m.conversation_id=c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
+         (SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message_at,
          (SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.sender_id!=$1 AND m.is_read=FALSE) AS unread_count
        FROM conversations c
        JOIN users cu ON cu.id=c.client_id
        JOIN users lu ON lu.id=c.lawyer_id
        WHERE c.client_id=$1 OR c.lawyer_id=$1
-       ORDER BY c.last_message_at DESC NULLS LAST`,
+       ORDER BY (SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id) DESC NULLS LAST`,
       [req.user.id]
     );
     res.json({ conversations: rows });
