@@ -83,11 +83,7 @@ function initSocket(server) {
           }).catch(() => {});
         }
 
-        // Update conversation last message
-        await pool.query(
-          `UPDATE conversations SET last_message=$1, last_message_at=NOW() WHERE id=$2`,
-          [content?.slice(0,100) || '📎 مرفق', conversationId]
-        ).catch(() => {});
+        // Note: last_message/last_message_at derived via subquery, no columns to update
 
       } catch (err) { console.error('[Socket message error]', err.message); }
     });

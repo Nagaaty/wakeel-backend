@@ -83,10 +83,7 @@ router.post('/conversations/:id', requireAuth, async (req, res, next) => {
       [req.params.id, req.user.id, finalContent]
     );
 
-    await pool.query(
-      `UPDATE conversations SET last_message=$1, last_message_at=NOW() WHERE id=$2`,
-      [finalContent.slice(0,100), req.params.id]
-    );
+    // Note: last_message/last_message_at are derived via subquery — no columns to update
 
     // Emit via Socket.io if available
     const io = req.app.get('io');
