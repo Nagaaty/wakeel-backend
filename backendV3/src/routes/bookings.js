@@ -132,6 +132,8 @@ router.post('/', requireAuth, async (req, res, next) => {
 });
 
 // GET /api/bookings — list bookings
+// Index hint: ensure bookings(client_id, scheduled_at) and bookings(lawyer_id, scheduled_at)
+// exist for fast lookups (created once via migrate.js migration 013).
 router.get('/', requireAuth, async (req, res, next) => {
   try {
     const { status, upcoming } = req.query;
@@ -164,9 +166,14 @@ router.get('/', requireAuth, async (req, res, next) => {
     q += ' ORDER BY b.scheduled_at DESC LIMIT 100';
 
     const { rows } = await pool.query(q, params);
+
+    // Allow mobile client to cache this response for 30 seconds.
+    // Prevents 4 identical requests firing on every "My Consultations" screen mount.
+    res.set('Cache-Control', 'private, max-age=30');
     res.json({ bookings: rows });
   } catch (err) { next(err); }
 });
+
 
 // PATCH /api/bookings/:id/status — lawyer accepts/rejects
 router.patch('/:id/status', requireAuth, async (req, res, next) => {

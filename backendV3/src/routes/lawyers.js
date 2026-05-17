@@ -101,6 +101,7 @@ router.get('/', async (req, res, next) => {
 
 // GET /api/lawyers/:id — full lawyer profile
 router.get('/:id', async (req, res, next) => {
+  if (req.params.id === 'me') return next();
   try {
     const { rows: [lawyer] } = await pool.query(
       `SELECT lp.*,
@@ -134,6 +135,7 @@ router.get('/:id', async (req, res, next) => {
 
 // GET /api/lawyers/:id/availability — available time slots + enabled services
 router.get('/:id/availability', async (req, res, next) => {
+  if (req.params.id === 'me') return next();
   try {
     const { date } = req.query; // YYYY-MM-DD
     if (!date) return res.status(400).json({ message: 'date required' });
@@ -149,34 +151,6 @@ router.get('/:id/availability', async (req, res, next) => {
         enabled_services: [],
       });
     }
-
-    // Ensure column & overrides table exist gracefully on first run
-    await pool.query('ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS has_set_schedule BOOLEAN DEFAULT false').catch(() => {});
-    await pool.query('ALTER TABLE lawyer_availability ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)').catch(() => {});
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS lawyer_schedule_overrides (
-        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        lawyer_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        override_date DATE NOT NULL,
-        is_off        BOOLEAN DEFAULT true,
-        slots         JSONB DEFAULT '[]'::jsonb,
-        service_types JSONB DEFAULT NULL,
-        created_at    TIMESTAMPTZ DEFAULT NOW(),
-        UNIQUE(lawyer_id, override_date)
-      )
-    `).catch(() => {});
-    // Defensive: add service_types col if the table existed before this migration
-    await pool.query(`ALTER TABLE lawyer_schedule_overrides ADD COLUMN IF NOT EXISTS service_types JSONB DEFAULT NULL`).catch(() => {});
-    // Defensive: ensure the new defaults table exists
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS lawyer_service_defaults (
-        lawyer_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        day_of_week   SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
-        service_types JSONB NOT NULL DEFAULT '["video","text","inperson","document"]'::jsonb,
-        updated_at    TIMESTAMPTZ DEFAULT NOW(),
-        PRIMARY KEY (lawyer_id, day_of_week)
-      )
-    `).catch(() => {});
 
     const [y, m, d] = date.split('-');
     const dayOfWeek = new Date(Number(y), Number(m) - 1, Number(d)).getDay();
@@ -317,13 +291,6 @@ router.get('/me/profile', requireAuth, async (req, res, next) => {
 // POST /api/lawyers/me/profile — save profile
 router.post('/me/profile', requireAuth, async (req, res, next) => {
   try {
-    // Defensive: ensure new office_lat/lng columns exist on first run
-    await pool.query(`
-      ALTER TABLE lawyer_profiles
-      ADD COLUMN IF NOT EXISTS office_lat NUMERIC(10, 7),
-      ADD COLUMN IF NOT EXISTS office_lng NUMERIC(10, 7)
-    `).catch(() => {});
-
     const {
       specialization, city, consultation_fee, experience_years, bio, bar_number,
       service_prices,
@@ -394,7 +361,7 @@ router.post('/:id/review', requireAuth, async (req, res, next) => {
     const { rows: [review] } = await pool.query(
       `INSERT INTO reviews (lawyer_id, client_id, booking_id, rating, comment, outcome)
        VALUES ($1,$2,$3,$4,$5,$6)
-       ON CONFLICT (client_id, lawyer_id) DO UPDATE SET rating=$4, comment=$5, outcome=$6, updated_at=NOW()
+       ON CONFLICT (client_id, lawyer_id) DO UPDATE SET rating=$4, comment=$5, outcome=$6
        RETURNING *`,
       [req.params.id, req.user.id, booking.id, rating, comment||null, outcome||null]
     );
@@ -422,7 +389,6 @@ router.post('/me/availability', requireAuth, async (req, res, next) => {
 
     const client = await pool.connect();
     try {
-      await client.query('ALTER TABLE lawyer_availability ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)').catch(() => {});
 
       await client.query('BEGIN');
       await client.query('DELETE FROM lawyer_availability WHERE lawyer_id=$1', [req.user.id]);
@@ -555,18 +521,6 @@ router.post('/me/overrides', requireAuth, async (req, res, next) => {
 // GET /api/lawyers/me/service-availability
 router.get('/me/service-availability', requireAuth, async (req, res, next) => {
   try {
-    // Defensive create — same idempotent pattern used elsewhere in this file
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS lawyer_service_defaults (
-        lawyer_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        day_of_week   SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
-        service_types JSONB NOT NULL DEFAULT '["video","text","inperson","document"]'::jsonb,
-        updated_at    TIMESTAMPTZ DEFAULT NOW(),
-        PRIMARY KEY (lawyer_id, day_of_week)
-      )
-    `).catch(() => {});
-    await pool.query(`ALTER TABLE lawyer_schedule_overrides ADD COLUMN IF NOT EXISTS service_types JSONB DEFAULT NULL`).catch(() => {});
-
     const { rows: defaults } = await pool.query(
       `SELECT day_of_week, service_types
        FROM lawyer_service_defaults
@@ -605,17 +559,6 @@ router.post('/me/service-availability', requireAuth, async (req, res, next) => {
   const { defaults, overrides } = req.body || {};
   const client = await pool.connect();
   try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS lawyer_service_defaults (
-        lawyer_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        day_of_week   SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
-        service_types JSONB NOT NULL DEFAULT '["video","text","inperson","document"]'::jsonb,
-        updated_at    TIMESTAMPTZ DEFAULT NOW(),
-        PRIMARY KEY (lawyer_id, day_of_week)
-      )
-    `).catch(() => {});
-    await client.query(`ALTER TABLE lawyer_schedule_overrides ADD COLUMN IF NOT EXISTS service_types JSONB DEFAULT NULL`).catch(() => {});
-
     await client.query('BEGIN');
 
     // Defaults — full replace

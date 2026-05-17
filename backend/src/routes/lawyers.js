@@ -361,7 +361,7 @@ router.post('/:id/review', requireAuth, async (req, res, next) => {
     const { rows: [review] } = await pool.query(
       `INSERT INTO reviews (lawyer_id, client_id, booking_id, rating, comment, outcome)
        VALUES ($1,$2,$3,$4,$5,$6)
-       ON CONFLICT (client_id, lawyer_id) DO UPDATE SET rating=$4, comment=$5, outcome=$6, updated_at=NOW()
+       ON CONFLICT (client_id, lawyer_id) DO UPDATE SET rating=$4, comment=$5, outcome=$6
        RETURNING *`,
       [req.params.id, req.user.id, booking.id, rating, comment||null, outcome||null]
     );

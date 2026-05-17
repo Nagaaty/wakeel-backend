@@ -101,35 +101,37 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/health', require('./routes/health'));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+// ─── Routes ────────────────────────────────────────────────────────────────────
+// ─── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/auth',        require('./routes/auth'));
 app.use('/api/lawyers',     require('./routes/lawyers'));
 app.use('/api/bookings',    require('./routes/bookings'));
-app.use('/api/payments',    require('./routes/payments'));
+app.use('/api/upload',      require('./routes/upload'));
 app.use('/api/messages',    require('./routes/messages'));
+app.use('/api/invoices',    require('./routes/invoices'));
 app.use('/api/admin',       require('./routes/admin'));
+app.use('/api/push',        require('./routes/push'));
+app.use('/api/support',     require('./routes/support'));
+app.use('/api/verification',require('./routes/verification'));
+app.use('/api/payments',    require('./routes/payments'));
+app.use('/api/subscriptions', require('./routes/subscriptions'));
+app.use('/api/broadcast',   require('./routes/broadcast'));
+app.use('/api/laws',        require('./routes/laws'));
+app.use('/api/installments',require('./routes/installments'));
+app.use('/api/analytics',   require('./routes/analytics'));
+app.use('/api/users',       require('./routes/users'));
+app.use('/api/court-dates', require('./routes/court_dates'));
+app.use('/api/referral',    require('./routes/referral'));
 app.use('/api/notifications',require('./routes/notifications'));
 app.use('/api/favorites',   require('./routes/favorites'));
 app.use('/api/video',       require('./routes/video'));
 app.use('/api/ai',          require('./routes/ai'));
-app.use('/api/support',     require('./routes/support'));
 app.use('/api/promos',      require('./routes/promos'));
-app.use('/api/verification',require('./routes/verification'));
-app.use('/api/subscriptions',require('./routes/subscriptions'));
 app.use('/api/payouts',     require('./routes/payouts'));
-app.use('/api/upload',      require('./routes/upload'));
-app.use('/api/push',        require('./routes/push'));
-app.use('/api/invoices',    require('./routes/invoices'));
-app.use('/api/installments',require('./routes/installments'));
-app.use('/api/analytics',   require('./routes/analytics'));
-    app.use('/api/broadcast',   require('./routes/broadcast'));
-    app.use('/api/users',       require('./routes/users'));
-    app.use('/api/court-dates', require('./routes/court_dates'));
-    app.use('/api/referral',    require('./routes/referral'));
 
 // ── 404 ────────────────────────────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ message: `Route not found: ${req.method} ${req.path}` }));
 
-// ── Error handler ──────────────────────────────────────────────────────────────
 if (process.env.SENTRY_DSN) {
   Sentry.setupExpressErrorHandler(app);
 }
@@ -173,4 +175,4 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 module.exports = { app, server };
-// touch 7
+// touch 8

@@ -223,6 +223,35 @@ const MIGRATIONS = [
     ],
   },
 
+  {
+    version: '014_laws_library',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS laws (
+        id SERIAL PRIMARY KEY,
+        law_id VARCHAR(50) UNIQUE,
+        law_name VARCHAR(255),
+        law_name_en VARCHAR(255),
+        article_number VARCHAR(100),
+        article_number_en VARCHAR(100),
+        content TEXT,
+        content_en TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_laws_search ON laws (law_name, article_number)`,
+      
+      // Seed initial 7 verbatim laws
+      `INSERT INTO laws (law_id, law_name, law_name_en, article_number, article_number_en, content, content_en) VALUES
+      ('civil_1', 'القانون المدني (رقم 131 لسنة 1948)', 'Civil Code', 'مادة 1', 'Article 1', 'تسري النصوص التشريعية على جميع المسائل التي تتناولها هذه النصوص في لفظها أو في فحواها. فإذا لم يوجد نص تشريعي يمكن تطبيقه، حكم القاضي بمقتضى العرف، فإذا لم يوجد، فبمقتضى مبادئ الشريعة الإسلامية، فإذا لم توجد، فبمقتضى مبادئ القانون الطبيعي وقواعد العدالة.', 'Legislative provisions govern all matters to which these provisions apply in letter or spirit. In the absence of a legislative provision, the judge shall decide according to custom, and in the absence of custom, according to the principles of Islamic Sharia.'),
+      ('civil_44', 'القانون المدني (رقم 131 لسنة 1948)', 'Civil Code', 'مادة 44', 'Article 44', 'كل شخص يبلغ سن الرشد متمتعاً بقواه العقلية، ولم يحجر عليه، يكون كامل الأهلية لمباشرة حقوقه المدنية.', 'Every person who has attained the age of majority, is of sound mind, and has not been interdicted, has full capacity to exercise his civil rights.'),
+      ('civil_147', 'القانون المدني (رقم 131 لسنة 1948)', 'Civil Code', 'مادة 147', 'Article 147', 'العقد شريعة المتعاقدين، فلا يجوز نقضه ولا تعديله إلا باتفاق الطرفين، أو للأسباب التي يقررها القانون.', 'The contract makes the law of the parties. It can be revoked or altered only by mutual consent of the parties or for reasons provided for by the law.'),
+      ('civil_148', 'القانون المدني (رقم 131 لسنة 1948)', 'Civil Code', 'مادة 148', 'Article 148', 'يجب تنفيذ العقد طبقاً لما اشتمل عليه وبطريقة تتفق مع ما يوجبه حسن النية.', 'A contract must be performed in accordance with its contents and in compliance with the requirements of good faith.'),
+      ('civil_163', 'القانون المدني (رقم 131 لسنة 1948)', 'Civil Code', 'مادة 163', 'Article 163', 'كل خطأ سبب ضرراً للغير يلزم من ارتكبه بالتعويض.', 'Every fault which causes injury to another imposes an obligation to make reparation upon the person by whom it is committed.'),
+      ('penal_234', 'قانون العقوبات (رقم 58 لسنة 1937)', 'Penal Code', 'مادة 234', 'Article 234', 'من قتل نفساً عمداً من غير سبق إصرار ولا ترصد يعاقب بالسجن المؤبد أو المشدد.', 'Whoever intentionally kills a person without premeditation or lying in wait shall be punished with life or aggravated imprisonment.'),
+      ('penal_311', 'قانون العقوبات (رقم 58 لسنة 1937)', 'Penal Code', 'مادة 311', 'Article 311', 'كل من اختلس منقولا مملوكا لغيره فهو سارق.', 'Whoever embezzles a movable property belonging to another is a thief.'),
+      ('cyber_25', 'مكافحة جرائم تقنية المعلومات (175 لسنة 2018)', 'Cybercrimes Law', 'مادة 25', 'Article 25', 'يعاقب بالحبس مدة لا تقل عن ستة أشهر، وبغرامة لا تقل عن خمسين ألف جنيه ولا تجاوز مائة ألف جنيه، أو بإحدى هاتين العقوبتين، كل من اعتدى على أي من المبادئ أو القيم الأسرية في المجتمع المصري، أو انتهك حرمة الحياة الخاصة.', 'Punishable by imprisonment for at least 6 months and a fine between 50,000 and 100,000 EGP, or either penalty, for anyone who violates Egyptian family principles or values, or breaches the privacy of an individual.')
+      ON CONFLICT (law_id) DO NOTHING`
+    ],
+  },
 ];
 
 // ─── Runner ────────────────────────────────────────────────────────────────

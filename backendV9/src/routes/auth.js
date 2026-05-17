@@ -112,6 +112,15 @@ router.post('/login', loginLimiter, async (req, res, next) => {
 
     if (!user) return res.status(401).json({ message: 'Invalid email or password', attemptsRemaining: req.rateLimit ? req.rateLimit.remaining - 1 : null });
 
+    // Enforce role selection if provided by the frontend (allows backwards compatibility)
+    if (req.body.role && user.role !== req.body.role && user.role !== 'admin') {
+      const properRole = user.role === 'lawyer' ? 'Lawyer' : 'Client';
+      return res.status(401).json({ 
+        message: `Account found, but please select the ${properRole} tab to log in.`,
+        attemptsRemaining: req.rateLimit ? req.rateLimit.remaining - 1 : null 
+      });
+    }
+
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok)  return res.status(401).json({ message: 'Invalid email or password', attemptsRemaining: req.rateLimit ? req.rateLimit.remaining - 1 : null });
 
