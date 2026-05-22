@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListSkeleton } from '../../src/components/Skeleton';
 import { useFocusEffect } from '@react-navigation/native';
 import { useUnreadNotifs } from '../../src/hooks/useUnreadNotifs';
+import { useI18n } from '../../src/i18n';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -30,11 +31,11 @@ const TYPE_BADGE: Record<string, string> = {
 };
 
 /** Strip "مشاركة" placeholder and other garbage from notification body preview */
-function cleanNotifBody(body: string | null | undefined): string {
+function cleanNotifBody(body: string | null | undefined, locale: string): string {
   if (!body) return '';
   // Remove surrounding quotes if present
   const stripped = body.replace(/^[""](.*)[""]$/, '$1').trim();
-  if (!stripped || stripped === 'مشاركة' || stripped === 'مشاركة.') return 'منشورك الأصلي';
+  if (!stripped || stripped === 'مشاركة' || stripped === 'مشاركة.') return locale === 'en' ? 'Original post' : 'منشورك الأصلي';
   return stripped;
 }
 
@@ -81,6 +82,7 @@ export default function NotificationsScreen() {
   const C      = useTheme();
   const insets = useSafeAreaInsets();
   const { refresh: refreshBadge, reset: resetBadge } = useUnreadNotifs();
+  const { t, locale } = useI18n();
 
   const [notifs,     setNotifs]     = useState<any[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -184,13 +186,13 @@ export default function NotificationsScreen() {
     if (!iso) return '';
     const diff = Date.now() - new Date(iso).getTime();
     const mins = Math.floor(diff / 60000);
-    if (mins < 1)  return 'الآن';
-    if (mins < 60) return `${mins}د`;
+    if (mins < 1)  return t('time.now');
+    if (mins < 60) return `${mins}${t('time.m')}`;
     const hrs = Math.floor(mins / 60);
-    if (hrs < 24)  return `${hrs}س`;
+    if (hrs < 24)  return `${hrs}${t('time.h')}`;
     const days = Math.floor(hrs / 24);
-    if (days < 7)  return `${days}ي`;
-    return `${Math.floor(days / 7)}أ`;
+    if (days < 7)  return `${days}${t('time.d')}`;
+    return `${Math.floor(days / 7)}${t('time.w')}`;
   };
 
   return (
@@ -206,9 +208,9 @@ export default function NotificationsScreen() {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <TouchableOpacity onPress={() => router.back()}>
-              <Text style={{ color: C.text, fontSize: 22 }}>‹</Text>
+              <Text style={{ color: C.text, fontSize: 22, transform: [{ scaleX: locale === 'ar' ? 1 : -1 }] }}>‹</Text>
             </TouchableOpacity>
-            <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'Cairo-Bold' }}>الإشعارات</Text>
+            <Text style={{ color: C.text, fontWeight: '700', fontSize: 20, fontFamily: 'Cairo-Bold' }}>{t('app.notifications')}</Text>
             {unreadCnt > 0 && (
               <View style={{ backgroundColor: '#e74c3c', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 }}>
                 <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{unreadCnt}</Text>
@@ -217,7 +219,7 @@ export default function NotificationsScreen() {
           </View>
           {unreadCnt > 0 && (
             <TouchableOpacity onPress={markAll}>
-              <Text style={{ color: C.gold, fontSize: 13 }}>قراءة الكل</Text>
+              <Text style={{ color: C.gold, fontSize: 13 }}>{t('app.markAllRead')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -234,8 +236,8 @@ export default function NotificationsScreen() {
                 borderColor: filter === f ? C.gold : C.border,
                 backgroundColor: filter === f ? C.gold : 'transparent',
               }}>
-              <Text style={{ color: filter === f ? '#fff' : C.text, fontSize: 13, fontWeight: filter === f ? '700' : '400' }}>
-                {f === 'all' ? 'الكل' : 'غير مقروءة'}
+                <Text style={{ color: filter === f ? '#fff' : C.text, fontSize: 13, fontWeight: filter === f ? '700' : '400' }}>
+                {f === 'all' ? t('app.all') : t('app.unread')}
               </Text>
             </TouchableOpacity>
           ))}
@@ -246,14 +248,14 @@ export default function NotificationsScreen() {
       {permStatus !== 'granted' && permStatus !== 'unavailable' && (
         <View style={{
           backgroundColor: C.gold + '10', borderBottomWidth: 1, borderBottomColor: C.gold + '25',
-          padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10,
+          padding: 14, flexDirection: locale === 'ar' ? 'row' : 'row-reverse', alignItems: 'center', gap: 10,
         }}>
           <Text style={{ fontSize: 20 }}>🔔</Text>
-          <Text style={{ color: C.text, fontSize: 13, flex: 1 }}>فعّل الإشعارات لتلقي تنبيهات الحجوزات والرسائل</Text>
+          <Text style={{ color: C.text, fontSize: 13, flex: 1, textAlign: locale === 'ar' ? 'right' : 'left' }}>{t('app.pushBanner')}</Text>
           <TouchableOpacity
             onPress={async () => { const r = await registerForPushNotifications(); setPermStatus(r.status); }}
             style={{ backgroundColor: C.gold, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 }}>
-            <Text style={{ color: '#000', fontWeight: '700', fontSize: 12 }}>تفعيل</Text>
+            <Text style={{ color: '#000', fontWeight: '700', fontSize: 12 }}>{t('app.enable')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -266,7 +268,7 @@ export default function NotificationsScreen() {
         contentContainerStyle={{ paddingBottom: 120 }}
         ListEmptyComponent={
           !loading
-            ? <Empty C={C} icon="🔔" title="لا توجد إشعارات" />
+            ? <Empty C={C} icon="🔔" title={t('app.noNotifs')} />
             : <ListSkeleton C={C} count={8} type="notification" />
         }
         renderItem={({ item: n }) => {
@@ -289,11 +291,11 @@ export default function NotificationsScreen() {
           return (
             <View>
               {/* ── LinkedIn-style row ────────────────────────────── */}
-              <TouchableOpacity
+                <TouchableOpacity
                 onPress={() => handleTap(n)}
                 activeOpacity={0.7}
                 style={{
-                  flexDirection: 'row',
+                  flexDirection: locale === 'ar' ? 'row' : 'row-reverse',
                   alignItems: 'center',
                   paddingHorizontal: 16,
                   paddingVertical: 14,
@@ -336,28 +338,36 @@ export default function NotificationsScreen() {
 
                 {/* Text block */}
                 <View style={{ flex: 1 }}>
-                  {/* Primary text: full title (actor name IS the title from backend) */}
+                  {/* Primary text: translate known Arabic titles if in English */}
                   <Text
                     style={{
                       color: C.text,
                       fontWeight: isRead ? '400' : '600',
                       fontSize: 14,
                       lineHeight: 20,
-                      textAlign: 'right',
+                      textAlign: locale === 'ar' ? 'right' : 'left',
                     }}
                     numberOfLines={isSocial ? 2 : 3}>
-                    {n.title}
+                    {locale === 'en' && n.title.includes('تم تأكيد الحجز') ? n.title.replace('تم تأكيد الحجز', 'Booking Confirmed') : 
+                     locale === 'en' && n.title.includes('تم إلغاء الحجز') ? n.title.replace('تم إلغاء الحجز', 'Booking Cancelled') :
+                     locale === 'en' && n.title.includes('حجز جديد') ? n.title.replace('حجز جديد', 'New Booking') :
+                     locale === 'en' && n.title.includes('تذكير بموعد') ? n.title.replace('تذكير بموعد', 'Appointment Reminder') :
+                     n.title}
                   </Text>
                   {/* Body preview (comment text / post snippet / booking detail) */}
                   {n.body ? (
                     <Text
-                      style={{ color: C.muted, fontSize: 13, marginTop: 3, lineHeight: 18, textAlign: 'right' }}
+                      style={{ color: C.muted, fontSize: 13, marginTop: 3, lineHeight: 18, textAlign: locale === 'ar' ? 'right' : 'left' }}
                       numberOfLines={isSocial ? 1 : 2}>
-                      {cleanNotifBody(n.body)}
+                      {locale === 'en' && cleanNotifBody(n.body, locale).includes('تم تأكيد حجزك مع') 
+                        ? cleanNotifBody(n.body, locale).replace('تم تأكيد حجزك مع', 'Your booking is confirmed with').replace('بتاريخ', 'on date').replace('الساعة', 'at time')
+                        : locale === 'en' && cleanNotifBody(n.body, locale).includes('لديك حجز جديد مع')
+                        ? cleanNotifBody(n.body, locale).replace('لديك حجز جديد مع', 'You have a new booking with').replace('بتاريخ', 'on date').replace('الساعة', 'at time')
+                        : cleanNotifBody(n.body, locale)}
                     </Text>
                   ) : null}
                   {/* Time + expand hint for system */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 5 }}>
+                  <View style={{ flexDirection: locale === 'ar' ? 'row' : 'row-reverse', alignItems: 'center', justifyContent: locale === 'ar' ? 'flex-end' : 'flex-end', gap: 8, marginTop: 5 }}>
                     <Text style={{ color: isRead ? C.muted : '#0a66c2', fontSize: 12, fontWeight: isRead ? '400' : '600' }}>
                       {timeAgo(n.created_at)}
                     </Text>
@@ -368,7 +378,7 @@ export default function NotificationsScreen() {
                     )}
                     {isSocial && (
                       <Text style={{ color: '#0a66c2', fontSize: 12, fontWeight: '600' }}>
-                        عرض المنشور ›
+                        {locale === 'en' ? 'View Post ›' : 'عرض المنشور ›'}
                       </Text>
                     )}
                   </View>
@@ -388,22 +398,22 @@ export default function NotificationsScreen() {
                 }}>
                   {/* Header */}
                   <View style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 10,
+                    flexDirection: locale === 'ar' ? 'row' : 'row-reverse', alignItems: 'center', gap: 10,
                     backgroundColor: C.gold + '10',
                     paddingHorizontal: 14, paddingVertical: 10,
                     borderBottomWidth: 1, borderBottomColor: C.gold + '20',
                   }}>
                     <WakeelAvatar size={32} gold={C.gold} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>Wakeel</Text>
-                      <Text style={{ color: C.muted, fontSize: 11 }}>منصة المحامين المعتمدة</Text>
+                      <Text style={{ color: C.text, fontWeight: '700', fontSize: 14, textAlign: locale === 'ar' ? 'left' : 'right' }}>Wakeel</Text>
+                      <Text style={{ color: C.muted, fontSize: 11, textAlign: locale === 'ar' ? 'left' : 'right' }}>{locale === 'en' ? 'Verified Lawyers Platform' : 'منصة المحامين المعتمدة'}</Text>
                     </View>
                     <Text style={{ color: C.muted, fontSize: 11 }}>{timeAgo(n.created_at)}</Text>
                   </View>
                   {/* Full detail */}
                   <View style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
-                    <Text style={{ color: C.text, fontWeight: '700', fontSize: 15, marginBottom: 6, textAlign: 'right' }}>{n.title}</Text>
-                    <Text style={{ color: C.text, fontSize: 14, lineHeight: 22, textAlign: 'right' }}>{n.body}</Text>
+                    <Text style={{ color: C.text, fontWeight: '700', fontSize: 15, marginBottom: 6, textAlign: locale === 'ar' ? 'right' : 'left' }}>{n.title}</Text>
+                    <Text style={{ color: C.text, fontSize: 14, lineHeight: 22, textAlign: locale === 'ar' ? 'right' : 'left' }}>{n.body}</Text>
                   </View>
                   {/* Close */}
                   <TouchableOpacity
@@ -417,7 +427,7 @@ export default function NotificationsScreen() {
                       borderWidth: 1, borderColor: C.border,
                       alignItems: 'center',
                     }}>
-                    <Text style={{ color: C.muted, fontSize: 13 }}>إغلاق</Text>
+                    <Text style={{ color: C.muted, fontSize: 13 }}>{t('app.close')}</Text>
                   </TouchableOpacity>
                 </View>
               )}

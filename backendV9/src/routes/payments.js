@@ -42,78 +42,98 @@ router.post('/initiate', requireAuth, async (req, res, next) => {
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // WAKEEL FAKE PAYMENT BYPASS
+    // Call Paymob Integration
     // ─────────────────────────────────────────────────────────────────────────────
-    // Since Paymob is not live, we simulate an instant success right here to activate the booking!
+    const paymobRes = await initiatePayment({
+      amountEGP: amount,
+      billing: {
+        firstName: booking.client_name,
+        lastName: 'Client',
+        email: booking.client_email,
+        phone: booking.client_phone || '01000000000'
+      },
+      method,
+      description: `Wakeel Booking #${bookingId}`
+    });
 
-    // 1. Create a successful payment record instantly
+    if (paymobRes.simulated) {
+      // WAKEEL FAKE PAYMENT BYPASS (Used when Paymob API key is missing)
+      const { rows: [pmt] } = await pool.query(
+        `INSERT INTO payments (booking_id, user_id, amount, method, ref_id, status)
+         VALUES ($1,$2,$3,$4,$5,'completed') RETURNING *`,
+        [bookingId, req.user.id, amount, method, `fake_txn_${Date.now()}`]
+      );
+
+      await pool.query(
+        `UPDATE bookings SET status='confirmed' WHERE id=$1`,
+        [bookingId]
+      );
+
+      const formattedDate = new Date(booking.scheduled_at).toISOString().split('T')[0];
+      const formattedTime = new Date(booking.scheduled_at).toTimeString().substring(0, 5);
+
+      await sendPaymentReceipt({
+        to: booking.client_email, clientName: booking.client_name, amount,
+        lawyerName: booking.lawyer_name, bookingId, paymentId: pmt.id,
+        consultationDate: formattedDate, consultationTime: formattedTime,
+      }).catch(console.error);
+
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, body, link)
+         VALUES ($1,'booking','✅ تم تأكيد الحجز',$2,'/bookings')`,
+        [booking.client_id, `تم تأكيد حجزك مع ${booking.lawyer_name} بتاريخ ${formattedDate} الساعة ${formattedTime}`]
+      ).catch(console.error);
+
+      await sendLawyerBookingNotification({
+        to: booking.lawyer_email,
+        clientName: booking.client_name,
+        lawyerName: booking.lawyer_name,
+        date: formattedDate,
+        time: formattedTime,
+        serviceType: booking.type || 'VIDEO',
+        fee: amount,
+        bookingId,
+      }).catch(console.error);
+
+      await sendBookingConfirmation({
+        to: booking.client_email,
+        clientName: booking.client_name,
+        lawyerName: booking.lawyer_name,
+        date: formattedDate,
+        time: formattedTime,
+        serviceType: booking.type || 'VIDEO',
+        fee: amount,
+        bookingId,
+      }).catch(console.error);
+
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, body, link)
+         VALUES ($1,'booking','📅 حجز جديد',$2,'/lawyer/dashboard')`,
+        [booking.lawyer_id, `${booking.client_name} حجز معك بتاريخ ${formattedDate} الساعة ${formattedTime}. المبلغ: ${amount} جم`]
+      ).catch(console.error);
+
+      await notifyNewBooking(booking.lawyer_id, {
+        clientName: booking.client_name, date: formattedDate, time: formattedTime
+      }).catch(console.error);
+
+      await notifyPaymentReceived(booking.lawyer_id, {
+        clientName: booking.client_name, amount
+      }).catch(console.error);
+
+      return res.json({ checkoutUrl: null, success: true, fakeSuccess: true });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // REAL PAYMOB PAYMENT
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Create pending payment record
     const { rows: [pmt] } = await pool.query(
       `INSERT INTO payments (booking_id, user_id, amount, method, ref_id, status)
-       VALUES ($1,$2,$3,$4,$5,'completed') RETURNING *`,
-      [bookingId, req.user.id, amount, method, `fake_txn_${Date.now()}`]
+       VALUES ($1,$2,$3,$4,$5,'pending') RETURNING *`,
+      [bookingId, req.user.id, amount, method, paymobRes.orderId]
     );
 
-    // 2. Mark booking as confirmed
-    await pool.query(
-      `UPDATE bookings SET status='confirmed' WHERE id=$1`,
-      [bookingId]
-    );
-
-    // 3. Email + DB notification → Client
-    const formattedDate = new Date(booking.scheduled_at).toISOString().split('T')[0];
-    const formattedTime = new Date(booking.scheduled_at).toTimeString().substring(0, 5);
-
-    await sendPaymentReceipt({
-      to: booking.client_email, clientName: booking.client_name, amount,
-      lawyerName: booking.lawyer_name, bookingId, paymentId: pmt.id,
-      consultationDate: formattedDate, consultationTime: formattedTime,
-    }).catch(console.error);
-
-    await pool.query(
-      `INSERT INTO notifications (user_id, type, title, body, link)
-       VALUES ($1,'booking','✅ تم تأكيد الحجز',$2,'/bookings')`,
-      [booking.client_id, `تم تأكيد حجزك مع ${booking.lawyer_name} بتاريخ ${formattedDate} الساعة ${formattedTime}`]
-    ).catch(console.error);
-
-    // 4. Email + DB notification → Lawyer
-    await sendLawyerBookingNotification({
-      to: booking.lawyer_email,
-      clientName: booking.client_name,
-      lawyerName: booking.lawyer_name,
-      date: formattedDate,
-      time: formattedTime,
-      serviceType: booking.type || 'VIDEO',
-      fee: amount,
-      bookingId,
-    }).catch(console.error);
-
-    // 5. Booking Confirmation → Client
-    await sendBookingConfirmation({
-      to: booking.client_email,
-      clientName: booking.client_name,
-      lawyerName: booking.lawyer_name,
-      date: formattedDate,
-      time: formattedTime,
-      serviceType: booking.type || 'VIDEO',
-      fee: amount,
-      bookingId,
-    }).catch(console.error);
-
-    await pool.query(
-      `INSERT INTO notifications (user_id, type, title, body, link)
-       VALUES ($1,'booking','📅 حجز جديد',$2,'/lawyer/dashboard')`,
-      [booking.lawyer_id, `${booking.client_name} حجز معك بتاريخ ${formattedDate} الساعة ${formattedTime}. المبلغ: ${amount} جم`]
-    ).catch(console.error);
-
-    await notifyNewBooking(booking.lawyer_id, {
-      clientName: booking.client_name, date: formattedDate, time: formattedTime
-    }).catch(console.error);
-
-    await notifyPaymentReceived(booking.lawyer_id, {
-      clientName: booking.client_name, amount
-    }).catch(console.error);
-
-    res.json({ checkoutUrl: null, success: true, fakeSuccess: true });
+    res.json({ checkoutUrl: paymobRes.checkoutUrl, success: true });
   } catch (err) { next(err); }
 });
 

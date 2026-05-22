@@ -155,16 +155,6 @@ function RootLayoutNav() {
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
-// ─── Mobile Engineer Agent: Sentry Initialization ───────────────────────────────
-import * as Sentry from '@sentry/react-native';
-
-if (process.env.EXPO_PUBLIC_SENTRY_DSN) {
-  Sentry.init({
-    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-    debug: false, 
-  });
-}
-
 // ─── Root ─────────────────────────────────────────────────────────────────────
 function RootLayout() {
   const [fontsLoaded] = ExpoFont.useFonts({
@@ -195,4 +185,4 @@ function RootLayout() {
   );
 }
 
-export default Sentry.wrap(RootLayout);
+export default RootLayout;

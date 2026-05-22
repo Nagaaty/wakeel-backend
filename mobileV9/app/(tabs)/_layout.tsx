@@ -68,12 +68,14 @@ export default function TabsLayout() {
             paddingBottom: insets.bottom,
             elevation: 0,
             shadowColor: 'transparent',
+            direction: 'ltr',
           },
           tabBarContentContainerStyle: {
             flexDirection: 'row',
             justifyContent: 'space-evenly',
             alignItems: 'center',
             flex: 1,
+            direction: 'ltr',
           },
           tabBarShowLabel: false,
           tabBarActiveTintColor: C.gold,
@@ -81,19 +83,19 @@ export default function TabsLayout() {
         }}
       >
         {/* ── 5 VISIBLE TABS ──────────────────────────────────── */}
-        <Tabs.Screen name="lawyers"
+        <Tabs.Screen name="index"
           options={{
-            title: 'Find Lawyers',
+            title: 'Home',
             tabBarIcon: ({ focused }) => (
-              <TabIcon icon="🔍" label={t('nav.lawyers')} focused={focused} C={C} />
+              <TabIcon icon="🏠" label={t('nav.home')} focused={focused} C={C} />
             ),
           }}
         />
-        <Tabs.Screen name="notifications"
+        <Tabs.Screen name="my-requests"
           options={{
-            title: 'Notifications',
+            title: 'Requests',
             tabBarIcon: ({ focused }) => (
-              <TabIcon icon="🔔" label={t('nav.notifications')} focused={focused} C={C} badge={unreadCount} />
+              <TabIcon icon="📋" label={t('nav.requests')} focused={focused} C={C} />
             ),
           }}
         />
@@ -116,19 +118,19 @@ export default function TabsLayout() {
           }}
           listeners={{ tabPress: () => router.push('/support') }}
         />
-        <Tabs.Screen name="my-requests"
+        <Tabs.Screen name="notifications"
           options={{
-            title: 'Requests',
+            title: 'Notifications',
             tabBarIcon: ({ focused }) => (
-              <TabIcon icon="📋" label={t('nav.requests')} focused={focused} C={C} />
+              <TabIcon icon="🔔" label={t('nav.notifications')} focused={focused} C={C} badge={unreadCount} />
             ),
           }}
         />
-        <Tabs.Screen name="index"
+        <Tabs.Screen name="lawyers"
           options={{
-            title: 'Home',
+            title: 'Find Lawyers',
             tabBarIcon: ({ focused }) => (
-              <TabIcon icon="🏠" label={t('nav.home')} focused={focused} C={C} />
+              <TabIcon icon="🔍" label={t('nav.lawyers')} focused={focused} C={C} />
             ),
           }}
         />

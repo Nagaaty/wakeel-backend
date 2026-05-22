@@ -25,8 +25,36 @@ import { useNetworkStatus } from '../../src/hooks/useNetworkStatus';
 // Card: padding(44) + topRow(68) + stars(20) + winbar(16) + bio(36) + meta(20) + actions(36) + save(36) + margin(18) = 294
 const LAWYER_CARD_HEIGHT = 294;
 
-const CATEGORIES_AR = ['','الأحوال الشخصية','الشركات','العقارات','القانون الجنائي','قانون العمل','الملكية الفكرية','الهجرة','المصرفي'];
-const CATEGORIES_EN = ['','Family Law','Corporate','Real Estate','Criminal','Labor Law','IP Law','Immigration','Banking'];
+const CATEGORIES_AR = [
+  '',
+  'الأحوال الشخصية',
+  'الشركات والتجارة',
+  'قانون العقارات',
+  'القانون الجنائي',
+  'قانون العمل',
+  'القانون الإداري',
+  'الملكية الفكرية',
+  'قانون الضرائب',
+  'قانون الأسرة',
+  'القانون البحري',
+  'قانون التحكيم',
+  'القانون الدولي'
+];
+const CATEGORIES_EN = [
+  '',
+  'Personal Status',
+  'Corporate',
+  'Real Estate',
+  'Criminal Law',
+  'Labor Law',
+  'Administrative',
+  'IP Law',
+  'Tax Law',
+  'Family Law',
+  'Maritime Law',
+  'Arbitration',
+  'International Law'
+];
 const CITIES_AR     = ['','القاهرة','الإسكندرية','الجيزة','المنصورة','طنطا','بورسعيد','الأقصر','أسوان'];
 const CITIES_EN     = ['','Cairo','Alexandria','Giza','Mansoura','Tanta','Port Said','Luxor','Aswan'];
 // sort options: [value, arLabel, enLabel]
