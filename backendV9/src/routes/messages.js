@@ -100,6 +100,7 @@ router.post('/conversations', requireAuth, async (req, res, next) => {
   try {
     const { lawyerId } = req.body;
     if (!lawyerId) return res.status(400).json({ message: 'lawyerId required' });
+    if (lawyerId === req.user.id) return res.status(400).json({ message: 'Cannot start a conversation with yourself' });
 
     // Get or create
     let { rows: [conv] } = await pool.query(
