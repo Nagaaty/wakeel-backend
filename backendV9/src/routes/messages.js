@@ -13,14 +13,17 @@ router.get('/conversations', requireAuth, async (req, res, next) => {
          CASE WHEN c.client_id=$1 THEN lu.avatar_url ELSE cu.avatar_url END AS other_avatar,
          CASE WHEN c.client_id=$1 THEN c.lawyer_id  ELSE c.client_id  END AS other_id,
          CASE WHEN c.client_id=$1 THEN lu.is_online  ELSE cu.is_online  END AS other_online,
+         CASE WHEN c.client_id=$1 THEN lu.role       ELSE cu.role       END AS other_role,
          (SELECT m.text FROM messages m WHERE m.conversation_id=c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
          (SELECT m.created_at FROM messages m WHERE m.conversation_id=c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message_at,
          (SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id AND m.sender_id!=$1 AND m.is_read=FALSE) AS unread_count
        FROM conversations c
        JOIN users cu ON cu.id=c.client_id
        JOIN users lu ON lu.id=c.lawyer_id
-       WHERE c.client_id=$1 OR c.lawyer_id=$1
-       ORDER BY (SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id) DESC NULLS LAST`,
+       WHERE (c.client_id=$1 OR c.lawyer_id=$1)
+          AND c.client_id != c.lawyer_id
+          AND CASE WHEN c.client_id=$1 THEN c.lawyer_id ELSE c.client_id END != $1
+        ORDER BY (SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id=c.id) DESC NULLS LAST`,
       [req.user.id]
     );
     res.json({ conversations: rows });
