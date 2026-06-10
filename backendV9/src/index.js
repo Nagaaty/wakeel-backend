@@ -144,7 +144,7 @@ if (process.env.NODE_ENV !== 'test') {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 Wakeel API running on port ${PORT}`);
   console.log(`🌐 Frontend: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
-  console.log(`📧 Email: ${process.env.EMAIL_HOST || process.env.EMAIL_SENDGRID_KEY ? '✅ configured' : '⚠️  not configured'}`);
+  console.log(`📧 Email: ${process.env.BREVO_API_KEY ? '✅ configured (Brevo)' : '⚠️  not configured'}`);
   console.log(`📱 Twilio: ${process.env.TWILIO_ACCOUNT_SID ? '✅ configured' : '⚠️  not configured'}`);
   console.log(`💳 Paymob: ${process.env.PAYMOB_API_KEY ? '✅ configured' : '⚠️  not configured'}`);
   console.log(`🎥 Daily.co: ${process.env.DAILY_API_KEY ? '✅ configured' : '⚠️  not configured'}`);

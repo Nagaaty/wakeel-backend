@@ -252,6 +252,22 @@ const MIGRATIONS = [
       ON CONFLICT (law_id) DO NOTHING`
     ],
   },
+
+  {
+    version: '015_crm_client_notes',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS lawyer_client_notes (
+        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        lawyer_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        client_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        notes       TEXT,
+        urgency     VARCHAR(20) DEFAULT 'normal' CHECK (urgency IN ('urgent','normal','low')),
+        updated_at  TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(lawyer_id, client_id)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_lawyer_client_notes ON lawyer_client_notes (lawyer_id, client_id)`
+    ],
+  },
 ];
 
 // ─── Runner ────────────────────────────────────────────────────────────────

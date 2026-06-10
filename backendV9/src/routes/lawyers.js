@@ -633,16 +633,39 @@ router.get('/me/clients', requireAuth, async (req, res, next) => {
     const { rows } = await pool.query(
       `SELECT u.id as client_id, u.name, u.phone, u.email,
               COUNT(b.id) as total_cases,
-              SUM(b.fee) as total_spent,
-              MAX(b.booking_date) as last_booking_date
+              COALESCE(SUM(b.amount), 0) as total_spent,
+              MAX(b.scheduled_at) as last_booking_date,
+              n.notes,
+              COALESCE(n.urgency, 'normal') as urgency
        FROM bookings b
        JOIN users u ON b.client_id = u.id
-       WHERE b.lawyer_id=$1 AND b.status='completed'
-       GROUP BY u.id, u.name, u.phone, u.email
+       LEFT JOIN lawyer_client_notes n ON (n.lawyer_id = b.lawyer_id AND n.client_id = b.client_id)
+       WHERE b.lawyer_id=$1 AND b.status IN ('confirmed', 'completed')
+       GROUP BY u.id, u.name, u.phone, u.email, n.notes, n.urgency
        ORDER BY last_booking_date DESC`,
       [req.user.id]
     );
     res.json({ clients: rows });
+  } catch (err) { next(err); }
+});
+
+// POST /api/lawyers/me/clients/:clientId/notes — Save notes/urgency for a client
+router.post('/me/clients/:clientId/notes', requireAuth, async (req, res, next) => {
+  try {
+    const { notes, urgency } = req.body;
+    const clientId = req.params.clientId;
+    const { rows } = await pool.query(
+      `INSERT INTO lawyer_client_notes (lawyer_id, client_id, notes, urgency, updated_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (lawyer_id, client_id)
+       DO UPDATE SET
+         notes = COALESCE(EXCLUDED.notes, lawyer_client_notes.notes),
+         urgency = COALESCE(EXCLUDED.urgency, lawyer_client_notes.urgency),
+         updated_at = NOW()
+       RETURNING *`,
+      [req.user.id, clientId, notes !== undefined ? notes : null, urgency || 'normal']
+    );
+    res.json({ success: true, note: rows[0] });
   } catch (err) { next(err); }
 });
 

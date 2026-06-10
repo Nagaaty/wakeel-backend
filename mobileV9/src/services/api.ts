@@ -2,8 +2,8 @@ import axios from 'axios';
 import { storage } from '../utils/storage';
 import { getConnectivityStatus } from '../utils/network';
 
-// const BASE_URL = 'https://wakeel-api.onrender.com';
 export const BASE_URL = 'http://16.171.32.21:5001'; // AWS Production Server (backendV9)
+// export const BASE_URL = 'http://192.168.100.42:5001'; // Local testing IP
 
 export function resolveMediaUrl(url: string | null | undefined): string {
   if (!url) return '';
@@ -104,6 +104,7 @@ export const lawyersAPI = {
   saveOverrides:   (data: any)    => api.post('/lawyers/me/overrides', data),
   getMyReviews:    ()             => api.get('/lawyers/me/reviews'),
   getMyClients:    ()             => api.get('/lawyers/me/clients'),
+  saveClientNotes: (clientId: string | number, data: { notes?: string; urgency?: string }) => api.post(`/lawyers/me/clients/${clientId}/notes`, data),
   review:          (id: string | number, data: any) => api.post(`/lawyers/${id}/review`, data),
 };
 

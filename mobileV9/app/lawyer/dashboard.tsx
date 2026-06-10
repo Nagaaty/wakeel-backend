@@ -229,71 +229,200 @@ function AvailabilityCalendar({ C, onBack }: any) {
 }
 
 function ClientCRMPage({ C, onBack }: any) {
-  const CLIENTS = [
-    {id:1,name:'محمد أحمد علي',phone:'01012345678',cases:3,lastContact:'2025-03-05',totalPaid:2400,notes:'عميل منتظم. قضية جنائية + عمالية',urgency:'urgent'},
-    {id:2,name:'فاطمة محمود',phone:'01098765432',cases:1,lastContact:'2025-02-20',totalPaid:650,notes:'قضية حضانة. تحتاج متابعة أسبوعية',urgency:'normal'},
-    {id:3,name:'خالد إبراهيم',phone:'01155667788',cases:2,lastContact:'2025-01-15',totalPaid:1200,notes:'قضية إيجار. انتهت بتسوية',urgency:'low'},
-    {id:4,name:'سارة حسن',phone:'01234567890',cases:1,lastContact:'2025-03-10',totalPaid:400,notes:'استشارة شركة جديدة',urgency:'normal'},
-  ];
-  const [selected,setSelected]=useState<any>(null);
-  const [search,setSearch]=useState('');
-  const UC:Record<string,string>={urgent:C.red,normal:C.gold,low:C.green};
-  const filtered=CLIENTS.filter(c=>c.name.includes(search)||c.phone.includes(search));
+  const { isRTL } = useI18n();
+  const [clients, setClients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<any>(null);
+  const [search, setSearch] = useState('');
 
-  if (selected) return (
-    <View style={{ flex:1, backgroundColor:C.bg }}>
-      <View style={{ backgroundColor:C.surface, paddingHorizontal:16, paddingVertical:14, borderBottomWidth:1, borderBottomColor:C.border, flexDirection:'row', alignItems:'center', gap:12 }}>
-        <TouchableOpacity onPress={()=>setSelected(null)}><Text style={{ color:C.text, fontSize:22 }}>‹</Text></TouchableOpacity>
-        <Text style={{ color:C.text, fontWeight:'700', fontSize:17 }}>ملف العميل</Text>
-      </View>
-      <ScrollView contentContainerStyle={{ padding:16, paddingBottom:100 }}>
-        <Card C={C} style={{ marginBottom:14 }}>
-          <View style={{ flexDirection:'row', alignItems:'center', gap:12, marginBottom:14 }}>
-            <Avatar C={C} initials={selected.name[0]} size={52} />
-            <View><Text style={{ color:C.text, fontWeight:'700', fontSize:16 }}>{selected.name}</Text>
-            <Text style={{ color:UC[selected.urgency], fontSize:12, fontWeight:'600', marginTop:2 }}>{selected.urgency==='urgent'?'🔴 عاجل':selected.urgency==='normal'?'🟡 عادي':'🟢 مرن'}</Text></View>
-          </View>
-          {[['📱 الهاتف',selected.phone],['⚖️ القضايا',`${selected.cases} قضية`],['💰 المدفوعات',`${selected.totalPaid} جنيه`],['📅 آخر تواصل',selected.lastContact]].map(([k,v])=>(
-            <View key={k as string} style={{ flexDirection:'row', justifyContent:'space-between', paddingVertical:8, borderBottomWidth:1, borderBottomColor:C.border }}>
-              <Text style={{ color:C.muted, fontSize:13 }}>{k as string}</Text><Text style={{ color:C.text, fontWeight:'600', fontSize:13 }}>{v as string}</Text>
+  // Editing notes and urgency
+  const [tempNote, setTempNote] = useState('');
+  const [tempUrgency, setTempUrgency] = useState<'urgent' | 'normal' | 'low'>('normal');
+  const [saving, setSaving] = useState(false);
+
+  const fetchClients = () => {
+    setLoading(true);
+    lawyersAPI.getMyClients()
+      .then((res: any) => setClients(res.clients || []))
+      .catch(console.warn)
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  const handleSelectClient = (c: any) => {
+    setSelected(c);
+    setTempNote(c.notes || '');
+    setTempUrgency(c.urgency || 'normal');
+  };
+
+  const handleSaveNotes = async () => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      await lawyersAPI.saveClientNotes(selected.client_id, { notes: tempNote, urgency: tempUrgency });
+      setClients(prev => prev.map(c => 
+        c.client_id === selected.client_id 
+          ? { ...c, notes: tempNote, urgency: tempUrgency } 
+          : c
+      ));
+      setSelected((prev: any) => prev ? { ...prev, notes: tempNote, urgency: tempUrgency } : null);
+      Alert.alert(isRTL ? 'نجاح' : 'Success', isRTL ? 'تم حفظ التعديلات!' : 'Notes saved!');
+    } catch (e: any) {
+      Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const UC: Record<string, string> = { urgent: C.red, normal: C.gold, low: C.green };
+  const filtered = clients.filter(c => (c.name || '').toLowerCase().includes(search.toLowerCase()) || (c.phone || '').includes(search));
+
+  if (selected) {
+    const formattedDate = selected.last_booking_date 
+      ? new Date(selected.last_booking_date).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+      : '—';
+    const hasChanges = tempNote !== (selected.notes || '') || tempUrgency !== (selected.urgency || 'normal');
+
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <View style={{ backgroundColor: C.surface, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={() => setSelected(null)}><Text style={{ color: C.text, fontSize: 22 }}>‹</Text></TouchableOpacity>
+          <Text style={{ color: C.text, fontWeight: '700', fontSize: 17 }}>{isRTL ? 'ملف العميل' : 'Client Profile'}</Text>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+          <Card C={C} style={{ marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <Avatar C={C} initials={selected.name ? selected.name[0] : 'C'} size={52} />
+              <View>
+                <Text style={{ color: C.text, fontWeight: '700', fontSize: 16 }}>{selected.name}</Text>
+                <Text style={{ color: UC[selected.urgency || 'normal'], fontSize: 12, fontWeight: '600', marginTop: 2 }}>
+                  {selected.urgency === 'urgent' ? '🔴 عاجل' : selected.urgency === 'low' ? '🟢 مرن' : '🟡 عادي'}
+                </Text>
+              </View>
             </View>
-          ))}
-        </Card>
-        <Card C={C} style={{ marginBottom:14 }}>
-          <Text style={{ color:C.text, fontWeight:'700', fontSize:14, marginBottom:8 }}>📝 ملاحظات</Text>
-          <Text style={{ color:C.muted, fontSize:14, lineHeight:22 }}>{selected.notes}</Text>
-        </Card>
-        <Btn C={C} full onPress={()=>router.push('/messages/index' as any)}>💬 راسل العميل</Btn>
-      </ScrollView>
-    </View>
-  );
+            {[
+              [isRTL ? '📱 الهاتف' : '📱 Phone', selected.phone],
+              [isRTL ? '⚖️ القضايا' : '⚖️ Cases', `${selected.total_cases} ${isRTL ? 'قضية' : 'Case(s)'}`],
+              [isRTL ? '💰 المدفوعات' : '💰 Spent', `EGP ${selected.total_spent}`],
+              [isRTL ? '📅 آخر تواصل' : '📅 Last Contact', formattedDate]
+            ].map(([k, v]) => (
+              <View key={k} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                <Text style={{ color: C.muted, fontSize: 13 }}>{k}</Text>
+                <Text style={{ color: C.text, fontWeight: '600', fontSize: 13 }}>{v}</Text>
+              </View>
+            ))}
+          </Card>
+
+          {/* Classification & Notes Card */}
+          <Card C={C} style={{ marginBottom: 14 }}>
+            <Text style={{ color: C.text, fontWeight: '700', fontSize: 14, marginBottom: 8 }}>{isRTL ? '⚙️ تصنيف العميل وملاحظات خاصة' : '⚙️ Classification & Private Notes'}</Text>
+            
+            {/* Urgency Selector */}
+            <View style={{ flexDirection: 'row', gap: 6, marginVertical: 8 }}>
+              {(['urgent', 'normal', 'low'] as const).map(u => {
+                const isSel = tempUrgency === u;
+                return (
+                  <TouchableOpacity
+                    key={u}
+                    onPress={() => setTempUrgency(u)}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: isSel ? UC[u] : C.border,
+                      backgroundColor: isSel ? UC[u] + '12' : 'transparent',
+                      alignItems: 'center',
+                    }}>
+                    <Text style={{ color: isSel ? UC[u] : C.muted, fontSize: 11, fontWeight: '700' }}>
+                      {u === 'urgent' ? '🔴' : u === 'low' ? '🟢' : '🟡'} {u}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TextInput
+              value={tempNote}
+              onChangeText={setTempNote}
+              placeholder={isRTL ? 'اكتب ملاحظة خاصة...' : 'Write private notes...'}
+              placeholderTextColor={C.muted}
+              multiline
+              numberOfLines={3}
+              style={{
+                backgroundColor: C.bg,
+                borderWidth: 1,
+                borderColor: C.border,
+                borderRadius: 9,
+                padding: 10,
+                color: C.text,
+                fontSize: 13,
+                minHeight: 60,
+                textAlignVertical: 'top',
+                textAlign: isRTL ? 'right' : 'left'
+              }}
+            />
+
+            {hasChanges && (
+              <TouchableOpacity
+                onPress={handleSaveNotes}
+                disabled={saving}
+                style={{ backgroundColor: C.gold, borderRadius: 10, paddingVertical: 10, alignItems: 'center', marginTop: 12 }}>
+                {saving ? (
+                  <ActivityIndicator size="small" color="#000" />
+                ) : (
+                  <Text style={{ color: '#000', fontWeight: '700', fontSize: 13 }}>
+                    {isRTL ? 'حفظ التعديلات' : 'Save changes'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </Card>
+
+          <Btn C={C} full onPress={() => router.push('/messages/index' as any)}>{isRTL ? '💬 راسل العميل' : '💬 Message Client'}</Btn>
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
-    <View style={{ flex:1, backgroundColor:C.bg }}>
-      <View style={{ backgroundColor:C.surface, paddingHorizontal:16, paddingVertical:14, borderBottomWidth:1, borderBottomColor:C.border }}>
-        <View style={{ flexDirection:'row', alignItems:'center', gap:10, marginBottom:10 }}>
-          <TouchableOpacity onPress={onBack}><Text style={{ color:C.text, fontSize:22 }}>‹</Text></TouchableOpacity>
-          <Text style={{ color:C.text, fontWeight:'700', fontSize:17 }}>إدارة العملاء CRM</Text>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={{ backgroundColor: C.surface, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <TouchableOpacity onPress={onBack}><Text style={{ color: C.text, fontSize: 22 }}>‹</Text></TouchableOpacity>
+          <Text style={{ color: C.text, fontWeight: '700', fontSize: 17 }}>{isRTL ? 'إدارة العملاء CRM' : 'Client CRM'}</Text>
         </View>
-        <View style={{ flexDirection:'row', backgroundColor:C.card2, borderWidth:1, borderColor:C.border, borderRadius:10, paddingHorizontal:12, paddingVertical:9, alignItems:'center', gap:8 }}>
+        <View style={{ flexDirection: 'row', backgroundColor: C.card2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, alignItems: 'center', gap: 8 }}>
           <Text>🔍</Text>
-          <TextInput value={search} onChangeText={setSearch} placeholder="ابحث..." placeholderTextColor={C.muted} style={{ flex:1, color:C.text, fontSize:14 }} />
+          <TextInput value={search} onChangeText={setSearch} placeholder={isRTL ? 'ابحث...' : 'Search...'} placeholderTextColor={C.muted} style={{ flex: 1, color: C.text, fontSize: 14 }} />
         </View>
       </View>
-      <FlatList data={filtered} keyExtractor={item=>String(item.id)} keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding:16, paddingBottom:100 }}
-        ListEmptyComponent={<Empty C={C} icon="👥" title="لا توجد عملاء" />}
-        renderItem={({item:cl})=>(
-          <TouchableOpacity onPress={()=>setSelected(cl)} style={{ flexDirection:'row', gap:12, alignItems:'center', backgroundColor:C.card, borderWidth:1, borderColor:C.border, borderRadius:14, padding:14, marginBottom:10 }}>
-            <Avatar C={C} initials={cl.name[0]} size={46} />
-            <View style={{ flex:1 }}>
-              <Text style={{ color:C.text, fontWeight:'700', fontSize:14 }}>{cl.name}</Text>
-              <Text style={{ color:C.muted, fontSize:12, marginTop:2 }}>{cl.cases} قضية · {cl.totalPaid} جنيه</Text>
-            </View>
-            <Badge C={C} color={UC[cl.urgency]}>{cl.urgency==='urgent'?'🔴':cl.urgency==='normal'?'🟡':'🟢'}</Badge>
-          </TouchableOpacity>
-        )}
-      />
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="large" color={C.gold} /></View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={item => String(item.client_id)}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          ListEmptyComponent={<Empty C={C} icon="👥" title={isRTL ? "لا توجد عملاء" : "No clients found"} />}
+          renderItem={({ item: cl }) => (
+            <TouchableOpacity onPress={() => handleSelectClient(cl)} style={{ flexDirection: 'row', gap: 12, alignItems: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+              <Avatar C={C} initials={cl.name ? cl.name[0] : 'C'} size={46} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>{cl.name}</Text>
+                <Text style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{cl.total_cases} {isRTL ? 'قضية' : 'Case(s)'} · EGP {cl.total_spent}</Text>
+              </View>
+              <Badge C={C} color={UC[cl.urgency || 'normal']}>
+                {cl.urgency === 'urgent' ? '🔴' : cl.urgency === 'low' ? '🟢' : '🟡'}
+              </Badge>
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </View>
   );
 }
