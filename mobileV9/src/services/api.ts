@@ -7,6 +7,12 @@ export const BASE_URL = 'http://16.171.32.21:5001'; // AWS Production Server (ba
 
 export function resolveMediaUrl(url: string | null | undefined): string {
   if (!url) return '';
+  if (url.startsWith('/')) {
+    return `${BASE_URL}${url}`;
+  }
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return `${BASE_URL}/${url}`;
+  }
   // Correct stale database URLs pointing to previous local IP assignments
   if (url.startsWith('http://192.168.')) {
     return url.replace(/^http:\/\/192\.168\.\d+\.\d+:\d+/, BASE_URL);

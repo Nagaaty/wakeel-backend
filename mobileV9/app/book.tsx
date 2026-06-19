@@ -373,7 +373,9 @@ export default function BookScreen() {
       router.replace({ pathname: '/payment-result', params: { success: 'true', booking_id: String(bookingId || '') } } as any);
     } catch (e: any) {
       hapticError();
-      setError(e?.message || (isRTL ? 'حدث خطأ. تحقق من اتصالك وحاول مجدداً.' : 'Something went wrong.'));
+      const msg = e?.message || (isRTL ? 'حدث خطأ. تحقق من اتصالك وحاول مجدداً.' : 'Something went wrong.');
+      setError(msg);
+      Alert.alert(isRTL ? 'خطأ' : 'Error', msg);
     } finally {
       setSubmitting(false);
     }

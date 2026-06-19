@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef, useCallback, memo } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   KeyboardAvoidingView, Platform, RefreshControl,
-  Alert, Animated, Easing, Image, ActionSheetIOS, Modal, ActivityIndicator, Keyboard,
+  Alert, Animated, Easing, Image, ActionSheetIOS, Modal, ActivityIndicator, Keyboard, StyleSheet,
 } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
@@ -30,7 +30,70 @@ import type { Conversation, Message } from '../../src/types';
 import * as ImagePicker from 'expo-image-picker';
 import api from '../../src/services/api';
 
-const CONV_ROW_HEIGHT = 79; // avatar(50) + paddingV(28) + border(1)
+
+const CONV_ROW_HEIGHT = 82; // avatar(54) + paddingV(28)
+
+// ── Beautiful gradient avatar for users without a photo ──────────────────────
+const AVATAR_PALETTES = [
+  ['#7C3AED','#A855F7'], // purple
+  ['#0369A1','#0EA5E9'], // sky blue
+  ['#065F46','#10B981'], // emerald
+  ['#B45309','#F59E0B'], // amber
+  ['#BE123C','#F43F5E'], // rose
+  ['#1D4ED8','#60A5FA'], // blue
+  ['#7E22CE','#C084FC'], // violet
+  ['#0F766E','#2DD4BF'], // teal
+  ['#B91C1C','#F87171'], // red
+  ['#15803D','#4ADE80'], // green
+];
+
+function getAvatarColors(name: string): [string, string] {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length] as [string, string];
+}
+
+function GradientAvatar({ name, size, uri, C }: { name: string; size: number; uri?: string | null; C: any }) {
+  const [imgError, setImgError] = React.useState(false);
+  const initials = (name || '?').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+  const [from, to] = getAvatarColors(name || '?');
+
+  if (uri && !imgError) {
+    return (
+      <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden',
+                     borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' }}>
+        <Image source={{ uri }} style={{ width: size, height: size }} onError={() => setImgError(true)} />
+      </View>
+    );
+  }
+
+  // Beautiful gradient-style avatar using two-tone background
+  return (
+    <View style={{
+      width: size, height: size, borderRadius: size / 2,
+      backgroundColor: from,
+      alignItems: 'center', justifyContent: 'center',
+      borderWidth: 2, borderColor: to + '80',
+      shadowColor: from, shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.4, shadowRadius: 6, elevation: 4,
+    }}>
+      {/* Inner shimmer circle */}
+      <View style={{
+        position: 'absolute', width: size * 0.7, height: size * 0.7,
+        borderRadius: size * 0.35, backgroundColor: to + '40',
+        top: size * 0.05, right: size * 0.05,
+      }} />
+      <Text style={{
+        color: '#fff', fontWeight: '800',
+        fontSize: size * 0.35,
+        letterSpacing: 1,
+        textShadowColor: 'rgba(0,0,0,0.3)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
+      }}>{initials}</Text>
+    </View>
+  );
+}
 
 const fmt = (iso: string) =>
   new Date(iso).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
@@ -301,18 +364,28 @@ export default function MessagesScreen() {
     if (!activeRef.current) return;
     setUploading(true);
     try {
+      // Use the pre-configured api instance (uploadAPI) which already has the
+      // Authorization header injected via the request interceptor — no manual
+      // token retrieval needed. This avoids "Invalid token" errors from SecureStore.
       const formData = new FormData();
       formData.append('file', { uri, type: mimeType, name } as any);
       formData.append('folder', 'chat');
-      const res: any = await api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+
+      const res: any = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000,
+      });
+
       const url = res?.url || res?.file?.url;
       if (!url) throw new Error('No URL returned');
+
       const content = mimeType.startsWith('image/') ? `__img__:${url}` : `📎 ${name}\n${url}`;
       const conv = activeRef.current;
       const s = await getSocket();
       s.emit('message:send', { conversationId: conv.id, content });
     } catch (e: any) {
-      Alert.alert('خطأ في الرفع', e?.message || 'تعذر رفع الملف');
+      const msg = e?.response?.data?.message || e?.message || 'تعذر رفع الملف';
+      Alert.alert('خطأ في الرفع', msg);
     } finally {
       setUploading(false);
     }
@@ -387,39 +460,85 @@ export default function MessagesScreen() {
               : <ListSkeleton C={C} count={5} type="message" />
           }
           renderItem={({ item: conv }) => {
-            const initials = (conv.other_name || '?').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
-            const unread   = parseInt(String((conv as any).unread_count || 0));
+            const unread = parseInt(String((conv as any).unread_count || 0));
+            const name   = conv.other_name || '?';
+            const [avatarFrom] = getAvatarColors(name);
+            const lastMsg = (conv as any).last_message || '';
+            const isImageMsg = lastMsg.startsWith('__img__:') || /\.(jpg|jpeg|png|gif|webp)/i.test(lastMsg);
+            const previewText = isImageMsg ? '📷 صورة' : (lastMsg || t('msg.startConv'));
             return (
-              <TouchableOpacity onPress={() => openConversation(conv)} activeOpacity={0.8}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12,
-                         paddingHorizontal: 16, paddingVertical: 14,
-                         borderBottomWidth: 1, borderBottomColor: C.border,
-                         backgroundColor: unread > 0 ? C.gold + '06' : 'transparent' }}>
+              <TouchableOpacity onPress={() => openConversation(conv)} activeOpacity={0.75}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 13,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  backgroundColor: unread > 0
+                    ? (C.gold + '10')
+                    : C.surface,
+                  borderBottomWidth: StyleSheet.hairlineWidth,
+                  borderBottomColor: C.border,
+                }}>
+
+                {/* Avatar with online dot */}
                 <View style={{ position: 'relative' }}>
-                  <CachedAvatar C={C} uri={(conv as any).other_photo} initials={initials} size={50} />
+                  <GradientAvatar name={name} size={54} uri={(conv as any).other_photo} C={C} />
                   {(conv as any).other_online && (
-                    <View style={{ position: 'absolute', bottom: 0, right: 0, width: 13, height: 13,
-                                   borderRadius: 7, backgroundColor: C.green, borderWidth: 2, borderColor: C.bg }} />
-                  )}
-                  {unread > 0 && (
-                    <View style={{ position: 'absolute', top: -3, left: -3, minWidth: 18, height: 18,
-                                   borderRadius: 9, backgroundColor: C.red, alignItems: 'center',
-                                   justifyContent: 'center', paddingHorizontal: 4 }}>
-                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{unread}</Text>
-                    </View>
+                    <View style={{
+                      position: 'absolute', bottom: 1, right: 1,
+                      width: 14, height: 14, borderRadius: 7,
+                      backgroundColor: '#22C55E',
+                      borderWidth: 2.5, borderColor: C.surface,
+                    }} />
                   )}
                 </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ color: C.text, fontWeight: unread > 0 ? '700' : '500', fontSize: 15 }}>
-                      {conv.other_name}
+
+                {/* Text content */}
+                <View style={{ flex: 1, gap: 3 }}>
+                  {/* Name row */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={{
+                      color: C.text,
+                      fontWeight: unread > 0 ? '700' : '600',
+                      fontSize: 15.5,
+                      flex: 1,
+                    }} numberOfLines={1}>
+                      {name}
                     </Text>
-                    {(conv as any).last_message_at && (
-                      <Text style={{ color: C.muted, fontSize: 11 }}>{fmt((conv as any).last_message_at)}</Text>
-                    )}
+                    {/* Time + unread badge */}
+                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                      {(conv as any).last_message_at && (
+                        <Text style={{
+                          color: unread > 0 ? avatarFrom : C.muted,
+                          fontSize: 11,
+                          fontWeight: unread > 0 ? '600' : '400',
+                        }}>
+                          {fmt((conv as any).last_message_at)}
+                        </Text>
+                      )}
+                      {unread > 0 && (
+                        <View style={{
+                          minWidth: 20, height: 20, borderRadius: 10,
+                          backgroundColor: avatarFrom,
+                          alignItems: 'center', justifyContent: 'center',
+                          paddingHorizontal: 5,
+                        }}>
+                          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{unread}</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                  <Text style={{ color: unread > 0 ? C.text : C.muted, fontSize: 13, marginTop: 2 }} numberOfLines={1}>
-                    {(conv as any).last_message || t('msg.startConv')}
+
+                  {/* Last message preview */}
+                  <Text
+                    style={{
+                      color: unread > 0 ? C.text : C.muted,
+                      fontSize: 13.5,
+                      fontWeight: unread > 0 ? '500' : '400',
+                    }}
+                    numberOfLines={1}>
+                    {previewText}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -444,47 +563,70 @@ export default function MessagesScreen() {
     >
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Header — deep gold, professional */}
+      {/* ── Chat Header — WhatsApp style, name+avatar always on LEFT ── */}
       <View style={{
         backgroundColor: C.gold,
-        paddingTop: insets.top + 8,
-        paddingHorizontal: 12,
-        paddingBottom: 12,
+        paddingTop: insets.top + 6,
+        paddingBottom: 10,
+        paddingHorizontal: 4,
+        // Force LTR so back-button is always LEFT, name+avatar always LEFT
+        direction: 'ltr',
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
-        elevation: 4,
+        elevation: 6,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
       }}>
+        {/* Back button — always far LEFT */}
         <TouchableOpacity
           onPress={() => { setActive(null); setOtherTyping(false); setError(''); }}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          style={{ padding: 4 }}>
-          <Text style={{ color: '#fff', fontSize: 26, lineHeight: 28 }}>‹</Text>
+          style={{ paddingHorizontal: 10, paddingVertical: 4 }}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
 
-        <CachedAvatar C={C} uri={(active as any).other_photo}
-          initials={initials} size={42} />
+        {/* Avatar */}
+        <GradientAvatar
+          name={active.other_name || '?'}
+          size={42}
+          uri={(active as any).other_photo}
+          C={C}
+        />
 
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>
+        {/* Name + status — LEFT aligned, grows to fill space */}
+        <View style={{ flex: 1, marginLeft: 10 }}>
+          <Text style={{
+            color: '#fff', fontWeight: '700', fontSize: 16,
+            textAlign: 'left',
+          }} numberOfLines={1}>
             {active.other_name}
           </Text>
-          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>
+          <Text style={{
+            color: 'rgba(255,255,255,0.82)', fontSize: 12,
+            textAlign: 'left',
+          }}>
             {otherTyping
-              ? 'يكتب...'
-              : (active as any).other_online ? 'متصل الآن' : 'غير متصل'}
+              ? '⌨️ يكتب...'
+              : (active as any).other_online
+                ? '🟢 متصل الآن'
+                : 'غير متصل'}
           </Text>
         </View>
 
-        <TouchableOpacity
-          onPress={() => router.push(`/lawyer/${(active as any).other_id || (active as any).lawyer_id}` as any)}
-          style={{ padding: 6 }}>
-          <Text style={{ fontSize: 20 }}>👤</Text>
-        </TouchableOpacity>
+        {/* Profile button — always far RIGHT */}
+        {user?.role === 'client' && (
+          <TouchableOpacity
+            onPress={() => router.push(`/lawyer/${(active as any).other_id || (active as any).lawyer_id}` as any)}
+            style={{
+              marginRight: 8, padding: 8,
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              borderRadius: 20,
+            }}>
+            <Ionicons name="person" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Slim offline indicator */}

@@ -5,6 +5,7 @@ import { useTheme } from '../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n, LangToggle } from '../i18n';
 import { useAuth } from '../hooks/useAuth';
+import { resolveMediaUrl } from '../services/api';
 
 export function TopNav() {
   const C = useTheme();
@@ -39,7 +40,7 @@ export function TopNav() {
             >
               {user?.avatar_url ? (
                 <Image
-                  source={{ uri: user.avatar_url }}
+                  source={{ uri: resolveMediaUrl(user.avatar_url) }}
                   style={{ width: 36, height: 36, borderRadius: 18 }}
                 />
               ) : (

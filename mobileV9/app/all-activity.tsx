@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../src/theme';
 import { useAuth } from '../src/hooks/useAuth';
 import { useI18n } from '../src/i18n';
-import { forumAPI, usersAPI } from '../src/services/api';
+import { forumAPI, usersAPI, resolveMediaUrl } from '../src/services/api';
 import { PostCard } from '../src/components/forum/PostCard';
 
 function timeAgo(iso: string, isRTL: boolean) {
@@ -120,7 +120,7 @@ export default function AllActivityScreen() {
               <View key={p.id} style={{ marginBottom: 8, backgroundColor: C.surface }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 8 }}>
                   {user?.avatar_url || user?.avatar ? (
-                    <Image source={{ uri: user.avatar_url || user.avatar }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                    <Image source={{ uri: resolveMediaUrl(user.avatar_url || user.avatar) }} style={{ width: 32, height: 32, borderRadius: 16 }} />
                   ) : (
                     <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: C.gold + '25', alignItems: 'center', justifyContent: 'center' }}>
                       <Text style={{ color: C.gold, fontSize: 12, fontWeight: '800' }}>{(user?.name || 'U').charAt(0)}</Text>
@@ -154,7 +154,7 @@ export default function AllActivityScreen() {
                 style={{ backgroundColor: C.surface, marginBottom: 8, paddingHorizontal: 16, paddingVertical: 14 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   {user?.avatar_url || user?.avatar ? (
-                    <Image source={{ uri: user.avatar_url || user.avatar }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                    <Image source={{ uri: resolveMediaUrl(user.avatar_url || user.avatar) }} style={{ width: 32, height: 32, borderRadius: 16 }} />
                   ) : (
                     <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: C.gold + '25', alignItems: 'center', justifyContent: 'center' }}>
                       <Text style={{ color: C.gold, fontSize: 12, fontWeight: '800' }}>{(user?.name || 'U').charAt(0)}</Text>
@@ -192,7 +192,7 @@ export default function AllActivityScreen() {
                 style={{ backgroundColor: C.surface, marginBottom: 8, paddingHorizontal: 16, paddingVertical: 14 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   {user?.avatar_url || user?.avatar ? (
-                    <Image source={{ uri: user.avatar_url || user.avatar }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+                    <Image source={{ uri: resolveMediaUrl(user.avatar_url || user.avatar) }} style={{ width: 32, height: 32, borderRadius: 16 }} />
                   ) : (
                     <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: C.gold + '25', alignItems: 'center', justifyContent: 'center' }}>
                       <Text style={{ color: C.gold, fontSize: 12, fontWeight: '800' }}>{(user?.name || 'U').charAt(0)}</Text>

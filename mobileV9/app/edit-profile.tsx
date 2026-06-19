@@ -3,17 +3,18 @@ import * as Location from 'expo-location';
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert,
-  KeyboardAvoidingView, Platform, Image, TextInput, ActivityIndicator,
+  KeyboardAvoidingView, Platform, TextInput, ActivityIndicator,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { selUser, setUser } from '../src/features/auth/authSlice';
 import { useTheme } from '../src/theme';
 import { Btn, Inp, Avatar, Card } from '../src/components/ui';
-import { authAPI, uploadAPI, lawyersAPI } from '../src/services/api';
+import { authAPI, uploadAPI, lawyersAPI, resolveMediaUrl } from '../src/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../src/i18n';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import LeafletMap from '../src/components/LeafletMap';
 
 // ─── Service types ───────────────────────────────────────────────────────────
 // Aligned with everywhere else: 4 types, no phone.
@@ -273,9 +274,9 @@ export default function EditProfileScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
         <View style={{ marginBottom: 30, marginTop: 4, marginHorizontal: 4 }}>
-          <View style={{ height: 160, borderRadius: 24, backgroundColor: C.surface, overflow: 'hidden', shadowColor: C.gold, shadowOpacity: 0.1, shadowRadius: 10, elevation: 4 }}>
-            {user?.cover_url ? (
-              <Image source={{ uri: user.cover_url }} style={{ width: '100%', height: '100%', opacity: 0.9 }} />
+          <View style={{ height: 160, borderRadius: 24, backgroundColor: C.surface, overflow: 'hidden' }}>
+            {(user?.cover_url && typeof user.cover_url === 'string') ? (
+              <ExpoImage source={{ uri: resolveMediaUrl(user.cover_url) }} style={{ width: '100%', height: '100%', opacity: 0.9 }} contentFit="cover" />
             ) : (
               <View style={{ width: '100%', height: '100%', backgroundColor: C.gold + '22' }} />
             )}
@@ -290,7 +291,7 @@ export default function EditProfileScreen() {
           
           <View style={{ alignSelf: 'center', marginTop: -50 }}>
             <View style={{ padding: 4, backgroundColor: C.bg, borderRadius: 60 }}>
-              <Avatar C={C} initials={initials} size={100} url={user?.avatar_url || user?.avatar} />
+              <Avatar C={C} initials={initials} size={100} url={resolveMediaUrl(user?.avatar_url || user?.avatar)} />
             </View>
             <TouchableOpacity 
               onPress={pickAvatar}
@@ -301,7 +302,7 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
-        <View style={{ backgroundColor: C.surface, borderRadius: 24, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 }}>
+        <View style={{ backgroundColor: C.surface, borderRadius: 24, padding: 20, marginBottom: 20 }}>
           <Text style={{ color: C.text, fontWeight: '800', fontSize: 16, marginBottom: 16, fontFamily: 'Cairo-Bold', textAlign: isRTL ? 'right' : 'left' }}>
             {isRTL ? 'المعلومات الشخصية' : 'Personal Info'}
           </Text>
@@ -314,7 +315,7 @@ export default function EditProfileScreen() {
         </View>
 
         {isLawyer && (
-          <View style={{ backgroundColor: C.surface, borderRadius: 24, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 }}>
+          <View style={{ backgroundColor: C.surface, borderRadius: 24, padding: 20, marginBottom: 20 }}>
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
               <Text style={{ fontSize: 18 }}>💲</Text>
               <Text style={{ color: C.text, fontWeight: '800', fontSize: 16, fontFamily: 'Cairo-Bold' }}>
@@ -342,7 +343,7 @@ export default function EditProfileScreen() {
                       borderRadius: 16, padding: 14, marginBottom: 12,
                     }}>
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}>
-                        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 }}>
+                        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ fontSize: 20 }}>{svc.icon}</Text>
                         </View>
                         <Text style={{ flex: 1, color: C.text, fontWeight: '700', fontSize: 14, fontFamily: 'Cairo-Bold', textAlign: isRTL ? 'right' : 'left' }}>
@@ -379,7 +380,7 @@ export default function EditProfileScreen() {
         )}
 
         {isLawyer && (
-          <View style={{ backgroundColor: C.surface, borderRadius: 24, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 }}>
+          <View style={{ backgroundColor: C.surface, borderRadius: 24, padding: 20, marginBottom: 20 }}>
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
               <Text style={{ fontSize: 18 }}>🏛️</Text>
               <Text style={{ color: C.text, fontWeight: '800', fontSize: 16, fontFamily: 'Cairo-Bold' }}>
@@ -411,41 +412,22 @@ export default function EditProfileScreen() {
             </View>
 
             {coords ? (
-              <View style={{
-                marginTop: 16, height: 200, borderRadius: 16, overflow: 'hidden',
-                borderWidth: 2, borderColor: C.gold + '40',
-              }}>
-                <MapView
-                  provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-                  style={{ flex: 1 }}
-                  region={{
-                    latitude:  coords.lat,
-                    longitude: coords.lng,
-                    latitudeDelta:  0.01,
-                    longitudeDelta: 0.01,
-                  }}
-                  onPress={(e) => {
-                    setCoords({
-                      lat: e.nativeEvent.coordinate.latitude,
-                      lng: e.nativeEvent.coordinate.longitude,
-                    });
-                  }}
-                >
-                  <Marker
-                    coordinate={{ latitude: coords.lat, longitude: coords.lng }}
-                    draggable
-                    onDragEnd={(e) => setCoords({
-                      lat: e.nativeEvent.coordinate.latitude,
-                      lng: e.nativeEvent.coordinate.longitude,
-                    })}
-                  />
-                </MapView>
+              <View style={{ marginTop: 16, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: C.gold + '40' }}>
+                <LeafletMap 
+                  lat={coords.lat} 
+                  lng={coords.lng} 
+                  onLocationSelect={(lat, lng) => setCoords({ lat, lng })}
+                  style={{ height: 250, width: '100%' }}
+                />
+                <View style={{ padding: 12, backgroundColor: C.surface, alignItems: 'center' }}>
+                  <Text style={{ color: C.text, fontWeight: '700', fontFamily: 'Cairo-Bold', marginBottom: 2 }}>
+                    {isRTL ? 'الموقع المحدد' : 'Selected Location'}
+                  </Text>
+                  <Text style={{ color: C.muted, fontSize: 11, fontFamily: 'Cairo-Regular', textAlign: 'center' }}>
+                    {isRTL ? 'اسحب الدبوس أو انقر لتعديل الموقع' : 'Drag the pin or click to adjust'}
+                  </Text>
+                </View>
               </View>
-            ) : null}
-            {coords ? (
-              <Text style={{ color: C.muted, fontSize: 11, marginTop: 8, textAlign: 'center', fontFamily: 'Cairo-Regular' }}>
-                📌 {isRTL ? 'اسحب الدبوس لتعديل الموقع بدقة' : 'Drag the pin to adjust precisely'}
-              </Text>
             ) : null}
           </View>
         )}
@@ -458,7 +440,7 @@ export default function EditProfileScreen() {
           </Btn>
         )}
 
-        <View style={{ backgroundColor: C.surface, borderRadius: 24, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 }}>
+        <View style={{ backgroundColor: C.surface, borderRadius: 24, padding: 20, marginBottom: 20 }}>
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <Text style={{ fontSize: 18 }}>🔐</Text>
             <Text style={{ color: C.text, fontWeight: '800', fontSize: 16, fontFamily: 'Cairo-Bold' }}>

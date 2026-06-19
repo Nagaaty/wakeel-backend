@@ -6,8 +6,8 @@ import {
   View, Text, TouchableOpacity, Linking,
   ActivityIndicator, Platform,
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
+import LeafletMap from "./LeafletMap";
 import { useTheme } from "../theme";
 import { useI18n } from "../i18n";
 
@@ -115,27 +115,12 @@ export function LawyerMap({ lawyerName, officeAddress, latitude, longitude, heig
 
   return (
     <View style={{ borderRadius: 14, overflow: "hidden", borderWidth: 1, borderColor: C.border }}>
-      <MapView
-        provider={PROVIDER_GOOGLE}
+      <LeafletMap 
+        lat={coords.lat} 
+        lng={coords.lng} 
+        staticMap={true}
         style={{ height }}
-        initialRegion={{
-          latitude:            coords.lat,
-          longitude:           coords.lng,
-          latitudeDelta:       0.01,
-          longitudeDelta:      0.01,
-        }}
-        showsUserLocation={!!userLoc}
-        showsMyLocationButton={false}
-        mapType="standard"
-      >
-        {/* Lawyer office marker */}
-        <Marker
-          coordinate={{ latitude: coords.lat, longitude: coords.lng }}
-          title={lawyerName}
-          description={officeAddress}
-          pinColor="#9A6F2A"
-        />
-      </MapView>
+      />
 
       {/* Address bar + directions button */}
       <View style={{

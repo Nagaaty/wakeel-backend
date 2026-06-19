@@ -30,14 +30,13 @@ import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useTheme } from '../../src/theme';
 import { useI18n } from '../../src/i18n';
 import { useAuth } from '../../src/hooks/useAuth';
+import { useSelector } from 'react-redux';
+import { selUser } from '../../src/features/auth/authSlice';
 import { lawyersAPI, forumAPI } from '../../src/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ProfileHeader }   from '../../src/components/profile/ProfileHeader';
-import { ActivityFeed }    from '../../src/components/profile/ActivityFeed';
-import { PinnedPostCard }  from '../../src/components/profile/PinnedPostCard';
-import { LawyerPostsTab }  from '../../src/components/forum/LawyerPostsTab';
 import { LawyerMap }       from '../../src/components/LawyerMap';
 
 const SERVICE_LABELS = {
@@ -55,13 +54,13 @@ export default function LawyerPublicProfile() {
   const { isRTL } = useI18n();
   const insets = useSafeAreaInsets();
   const { isLoggedIn } = useAuth();
+  const currentUser = useSelector(selUser);
+  const isOwnProfile = !!(currentUser?.id && currentUser.id === id);
 
   const [lawyer, setLawyer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<Tab>('about');
-  const [pinned, setPinned] = useState<any[]>([]);
-  const [pinnedLoaded, setPinnedLoaded] = useState(false);
 
   // ── Load lawyer ──────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -77,23 +76,7 @@ export default function LawyerPublicProfile() {
     }
   }, [id]);
 
-  // ── Load pinned posts (lazy, when Posts tab opens) ───────────────────────
-  const loadPinned = useCallback(async () => {
-    if (!id || pinnedLoaded) return;
-    try {
-      const res: any = await forumAPI.getPinnedPosts(id);
-      setPinned(res?.pinned || []);
-    } catch {
-      setPinned([]);
-    } finally {
-      setPinnedLoaded(true);
-    }
-  }, [id, pinnedLoaded]);
-
   useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    if (tab === 'posts') loadPinned();
-  }, [tab, loadPinned]);
 
   // ── Compute starting price (lowest of 4 service types) ──────────────────
   const startingPrice = useMemo(() => {
@@ -290,7 +273,7 @@ export default function LawyerPublicProfile() {
                     </Text>
                   )}
                   <LawyerMap
-                    lawyerName={lawyer.name}
+                    lawyerName={lawyer.name || 'Lawyer'}
                     officeAddress={lawyer.office || ''}
                     latitude={lawyer.office_lat ? Number(lawyer.office_lat) : undefined}
                     longitude={lawyer.office_lng ? Number(lawyer.office_lng) : undefined}
@@ -310,7 +293,7 @@ export default function LawyerPublicProfile() {
                 lawyer.reviews.map((r: any, i: number) => (
                   <View key={r.id || i} style={[styles.reviewCard, { backgroundColor: C.surface, borderColor: C.border }]}>
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <Text style={{ color: C.gold, fontSize: 14 }}>{'⭐'.repeat(Number(r.rating) || 0)}</Text>
+                      <Text style={{ color: C.gold, fontSize: 14 }}>{'⭐'.repeat(Math.max(0, Math.round(Number(r.rating) || 0)))}</Text>
                       <Text style={{ color: C.muted, fontSize: 11 }}>{r.created_at ? String(r.created_at).slice(0, 10) : ''}</Text>
                     </View>
                     {r.comment && (
@@ -350,7 +333,8 @@ export default function LawyerPublicProfile() {
         </View>
       </ScrollView>
 
-      {/* ── Sticky bottom CTA ── */}
+      {/* ── Sticky bottom CTA — hidden on own profile ── */}
+      {!isOwnProfile && (
       <View style={[styles.bottomCta, {
         backgroundColor: C.surface, borderTopColor: C.border,
         paddingBottom: insets.bottom + 12,
@@ -381,6 +365,7 @@ export default function LawyerPublicProfile() {
           </Text>
         </TouchableOpacity>
       </View>
+      )}
     </View>
   );
 }

@@ -9,7 +9,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchLawyers, selLawyers, selLawyersLoad, selLawyersTotal,
 } from '../../src/features/lawyers/lawyersSlice';
-import { selLoggedIn } from '../../src/features/auth/authSlice';
+import { selLoggedIn, selUser } from '../../src/features/auth/authSlice';
 import { useTheme } from '../../src/theme';
 import { Avatar, WinBar, Stars, Tag, Btn, Spinner, Empty, ErrMsg } from '../../src/components/ui';
 import { favoritesAPI } from '../../src/services/api';
@@ -38,7 +38,12 @@ const CATEGORIES_AR = [
   'قانون الأسرة',
   'القانون البحري',
   'قانون التحكيم',
-  'القانون الدولي'
+  'القانون الدولي',
+  'قانون الهجرة والسفر',
+  'القانون المصرفي والمالي',
+  'القانون الطبي',
+  'قانون التكنولوجيا والجرائم الإلكترونية',
+  'صياغة العقود'
 ];
 const CATEGORIES_EN = [
   '',
@@ -53,10 +58,15 @@ const CATEGORIES_EN = [
   'Family Law',
   'Maritime Law',
   'Arbitration',
-  'International Law'
+  'International Law',
+  'Immigration & Travel',
+  'Banking & Finance',
+  'Medical Law',
+  'Cybercrime & IT Law',
+  'Contract Drafting'
 ];
-const CITIES_AR     = ['','القاهرة','الإسكندرية','الجيزة','المنصورة','طنطا','بورسعيد','الأقصر','أسوان'];
-const CITIES_EN     = ['','Cairo','Alexandria','Giza','Mansoura','Tanta','Port Said','Luxor','Aswan'];
+const CITIES_AR     = ['','القاهرة','الإسكندرية','الجيزة','المنصورة','طنطا','أسيوط','بورسعيد','الإسماعيلية','الأقصر','أسوان'];
+const CITIES_EN     = ['','Cairo','Alexandria','Giza','Mansoura','Tanta','Asyut','Port Said','Ismailia','Luxor','Aswan'];
 // sort options: [value, arLabel, enLabel]
 const SORT_OPTS: [string,string,string][] = [
   ['rating',    '⭐ الأعلى تقييماً', '⭐ Top Rated'],
@@ -228,6 +238,7 @@ export default function LawyersTab() {
   const total    = useSelector(selLawyersTotal);
   const insets   = useSafeAreaInsets();
   const isLoggedIn = useSelector(selLoggedIn);
+  const currentUser = useSelector(selUser);
   const { isRTL } = useI18n();
   const [favorites, setFavorites] = useState<number[]>([]);
 
@@ -338,7 +349,7 @@ export default function LawyersTab() {
 
         {/* Category chips */}
         <FlatList horizontal data={isRTL ? CATEGORIES_AR : CATEGORIES_EN} keyExtractor={i=>i||'all'}
-          showsHorizontalScrollIndicator={false}
+          showsHorizontalScrollIndicator={true}
           contentContainerStyle={{ gap:8, marginBottom:8 }}
           renderItem={({ item, index }) => {
             const apiValue = CATEGORIES_AR[index]; // always send Arabic to backend
@@ -356,7 +367,7 @@ export default function LawyersTab() {
 
         {/* City chips */}
         <FlatList horizontal data={isRTL ? CITIES_AR : CITIES_EN} keyExtractor={i=>i||'all'}
-          showsHorizontalScrollIndicator={false}
+          showsHorizontalScrollIndicator={true}
           contentContainerStyle={{ gap:8 }}
           renderItem={({ item, index }) => {
             const apiValue = CITIES_AR[index];
@@ -378,7 +389,7 @@ export default function LawyersTab() {
       {/* List */}
       <View style={{ flex: 1 }}>
         <FlashList
-          data={lawyers}
+          data={lawyers.filter((l: any) => l.id !== currentUser?.id)}
           key={isGrid ? 'g' : 'l'}
           keyExtractor={item => String(item.id)}
           numColumns={isGrid ? 2 : 1}

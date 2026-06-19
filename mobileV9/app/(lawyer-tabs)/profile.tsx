@@ -25,7 +25,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
   Share, RefreshControl, Alert, StyleSheet,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../src/theme';
 import { useI18n } from '../../src/i18n';
 import { useAuth } from '../../src/hooks/useAuth';
@@ -104,7 +104,11 @@ export default function LawyerOwnProfile() {
     }
   }, [user?.id, myPostsLoaded]);
 
-  useEffect(() => { loadProfile(); }, [loadProfile]);
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, [loadProfile])
+  );
   useEffect(() => {
     // Only load these if somehow still needed, but tabs are gone
   }, [tab, loadPinned, loadMyPosts]);

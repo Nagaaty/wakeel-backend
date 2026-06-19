@@ -106,11 +106,11 @@ export function WinBar({ wins, losses, C }: any) {
 }
 
 // ─── Avatar — serif initials, gold gradient, matches reference ────────────────
-import { Image } from 'react-native';
+import { Image } from 'expo-image';
 
 export function Avatar({ C: Cprop, initials, size = 48, color, url }: any) {
   const C = safeC(Cprop);
-  if (url) {
+  if (url && typeof url === 'string' && url.startsWith('http')) {
     return (
       <Image
         source={{ uri: url }}

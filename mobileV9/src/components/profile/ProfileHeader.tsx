@@ -26,6 +26,7 @@ import { useTheme } from '../../theme';
 import { useI18n } from '../../i18n';
 import { CachedAvatar } from '../CachedImage';
 import { LinearGradient } from 'expo-linear-gradient';
+import { resolveMediaUrl } from '../../services/api';
 
 interface Action {
   label: string;
@@ -76,7 +77,7 @@ export function ProfileHeader({
     <View style={{ backgroundColor: C.bg }}>
       {/* ── Premium Cover ── */}
       <ImageBackground
-        source={user?.cover_url ? { uri: user.cover_url } : undefined}
+        source={user?.cover_url ? { uri: resolveMediaUrl(user.cover_url) } : undefined}
         style={[styles.cover, { backgroundColor: C.gold + '22' }]}
         imageStyle={{ borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}
       >
@@ -259,7 +260,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 4,
     borderRadius: 12,
   },
-  headline: { fontSize: 15, marginTop: 8, lineHeight: 22, fontFamily: 'Cairo-Medium', textAlign: 'center' },
+  headline: { fontSize: 15, marginTop: 8, lineHeight: 22, fontFamily: 'Cairo-SemiBold', textAlign: 'center' },
   subline:  { fontSize: 13, marginTop: 6, fontFamily: 'Cairo-Regular', textAlign: 'center' },
   actionsRow: {
     width: '100%',

@@ -6,7 +6,7 @@ import {
 import { router } from 'expo-router';
 import { useTheme } from '../../src/theme';
 import { Empty } from '../../src/components/ui';
-import { notificationsAPI, forumAPI } from '../../src/services/api';
+import { notificationsAPI, forumAPI, resolveMediaUrl } from '../../src/services/api';
 import {
   getNotificationPermissionStatus,
   registerForPushNotifications,
@@ -55,7 +55,7 @@ function NotifAvatar({ url, name, size = 48, gold, bg }: {
 }) {
   const initials = (name || '?').split(' ').map((w: string) => w[0] || '').join('').slice(0, 2).toUpperCase();
   if (url) {
-    return <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#ddd' }} />;
+    return <Image source={{ uri: resolveMediaUrl(url) }} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: '#ddd' }} />;
   }
   return (
     <View style={{
