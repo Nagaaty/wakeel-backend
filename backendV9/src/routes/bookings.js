@@ -123,9 +123,18 @@ router.post('/', requireAuth, async (req, res, next) => {
       }).catch(console.error);
     }
 
-    // NOTE: DB notification is intentionally NOT sent here.
-    // The lawyer receives their confirmed notification after payment succeeds (payments.js).
-    // Sending one here (pending state) would be a duplicate.
+    // Save DB notification for lawyer
+    const { rows: [notif] } = await pool.query(
+      `INSERT INTO notifications (user_id, type, title, body, link)
+       VALUES ($1, 'booking', '📅 حجز جديد', $2, '/lawyer/dashboard')
+       RETURNING *`,
+      [lawyerId, `لديك حجز جديد من ${client.name} بتاريخ ${bookingDate} الساعة ${startTime}`]
+    ).catch(console.error) || { rows: [] };
+
+    if (notif) {
+      const io = req.app.get('io');
+      if (io) io.to(`user:${lawyerId}`).emit('notification:new', notif);
+    }
 
     res.status(201).json({ booking, conversationId: conv.id });
   } catch (err) { next(err); }

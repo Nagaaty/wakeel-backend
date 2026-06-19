@@ -143,7 +143,7 @@ router.post('/confirm', requireAuth, async (req, res, next) => {
     const { paymentId, paymobTransactionId, success } = req.body;
 
     const { rows: [pmt] } = await pool.query(
-      `SELECT p.*, b.client_id, b.lawyer_id, b.fee,
+      `SELECT p.*, b.client_id, b.lawyer_id, b.fee, b.scheduled_at,
               cu.name AS client_name, cu.email AS client_email, cu.phone AS client_phone,
               lu.name AS lawyer_name, lu.email AS lawyer_email
        FROM payments p
@@ -162,39 +162,81 @@ router.post('/confirm', requireAuth, async (req, res, next) => {
       [status, paymobTransactionId || null, paymentId]
     );
 
-    if (status === 'paid') {
+    if (status === 'completed' || status === 'paid') {
+      // Check if booking was already confirmed/paid to avoid duplicate processing
+      const { rows: [bookingCheck] } = await pool.query(
+        `SELECT status FROM bookings WHERE id=$1`,
+        [pmt.booking_id]
+      );
+      const wasAlreadyConfirmed = bookingCheck?.status === 'confirmed' || bookingCheck?.status === 'completed';
+
       await pool.query(
         `UPDATE bookings SET payment_status='paid', status='confirmed' WHERE id=$1`,
         [pmt.booking_id]
       );
 
-      // Send receipts
-      await sendPaymentReceipt({
-        to:         pmt.client_email,
-        clientName: pmt.client_name,
-        amount:     pmt.amount,
-        lawyerName: pmt.lawyer_name,
-        bookingId:  pmt.booking_id,
-        paymentId:  paymobTransactionId || pmt.id,
-      }).catch(console.error);
+      if (!wasAlreadyConfirmed) {
+        const formattedDate = new Date(pmt.scheduled_at).toISOString().split('T')[0];
+        const formattedTime = new Date(pmt.scheduled_at).toTimeString().substring(0, 5);
 
-      if (pmt.client_phone) {
-        await sendPaymentReceiptWA({
-          phone:      pmt.client_phone,
+        // Send receipts
+        await sendPaymentReceipt({
+          to:         pmt.client_email,
           clientName: pmt.client_name,
           amount:     pmt.amount,
           lawyerName: pmt.lawyer_name,
           bookingId:  pmt.booking_id,
+          paymentId:  paymobTransactionId || pmt.id,
+        }).catch(console.error);
+
+        if (pmt.client_phone) {
+          await sendPaymentReceiptWA({
+            phone:      pmt.client_phone,
+            clientName: pmt.client_name,
+            amount:     pmt.amount,
+            lawyerName: pmt.lawyer_name,
+            bookingId:  pmt.booking_id,
+          }).catch(console.error);
+        }
+
+        // Save DB notification for client
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, body, link)
+           VALUES ($1,'booking','✅ تم تأكيد الحجز',$2,'/bookings')`,
+          [pmt.client_id, `تم تأكيد حجزك مع ${pmt.lawyer_name} بتاريخ ${formattedDate} الساعة ${formattedTime}`]
+        ).catch(console.error);
+
+        // Save DB notification for lawyer
+        await pool.query(
+          `INSERT INTO notifications (user_id, type, title, body, link)
+           VALUES ($1,'booking','📅 حجز جديد',$2,'/lawyer/dashboard')`,
+          [pmt.lawyer_id, `${pmt.client_name} حجز معك بتاريخ ${formattedDate} الساعة ${formattedTime}. المبلغ: ${pmt.amount} جم`]
+        ).catch(console.error);
+
+        // Emit real-time notification via Socket.io if available
+        const io = req.app.get('io');
+        if (io) {
+          try {
+            const { rows: [notif] } = await pool.query(
+              `SELECT * FROM notifications WHERE user_id=$1 AND type='booking' ORDER BY created_at DESC LIMIT 1`,
+              [pmt.lawyer_id]
+            );
+            if (notif) {
+              io.to(`user:${pmt.lawyer_id}`).emit('notification:new', notif);
+            }
+          } catch (e) {
+            console.error('[confirm socket emit error]', e);
+          }
+        }
+
+        await notifyPaymentReceived(pmt.lawyer_id, {
+          clientName: pmt.client_name,
+          amount:     pmt.amount,
         }).catch(console.error);
       }
-
-      await notifyPaymentReceived(pmt.lawyer_id, {
-        clientName: pmt.client_name,
-        amount:     pmt.amount,
-      }).catch(console.error);
     }
 
-    res.json({ status, message: status === 'paid' ? 'Payment confirmed' : 'Payment failed' });
+    res.json({ status, message: (status === 'completed' || status === 'paid') ? 'Payment confirmed' : 'Payment failed' });
   } catch (err) { next(err); }
 });
 
@@ -220,10 +262,54 @@ router.post('/webhook', async (req, res) => {
           [success ? 'paid' : 'failed', pmt.id]
         );
         if (success) {
-          await pool.query(
-            `UPDATE bookings SET status='confirmed' WHERE id=$1`,
+          // Check if booking was already confirmed to prevent duplicates
+          const { rows: [booking] } = await pool.query(
+            `SELECT b.*, cu.name AS client_name, lu.name AS lawyer_name
+             FROM bookings b
+             JOIN users cu ON cu.id = b.client_id
+             JOIN users lu ON lu.id = b.lawyer_id
+             WHERE b.id=$1`,
             [pmt.booking_id]
           );
+          if (booking && booking.status !== 'confirmed' && booking.status !== 'completed') {
+            await pool.query(
+              `UPDATE bookings SET status='confirmed', payment_status='paid' WHERE id=$1`,
+              [pmt.booking_id]
+            );
+
+            const formattedDate = new Date(booking.scheduled_at).toISOString().split('T')[0];
+            const formattedTime = new Date(booking.scheduled_at).toTimeString().substring(0, 5);
+
+            // Save DB notification for client
+            await pool.query(
+              `INSERT INTO notifications (user_id, type, title, body, link)
+               VALUES ($1,'booking','✅ تم تأكيد الحجز',$2,'/bookings')`,
+              [booking.client_id, `تم تأكيد حجزك مع ${booking.lawyer_name} بتاريخ ${formattedDate} الساعة ${formattedTime}`]
+            ).catch(console.error);
+
+            // Save DB notification for lawyer
+            await pool.query(
+              `INSERT INTO notifications (user_id, type, title, body, link)
+               VALUES ($1,'booking','📅 حجز جديد',$2,'/lawyer/dashboard')`,
+              [booking.lawyer_id, `${booking.client_name} حجز معك بتاريخ ${formattedDate} الساعة ${formattedTime}. المبلغ: ${pmt.amount} جم`]
+            ).catch(console.error);
+
+            // Emit via socket if available
+            const io = req.app.get('io');
+            if (io) {
+              try {
+                const { rows: [notif] } = await pool.query(
+                  `SELECT * FROM notifications WHERE user_id=$1 AND type='booking' ORDER BY created_at DESC LIMIT 1`,
+                  [booking.lawyer_id]
+                );
+                if (notif) {
+                  io.to(`user:${booking.lawyer_id}`).emit('notification:new', notif);
+                }
+              } catch (e) {
+                console.error('[webhook socket emit error]', e);
+              }
+            }
+          }
         }
       }
     }
