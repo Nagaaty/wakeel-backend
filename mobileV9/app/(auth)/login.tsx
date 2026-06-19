@@ -101,6 +101,7 @@ export default function LoginScreen() {
   const isLocked = lockedUntil !== null && Date.now() < lockedUntil;
 
   useEffect(() => {
+    dispatch(clearError());
     Promise.all([getBiometricCapability(), isBiometricEnabled()]).then(([cap, enabled]) => {
       const hw = cap.isAvailable && cap.isEnrolled;
       setBioHW(hw);

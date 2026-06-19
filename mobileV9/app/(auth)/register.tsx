@@ -37,6 +37,10 @@ export default function RegisterScreen() {
     }
   }, [step, timeLeft]);
 
+  React.useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
+
   const handleOtpChange = (i: number, val: string) => {
     if (!/^\d?$/.test(val)) return;
     const next = [...otp];
