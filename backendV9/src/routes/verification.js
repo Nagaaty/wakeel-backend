@@ -48,8 +48,12 @@ router.post('/face-match', uploadPublic.fields([
     const normalizedText = frontText.replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     const has14Digits = /(?:\D|^)(\d{14})(?:\D|$)/.test(normalizedText);
     
+    let ocrFailed = false;
+    let ocrNote = '';
     if (!hasKeyword && !has14Digits) {
-      return res.status(400).json({ message: 'Invalid Document: We could not identify the front photo as a valid Egyptian National ID or Bar Association License. Please ensure there is no glare and the text is clear.' });
+      console.warn('⚠️ OCR check failed: Front photo does not contain expected Egyptian ID keywords or a 14-digit National ID.');
+      ocrFailed = true;
+      ocrNote += 'Front ID keywords/14-digits missing. ';
     }
 
     // Clean up whitespace, punctuation, and AI hallucinations
@@ -59,10 +63,14 @@ router.post('/face-match', uploadPublic.fields([
     
     // An Egyptian ID contains well over 50 characters of valid text. We check for at least 15 on front, 10 on back.
     if (validFrontText.length < 15) {
-      return res.status(400).json({ message: 'Invalid Front Document: We could not detect enough valid text on the front card. Please ensure you captured a clear, well-lit photo.' });
+      console.warn(`⚠️ OCR check failed: Only ${validFrontText.length} characters detected on front ID.`);
+      ocrFailed = true;
+      ocrNote += 'Front text length too short. ';
     }
     if (validBackText.length < 10) {
-      return res.status(400).json({ message: 'Invalid Back Document: We could not detect enough valid text on the back card. Please ensure you captured a clear, well-lit photo of the back side.' });
+      console.warn(`⚠️ OCR check failed: Only ${validBackText.length} characters detected on back ID.`);
+      ocrFailed = true;
+      ocrNote += 'Back text length too short. ';
     }
 
     // 2. Face Verification
@@ -84,10 +92,12 @@ router.post('/face-match', uploadPublic.fields([
         return res.status(400).json({ message: 'Faces do not match. Please ensure clear visibility and try again.' });
       }
     } else {
-      // If no AWS keys, we still verified it's a real document using the strict Arabic OCR keyword check!
-      // Simulate AI processing delay for the biometric match portion
-      await new Promise(r => setTimeout(r, 1500));
-      return res.json({ match: true, similarity: 98.5, simulated: true, note: 'Strict OCR Passed. Face match simulated.' });
+      return res.json({
+        match: true,
+        similarity: 98.5,
+        simulated: true,
+        note: ocrFailed ? `OCR checks skipped/failed (${ocrNote.trim()}). Face match simulated.` : 'OCR Passed. Face match simulated.'
+      });
     }
   } catch (err) {
     if (err.name === 'InvalidParameterException' || err.name === 'InvalidImageFormatException') {

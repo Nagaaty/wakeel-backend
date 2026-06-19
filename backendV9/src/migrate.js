@@ -187,11 +187,13 @@ const MIGRATIONS = [
       `CREATE TABLE IF NOT EXISTS lawyer_schedule_overrides (
         id          SERIAL PRIMARY KEY,
         lawyer_id   UUID REFERENCES users(id) ON DELETE CASCADE,
-        date        DATE NOT NULL,
+        override_date DATE NOT NULL,
         is_off      BOOLEAN DEFAULT false,
         slots       JSONB DEFAULT '[]',
-        created_at  TIMESTAMPTZ DEFAULT NOW()
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(lawyer_id, override_date)
       )`,
+      `CREATE INDEX IF NOT EXISTS idx_override_lawyer_date ON lawyer_schedule_overrides(lawyer_id, override_date)`,
       `ALTER TABLE lawyer_schedule_overrides ADD COLUMN IF NOT EXISTS service_types JSONB DEFAULT '["consultation"]'`,
       `CREATE TABLE IF NOT EXISTS lawyer_service_defaults (
         id          SERIAL PRIMARY KEY,
