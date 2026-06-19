@@ -196,10 +196,11 @@ const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS idx_override_lawyer_date ON lawyer_schedule_overrides(lawyer_id, override_date)`,
       `ALTER TABLE lawyer_schedule_overrides ADD COLUMN IF NOT EXISTS service_types JSONB DEFAULT '["consultation"]'`,
       `CREATE TABLE IF NOT EXISTS lawyer_service_defaults (
-        id          SERIAL PRIMARY KEY,
-        lawyer_id   UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
-        services    JSONB DEFAULT '{}',
-        created_at  TIMESTAMPTZ DEFAULT NOW()
+        lawyer_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        day_of_week   SMALLINT NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+        service_types JSONB NOT NULL DEFAULT '["video","text","phone","inperson","document"]'::jsonb,
+        updated_at    TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (lawyer_id, day_of_week)
       )`,
     ],
   },

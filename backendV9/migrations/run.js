@@ -21,9 +21,19 @@ const pool = new Pool(poolConfig);
 async function run() {
   const client = await pool.connect();
   try {
-    const sql = fs.readFileSync(path.join(__dirname, '001_schema.sql'), 'utf8');
-    await client.query(sql);
-    console.log('✅ Migration complete');
+    const files = fs.readdirSync(__dirname)
+      .filter(f => f.endsWith('.sql'))
+      .sort();
+
+    console.log(`Found ${files.length} SQL migration file(s) to run...`);
+
+    for (const file of files) {
+      console.log(`Running migration: ${file}...`);
+      const sql = fs.readFileSync(path.join(__dirname, file), 'utf8');
+      await client.query(sql);
+      console.log(`✅ Completed: ${file}`);
+    }
+    console.log('✅ All SQL migrations complete');
   } catch (err) {
     console.error('❌ Migration failed:', err.message);
     process.exit(1);
