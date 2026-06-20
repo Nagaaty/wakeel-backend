@@ -31,7 +31,10 @@ if (process.env.SENTRY_DSN) {
 app.set('trust proxy', 1);
 
 // ── Security middleware ────────────────────────────────────────────────────────
-app.use(helmet({ crossOriginEmbedderPolicy: false }));
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin) return callback(null, true);

@@ -56,11 +56,14 @@ function initSocket(server) {
     socket.on('message:send', async ({ conversationId, content, attachmentUrl }) => {
       if (!content?.trim() && !attachmentUrl) return;
       try {
+        let finalContent = content?.trim() || '';
+        if (attachmentUrl) finalContent += (finalContent ? '\n' : '') + attachmentUrl;
+
         // Save to DB
         const { rows: [msg] } = await pool.query(`
-          INSERT INTO messages (conversation_id, sender_id, content, attachment_url)
-          VALUES ($1, $2, $3, $4) RETURNING *
-        `, [conversationId, userId, content?.trim() || '', attachmentUrl || null]);
+          INSERT INTO messages (conversation_id, sender_id, text)
+          VALUES ($1, $2, $3) RETURNING *, text as content
+        `, [conversationId, userId, finalContent]);
 
         // Get conversation participants
         const { rows } = await pool.query(

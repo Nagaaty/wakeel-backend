@@ -20,9 +20,9 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { AppState } from 'react-native';
 import io from 'socket.io-client';
 import { useAuth } from './useAuth';
-import { notificationsAPI } from '../services/api';
+import { notificationsAPI, BASE_URL } from '../services/api';
 
-const WS_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.100.42:5001';
+const WS_URL = BASE_URL;
 
 // Module-level singleton — same socket reused across all consumers
 let notifSocket: any = null;

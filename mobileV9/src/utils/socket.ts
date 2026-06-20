@@ -1,8 +1,9 @@
 // ─── Socket.io Client — Production-ready with auto-reconnect ─────────────────
 import { io, Socket } from 'socket.io-client';
+import { BASE_URL } from '../services/api';
 import { storage } from './storage';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.100.42:5001';
+const API_URL = BASE_URL;
 
 let socket: Socket | null = null;
 let isConnecting = false;

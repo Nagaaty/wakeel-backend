@@ -372,7 +372,6 @@ export default function MessagesScreen() {
       formData.append('folder', 'chat');
 
       const res: any = await api.post('/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 60000,
       });
 

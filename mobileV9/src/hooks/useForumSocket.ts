@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import io from 'socket.io-client';
 import { useAuth } from './useAuth';
-const WS_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.100.42:5001';
+import { BASE_URL } from '../services/api';
+const WS_URL = BASE_URL;
 let socket: any = null;
 
 export function useForumSocket({ onLike, onComment, onNewPost, onShare }: {

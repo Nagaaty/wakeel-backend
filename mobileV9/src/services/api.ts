@@ -173,8 +173,8 @@ export const courtDatesAPI = {
 };
 
 export const uploadAPI = {
-  upload: (data: FormData) => api.post('/upload', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  multiple: (data: FormData) => api.post('/upload/multiple', data, { headers: { 'Content-Type': 'multipart/form-data' } })
+  upload: (data: FormData) => api.post('/upload', data),
+  multiple: (data: FormData) => api.post('/upload/multiple', data)
 };
 
 
@@ -353,13 +353,13 @@ export const verificationAPI = {
   setAvailability:  (data: any)    => api.patch('/verification/availability', data),
   setServicePrices: (data: any)    => api.patch('/verification/service-prices', data),
   availableNow:     ()             => api.get('/verification/available-now'),
-  faceMatch:        (data: FormData) => api.post('/verification/face-match', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  faceMatch:        (data: FormData) => api.post('/verification/face-match', data),
 };
 
 
 export const docVaultAPI = {
   list:     (params?: any)           => api.get('/document-vault', { params }),
-  upload:   (data: FormData)         => api.post('/document-vault/upload', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  upload:   (data: FormData)         => api.post('/document-vault/upload', data),
   get:      (id: string | number)    => api.get(`/document-vault/${id}`),
   delete:   (id: string | number)    => api.delete(`/document-vault/${id}`),
   share:    (id: number, data: any)  => api.post(`/document-vault/${id}/share`, data),
