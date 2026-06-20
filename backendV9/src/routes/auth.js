@@ -258,12 +258,14 @@ router.post('/send-otp', requireAuth, async (req, res, next) => {
     } else {
       result = await sendPhoneOTP(target, req.user.id, purpose);
     }
-    // Return OTP in response so client can auto-display it during dev/sprint testing
-    const { rows: [otp] } = await pool.query(
-      `SELECT code FROM otp_codes WHERE phone=$1 AND purpose=$2 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
-      [target, purpose]
-    );
-    res.json({ ok: true, message: 'OTP sent', devOtp: otp?.code });
+    if (result?.skipped) {
+      const { rows: [otp] } = await pool.query(
+        `SELECT code FROM otp_codes WHERE phone=$1 AND purpose=$2 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+        [target, purpose]
+      );
+      return res.json({ ok: true, message: 'OTP sent (dev mode)', devOtp: otp?.code });
+    }
+    res.json({ ok: true, message: 'OTP sent' });
   } catch (err) { next(err); }
 });
 
@@ -280,12 +282,14 @@ router.post('/send-otp-public', async (req, res, next) => {
     } else {
       result = await sendPhoneOTP(target, null, purpose);
     }
-    // Return OTP in response so client can auto-display it during dev/sprint testing
-    const { rows: [otp] } = await pool.query(
-      `SELECT code FROM otp_codes WHERE phone=$1 AND purpose=$2 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
-      [target, purpose]
-    );
-    res.json({ ok: true, message: 'OTP sent', devOtp: otp?.code });
+    if (result?.skipped) {
+      const { rows: [otp] } = await pool.query(
+        `SELECT code FROM otp_codes WHERE phone=$1 AND purpose=$2 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+        [target, purpose]
+      );
+      return res.json({ ok: true, message: 'OTP sent (dev mode)', devOtp: otp?.code });
+    }
+    res.json({ ok: true, message: 'OTP sent' });
   } catch (err) { next(err); }
 });
 
