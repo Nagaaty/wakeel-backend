@@ -143,7 +143,7 @@ router.post('/confirm', requireAuth, async (req, res, next) => {
     const { paymentId, paymobTransactionId, success } = req.body;
 
     const { rows: [pmt] } = await pool.query(
-      `SELECT p.*, b.client_id, b.lawyer_id, b.fee, b.scheduled_at,
+      `SELECT p.*, b.client_id, b.lawyer_id, b.amount AS fee, b.scheduled_at,
               cu.name AS client_name, cu.email AS client_email, cu.phone AS client_phone,
               lu.name AS lawyer_name, lu.email AS lawyer_email
        FROM payments p

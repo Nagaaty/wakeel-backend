@@ -258,14 +258,12 @@ router.post('/send-otp', requireAuth, async (req, res, next) => {
     } else {
       result = await sendPhoneOTP(target, req.user.id, purpose);
     }
-    if (result?.skipped) {
-      const { rows: [otp] } = await pool.query(
-        `SELECT code FROM otp_codes WHERE phone=$1 AND purpose=$2 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
-        [target, purpose]
-      );
-      return res.json({ ok: true, message: 'OTP sent (dev mode)', devOtp: otp?.code });
-    }
-    res.json({ ok: true, message: 'OTP sent' });
+    // Return OTP in response so client can auto-display it during dev/sprint testing
+    const { rows: [otp] } = await pool.query(
+      `SELECT code FROM otp_codes WHERE phone=$1 AND purpose=$2 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+      [target, purpose]
+    );
+    res.json({ ok: true, message: 'OTP sent', devOtp: otp?.code });
   } catch (err) { next(err); }
 });
 
@@ -282,15 +280,12 @@ router.post('/send-otp-public', async (req, res, next) => {
     } else {
       result = await sendPhoneOTP(target, null, purpose);
     }
-    // Dev fallback: if email not configured, return OTP in response so app can display it
-    if (result?.skipped) {
-      const { rows: [otp] } = await pool.query(
-        `SELECT code FROM otp_codes WHERE phone=$1 AND purpose=$2 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
-        [target, purpose]
-      );
-      return res.json({ ok: true, message: 'OTP sent (dev: check Render logs)', devOtp: otp?.code });
-    }
-    res.json({ ok: true, message: 'OTP sent' });
+    // Return OTP in response so client can auto-display it during dev/sprint testing
+    const { rows: [otp] } = await pool.query(
+      `SELECT code FROM otp_codes WHERE phone=$1 AND purpose=$2 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+      [target, purpose]
+    );
+    res.json({ ok: true, message: 'OTP sent', devOtp: otp?.code });
   } catch (err) { next(err); }
 });
 

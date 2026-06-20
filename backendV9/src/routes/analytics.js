@@ -32,7 +32,7 @@ router.get('/admin', requireAuth, requireRole('admin'), async (req, res, next) =
         COUNT(*) FILTER (WHERE created_at > NOW()-INTERVAL '30 days') AS new_this_month
         FROM lawyer_profiles`),
 
-      pool.query(`SELECT b.id, b.booking_date, b.fee, b.status,
+      pool.query(`SELECT b.id, b.booking_date, b.amount AS fee, b.status,
         cu.name AS client_name, lu.name AS lawyer_name
         FROM bookings b
         JOIN users cu ON cu.id=b.client_id
@@ -70,16 +70,16 @@ router.get('/lawyer', requireAuth, requireRole('lawyer'), async (req, res, next)
         COUNT(*) AS total_bookings,
         COUNT(*) FILTER (WHERE status='completed') AS completed,
         COUNT(*) FILTER (WHERE status='pending') AS pending,
-        COALESCE(SUM(fee) FILTER (WHERE status='completed'),0) AS total_earned,
-        COALESCE(SUM(fee) FILTER (WHERE status='completed' AND created_at>NOW()-INTERVAL '30 days'),0) AS earned_this_month,
-        COALESCE(AVG(fee) FILTER (WHERE status='completed'),0) AS avg_fee,
+        COALESCE(SUM(amount) FILTER (WHERE status='completed'),0) AS total_earned,
+        COALESCE(SUM(amount) FILTER (WHERE status='completed' AND created_at>NOW()-INTERVAL '30 days'),0) AS earned_this_month,
+        COALESCE(AVG(amount) FILTER (WHERE status='completed'),0) AS avg_fee,
         (SELECT karma_score FROM lawyer_profiles WHERE user_id=$1) AS karma_score
         FROM bookings WHERE lawyer_id=$1`, [lawyerId]),
 
       pool.query(`SELECT
         DATE_TRUNC('month', created_at) AS month,
         COUNT(*) AS bookings,
-        COALESCE(SUM(fee),0) AS revenue
+        COALESCE(SUM(amount),0) AS revenue
         FROM bookings WHERE lawyer_id=$1 AND status='completed'
         GROUP BY month ORDER BY month DESC LIMIT 12`, [lawyerId]),
 
@@ -87,7 +87,7 @@ router.get('/lawyer', requireAuth, requireRole('lawyer'), async (req, res, next)
         JOIN users u ON u.id=r.client_id
         WHERE r.lawyer_id=$1 ORDER BY r.created_at DESC LIMIT 5`, [lawyerId]),
 
-      pool.query(`SELECT u.id, u.name, COUNT(b.id) AS sessions, SUM(b.fee) AS total_paid
+      pool.query(`SELECT u.id, u.name, COUNT(b.id) AS sessions, SUM(b.amount) AS total_paid
         FROM bookings b JOIN users u ON u.id=b.client_id
         WHERE b.lawyer_id=$1 AND b.status='completed'
         GROUP BY u.id, u.name ORDER BY total_paid DESC LIMIT 5`, [lawyerId]),
