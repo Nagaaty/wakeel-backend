@@ -120,6 +120,7 @@ function ConnectionBadge({ C }: { C: any }) {
 function MsgBubble({ msg, isMine, C }: { msg: Message; isMine: boolean; C: any }) {
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideX = useRef(new Animated.Value(isMine ? 20 : -20)).current;
+  const [modalVisible, setModalVisible] = useState(false);
   // DB stores as 'text', REST fallback aliases to 'content'
   const content = (msg as any).text || (msg as any).content || '';
   const isImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(content) || content.startsWith('__img__:');
@@ -155,7 +156,64 @@ function MsgBubble({ msg, isMine, C }: { msg: Message; isMine: boolean; C: any }
         overflow: 'hidden',
       }}>
         {isImage ? (
-          <Image source={{ uri: imgUrl }} style={{ width: 200, height: 160, borderRadius: 16 }} resizeMode="cover" />
+          <View>
+            <TouchableOpacity onPress={() => setModalVisible(true)} activeOpacity={0.85}>
+              <Image source={{ uri: imgUrl }} style={{ width: 200, height: 160, borderRadius: 16 }} resizeMode="cover" />
+            </TouchableOpacity>
+
+            <Modal
+              visible={modalVisible}
+              transparent={true}
+              animationType="fade"
+              onRequestClose={() => setModalVisible(false)}
+            >
+              <View style={{
+                flex: 1,
+                backgroundColor: 'rgba(0, 0, 0, 0.95)',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+                {/* Close area overlay */}
+                <TouchableOpacity 
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                  }} 
+                  activeOpacity={1}
+                  onPress={() => setModalVisible(false)}
+                />
+                
+                {/* Close Button */}
+                <TouchableOpacity 
+                  onPress={() => setModalVisible(false)}
+                  style={{
+                    position: 'absolute',
+                    top: Platform.OS === 'ios' ? 60 : 40,
+                    right: 20,
+                    zIndex: 10,
+                    padding: 8,
+                    borderRadius: 20,
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  }}
+                >
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+
+                {/* Fullscreen Image */}
+                <Image 
+                  source={{ uri: imgUrl }} 
+                  style={{ 
+                    width: '100%', 
+                    height: '80%', 
+                  }} 
+                  resizeMode="contain" 
+                />
+              </View>
+            </Modal>
+          </View>
         ) : (
           <Text style={{ color: isMine ? '#fff' : C.text, fontSize: 15, lineHeight: 22 }}>
             {content}
