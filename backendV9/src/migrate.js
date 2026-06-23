@@ -271,6 +271,13 @@ const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS idx_lawyer_client_notes ON lawyer_client_notes (lawyer_id, client_id)`
     ],
   },
+
+  {
+    version: '016_lawyer_zoom_link',
+    sql: [
+      `ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS zoom_link VARCHAR(255)`
+    ]
+  },
 ];
 
 // ─── Runner ────────────────────────────────────────────────────────────────

@@ -909,6 +909,7 @@ function EarningsTab({ C, stats, onPayout }: any) {
 export default function LawyerDashboardScreen() {
   const C=useTheme(); const dispatch=useDispatch<AppDispatch>();
   const {user,initials,logout}=useAuth();
+  const {isRTL}=useI18n();
   const bookings=useSelector(selBookings); const bLoading=useSelector(selBLoading);
   const insets=useSafeAreaInsets();
   const [subPage,setSubPage]=useState<SubPage>(null);
@@ -1049,7 +1050,35 @@ export default function LawyerDashboardScreen() {
                         <Text style={{ color:C.gold, fontWeight:'700', marginTop:4 }}>{b.fee} جنيه</Text>
                       </View>
                       <View style={{ gap:8 }}>
-                        {b.service_type==='video'&&<Btn C={C} size="sm" onPress={()=>router.push({pathname:'/video',params:{booking:b.id}} as any)}>📹</Btn>}
+                        {b.service_type==='video'&&<Btn C={C} size="sm" onPress={async ()=>{
+                          const zoomLink = b.lawyer_zoom_link;
+                          if (!zoomLink || !zoomLink.trim()) {
+                            Alert.alert(
+                              isRTL ? 'تنبيه' : 'Alert',
+                              isRTL
+                                ? 'لم تقم بتعيين رابط زووم الخاص بك. يرجى الانتقال إلى إعدادات الملف الشخصي لتعيينه.'
+                                : 'You have not set your Zoom meeting link. Please go to profile settings to set it.'
+                            );
+                          } else {
+                            try {
+                              let cleanLink = zoomLink.trim();
+                              if (!cleanLink.startsWith('http://') && !cleanLink.startsWith('https://')) {
+                                cleanLink = 'https://' + cleanLink;
+                              }
+                              const supported = await Linking.canOpenURL(cleanLink);
+                              if (supported) {
+                                await Linking.openURL(cleanLink);
+                              } else {
+                                Alert.alert(
+                                  isRTL ? 'خطأ' : 'Error',
+                                  isRTL ? 'تعذر فتح الرابط.' : 'Unable to open link.'
+                                );
+                              }
+                            } catch (e: any) {
+                              Alert.alert(isRTL ? 'خطأ' : 'Error', e.message);
+                            }
+                          }
+                        }}>📹</Btn>}
                         <Btn C={C} size="sm" variant="ghost" onPress={()=>changeStatus(b.id,'completed')} disabled={acting===b.id}>🏆</Btn>
                       </View>
                     </View>

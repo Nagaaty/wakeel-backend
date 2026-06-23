@@ -48,6 +48,7 @@ export default function EditProfileScreen() {
   // Lawyer-only state
   const [prices, setPrices]         = useState<Record<string, number>>(DEFAULT_PRICES);
   const [office, setOffice]         = useState('');
+  const [zoomLink, setZoomLink]     = useState('');
   const [coords, setCoords]         = useState<{ lat: number; lng: number } | null>(null);
   const [lawyerLoading, setLawyerLoading]   = useState(isLawyer);
   const [lawyerSaving, setLawyerSaving]     = useState(false);
@@ -75,6 +76,7 @@ export default function EditProfileScreen() {
           });
         }
         if (d?.office) setOffice(d.office);
+        if (d?.zoom_link) setZoomLink(d.zoom_link);
         if (d?.office_lat && d?.office_lng) {
           setCoords({ lat: Number(d.office_lat), lng: Number(d.office_lng) });
         }
@@ -218,6 +220,15 @@ export default function EditProfileScreen() {
         return;
       }
     }
+    if (zoomLink.trim() && !zoomLink.trim().startsWith('http://') && !zoomLink.trim().startsWith('https://')) {
+      Alert.alert(
+        isRTL ? 'رابط غير صالح' : 'Invalid Link',
+        isRTL
+          ? 'يجب أن يبدأ رابط زووم بـ http:// أو https://'
+          : 'Zoom link must start with http:// or https://',
+      );
+      return;
+    }
     setLawyerSaving(true);
     try {
       await lawyersAPI.saveProfile({
@@ -228,6 +239,7 @@ export default function EditProfileScreen() {
         office:           office.trim() || null,
         office_lat:       coords?.lat ?? null,
         office_lng:       coords?.lng ?? null,
+        zoom_link:        zoomLink.trim() || null,
       });
       Alert.alert('✅', isRTL ? 'تم حفظ معلومات المحامي' : 'Lawyer info saved');
     } catch (e: any) {
@@ -376,6 +388,32 @@ export default function EditProfileScreen() {
                 })}
               </View>
             )}
+          </View>
+        )}
+
+        {isLawyer && (
+          <View style={{ backgroundColor: C.surface, borderRadius: 24, padding: 20, marginBottom: 20 }}>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <Text style={{ fontSize: 18 }}>🎥</Text>
+              <Text style={{ color: C.text, fontWeight: '800', fontSize: 16, fontFamily: 'Cairo-Bold' }}>
+                {isRTL ? 'رابط زووم للاستشارات' : 'Zoom Consultation Link'}
+              </Text>
+            </View>
+            <Text style={{ color: C.muted, fontSize: 13, marginBottom: 18, fontFamily: 'Cairo-Regular', textAlign: isRTL ? 'right' : 'left', lineHeight: 20 }}>
+              {isRTL
+                ? 'رابط غرفتك الخاصة في زووم ليتمكن العملاء من الانضمام لاستشارات الفيديو.'
+                : 'Your personal Zoom meeting link for clients to join video consultations.'}
+            </Text>
+
+            <Inp
+              C={C}
+              label={isRTL ? 'رابط زووم' : 'Zoom Meeting Link'}
+              value={zoomLink}
+              onChangeText={setZoomLink}
+              placeholder="https://zoom.us/j/..."
+              autoCapitalize="none"
+              keyboardType="url"
+            />
           </View>
         )}
 

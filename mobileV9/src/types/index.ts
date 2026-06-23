@@ -34,6 +34,7 @@ export interface LawyerProfile {
   subscription_plan?:  string;
   avatar_url?:         string;
   reviews?:            Review[];
+  zoom_link?:          string;
 }
 
 export interface Booking {
@@ -51,6 +52,7 @@ export interface Booking {
   payment_status: 'unpaid' | 'paid' | 'refunded';
   notes?:         string;
   urgency?:       string;
+  lawyer_zoom_link?: string;
 }
 
 export interface Message {

@@ -68,6 +68,7 @@ export default function LawyerSetupScreen() {
     text: 200, voice: 400, video: 600, inperson: 800, document: 350,
   });
   const [docs, setDocs] = useState<Record<string, string>>({});
+  const [zoomLink, setZoomLink] = useState('');
 
   const updP = (k: string, v: any) => setProfile(p => ({ ...p, [k]: v }));
   const toggleSlot = (d: number, s: string) => setSchedule(p => {
@@ -105,8 +106,23 @@ export default function LawyerSetupScreen() {
   };
 
   const saveStep3 = async () => {
+    if (zoomLink.trim() && !zoomLink.trim().startsWith('http://') && !zoomLink.trim().startsWith('https://')) {
+      Alert.alert(
+        isRTL ? 'رابط غير صالح' : 'Invalid Link',
+        isRTL
+          ? 'يجب أن يبدأ رابط زووم بـ http:// أو https://'
+          : 'Zoom link must start with http:// or https://',
+      );
+      return;
+    }
     setLoading(true);
-    try { await lawyersAPI.saveProfile({ consultation_fee: prices.voice, service_prices: prices }); } catch {}
+    try {
+      await lawyersAPI.saveProfile({
+        consultation_fee: prices.voice,
+        service_prices: prices,
+        zoom_link: zoomLink.trim() || null,
+      });
+    } catch {}
     setLoading(false); setStep(4);
   };
 
@@ -320,6 +336,22 @@ export default function LawyerSetupScreen() {
                 </View>
               </View>
             ))}
+
+            <View style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 14, marginBottom: 20 }}>
+              <Text style={{ color: C.text, fontWeight: '700', fontSize: 13, marginBottom: 8, textAlign: isRTL ? 'right' : 'left' }}>
+                {isRTL ? 'رابط زووم للاستشارات (اختياري حالياً)' : 'Zoom Consultation Link (Optional for now)'}
+              </Text>
+              <TextInput
+                value={zoomLink}
+                onChangeText={setZoomLink}
+                placeholder="https://zoom.us/j/..."
+                placeholderTextColor={C.muted}
+                autoCapitalize="none"
+                keyboardType="url"
+                style={{ backgroundColor: C.bg, borderWidth: 1, borderColor: C.border, borderRadius: 8, padding: 10, color: C.text, fontSize: 14, textAlign: 'left' }}
+              />
+            </View>
+
             <Btn C={C} full disabled={loading} onPress={saveStep3}>
               {loading ? '⏳' : (isRTL ? 'التالي: المستندات ←' : 'Next: Documents →')}
             </Btn>

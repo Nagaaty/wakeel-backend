@@ -294,7 +294,44 @@ function ConsultCard({
           {/* Video Button */}
           {status === 'confirmed' && joinState === 'open' && isVideoSvc && (
             <TouchableOpacity
-              onPress={() => router.push(`/video?booking=${b.id}` as any)}
+              onPress={async () => {
+                const zoomLink = b.lawyer_zoom_link;
+                if (!zoomLink || !zoomLink.trim()) {
+                  if (isLawyer) {
+                    Alert.alert(
+                      isRTL ? 'تنبيه' : 'Alert',
+                      isRTL
+                        ? 'لم تقم بتعيين رابط زووم الخاص بك. يرجى الانتقال إلى إعدادات الملف الشخصي لتعيينه.'
+                        : 'You have not set your Zoom meeting link. Please go to profile settings to set it.'
+                    );
+                  } else {
+                    Alert.alert(
+                      isRTL ? 'تنبيه' : 'Alert',
+                      isRTL
+                        ? 'لم يقم المحامي بإضافة رابط زووم بعد. يرجى التواصل معه عبر المحادثة.'
+                        : 'The lawyer has not added their Zoom meeting link yet. Please contact them via chat.'
+                    );
+                  }
+                } else {
+                  try {
+                    let cleanLink = zoomLink.trim();
+                    if (!cleanLink.startsWith('http://') && !cleanLink.startsWith('https://')) {
+                      cleanLink = 'https://' + cleanLink;
+                    }
+                    const supported = await Linking.canOpenURL(cleanLink);
+                    if (supported) {
+                      await Linking.openURL(cleanLink);
+                    } else {
+                      Alert.alert(
+                        isRTL ? 'خطأ' : 'Error',
+                        isRTL ? 'تعذر فتح الرابط.' : 'Unable to open link.'
+                      );
+                    }
+                  } catch (e: any) {
+                    Alert.alert(isRTL ? 'خطأ' : 'Error', e.message);
+                  }
+                }
+              }}
               style={{ flex: 1, backgroundColor: '#DC2626', paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: rowDir, gap: 8 }}
             >
               <Feather name='video' size={16} color='#fff' />
