@@ -157,8 +157,9 @@ app.get('/api/diagnose-server-logs', (req, res) => {
     }
 
     let errorLogTail = '';
-    let chosenErrLog = path.join(pm2LogDir, 'wakeel-backend-error.log');
-    if (!fs.existsSync(chosenErrLog) && fs.existsSync(pm2LogDir)) {
+    const requestedFile = req.query.file || 'wakeel-backend-error-0.log';
+    let chosenErrLog = path.join(pm2LogDir, requestedFile);
+    if (!fs.existsSync(chosenErrLog) && !req.query.file && fs.existsSync(pm2LogDir)) {
       const found = fs.readdirSync(pm2LogDir).find(f => f.includes('err'));
       if (found) chosenErrLog = path.join(pm2LogDir, found);
     }
@@ -171,7 +172,7 @@ app.get('/api/diagnose-server-logs', (req, res) => {
         errorLogTail = 'Error reading log file: ' + e.message;
       }
     } else {
-      errorLogTail = 'No error log file found at ' + chosenErrLog;
+      errorLogTail = 'No log file found at ' + chosenErrLog;
     }
 
     res.json({
