@@ -332,7 +332,7 @@ function ConsultCard({
                   }
                 }
               }}
-              style={{ flex: 1, backgroundColor: '#DC2626', paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: rowDir, gap: 8 }}
+              style={{ flex: 1, backgroundColor: '#2563EB', paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: rowDir, gap: 8 }}
             >
               <Feather name='video' size={16} color='#fff' />
               <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>{isRTL ? 'انضم للفيديو' : 'Join Video'}</Text>

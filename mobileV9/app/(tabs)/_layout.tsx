@@ -47,7 +47,7 @@ const HIDDEN_TAB = {
 
 export default function TabsLayout() {
   const C = useTheme();
-  const { t } = useI18n();
+  const { t, isRTL } = useI18n();
   const isLoggedIn = useSelector(selLoggedIn);
   const insets = useSafeAreaInsets();
   const { count: unreadCount } = useUnreadNotifs();
@@ -71,7 +71,7 @@ export default function TabsLayout() {
             direction: 'ltr',
           },
           tabBarContentContainerStyle: {
-            flexDirection: 'row',
+            flexDirection: isRTL ? 'row-reverse' : 'row',
             justifyContent: 'space-evenly',
             alignItems: 'center',
             flex: 1,
