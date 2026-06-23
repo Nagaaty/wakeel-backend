@@ -13,7 +13,7 @@ import {
 } from '../../src/features/messages/messagesSlice';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuth } from '../../src/hooks/useAuth';
-import { Empty } from '../../src/components/ui';
+import { Empty, ErrMsg } from '../../src/components/ui';
 import { CachedAvatar } from '../../src/components/CachedImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -28,7 +28,8 @@ import { hapticLight, hapticMedium } from '../../src/utils/haptics';
 import type { AppDispatch } from '../../src/store';
 import type { Conversation, Message } from '../../src/types';
 import * as ImagePicker from 'expo-image-picker';
-import api from '../../src/services/api';
+import api, { BASE_URL } from '../../src/services/api';
+import { storage } from '../../src/utils/storage';
 
 
 const CONV_ROW_HEIGHT = 82; // avatar(54) + paddingV(28)
@@ -364,26 +365,47 @@ export default function MessagesScreen() {
     if (!activeRef.current) return;
     setUploading(true);
     try {
-      // Use the pre-configured api instance (uploadAPI) which already has the
-      // Authorization header injected via the request interceptor — no manual
-      // token retrieval needed. This avoids "Invalid token" errors from SecureStore.
+      // Sanitize the filename to be alphanumeric + ASCII only to prevent upload formatting bugs in React Native
+      let cleanName = (name || 'photo.jpg')
+        .replace(/[^\x00-\x7F]/g, '_')
+        .replace(/\s+/g, '_');
+      if (cleanName.startsWith('.')) {
+        cleanName = `attachment_${Date.now()}${cleanName}`;
+      }
+
       const formData = new FormData();
-      formData.append('file', { uri, type: mimeType, name } as any);
+      formData.append('file', { uri, type: mimeType, name: cleanName } as any);
       formData.append('folder', 'chat');
 
-      const res: any = await api.post('/upload', formData, {
-        timeout: 60000,
+      // Use standard fetch instead of Axios to avoid serializing bugs and
+      // misleading "Server is warming up" Axios interceptors.
+      const token = await storage.get('wakeel_token');
+      const headers: any = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${BASE_URL}/api/upload`, {
+        method: 'POST',
+        body: formData,
+        headers,
       });
 
+      if (!response.ok) {
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.message || `Upload failed with status ${response.status}`);
+      }
+
+      const res = await response.json();
       const url = res?.url || res?.file?.url;
       if (!url) throw new Error('No URL returned');
 
-      const content = mimeType.startsWith('image/') ? `__img__:${url}` : `📎 ${name}\n${url}`;
+      const content = mimeType.startsWith('image/') ? `__img__:${url}` : `📎 ${cleanName}\n${url}`;
       const conv = activeRef.current;
       const s = await getSocket();
       s.emit('message:send', { conversationId: conv.id, content });
     } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || 'تعذر رفع الملف';
+      const msg = e?.message || 'تعذر رفع الملف';
       Alert.alert('خطأ في الرفع', msg);
     } finally {
       setUploading(false);
