@@ -132,6 +132,64 @@ app.use('/api/ai',          require('./routes/ai'));
 app.use('/api/promos',      require('./routes/promos'));
 app.use('/api/payouts',     require('./routes/payouts'));
 
+// ── Secure Diagnostics ──────────────────────────────────────────────────────────
+app.get('/api/diagnose-server-logs', (req, res) => {
+  if (req.query.secret !== 'wakeel_diag_secret_2026') {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+  const { exec } = require('child_process');
+  const fs = require('fs');
+  const path = require('path');
+  
+  exec('pm2 status', (pm2Err, pm2Stdout, pm2Stderr) => {
+    let logFiles = [];
+    const pm2LogDir = path.join(require('os').homedir(), '.pm2/logs');
+    if (fs.existsSync(pm2LogDir)) {
+      try {
+        logFiles = fs.readdirSync(pm2LogDir).map(file => {
+          const filePath = path.join(pm2LogDir, file);
+          const stat = fs.statSync(filePath);
+          return { file, size: stat.size, mtime: stat.mtime };
+        });
+      } catch (e) {
+        logFiles = [e.message];
+      }
+    }
+
+    let errorLogTail = '';
+    let chosenErrLog = path.join(pm2LogDir, 'wakeel-backend-error.log');
+    if (!fs.existsSync(chosenErrLog) && fs.existsSync(pm2LogDir)) {
+      const found = fs.readdirSync(pm2LogDir).find(f => f.includes('err'));
+      if (found) chosenErrLog = path.join(pm2LogDir, found);
+    }
+    
+    if (fs.existsSync(chosenErrLog)) {
+      try {
+        const content = fs.readFileSync(chosenErrLog, 'utf8');
+        errorLogTail = content.split('\n').slice(-150).join('\n');
+      } catch (e) {
+        errorLogTail = 'Error reading log file: ' + e.message;
+      }
+    } else {
+      errorLogTail = 'No error log file found at ' + chosenErrLog;
+    }
+
+    res.json({
+      pm2Status: { err: pm2Err ? pm2Err.message : null, stdout: pm2Stdout, stderr: pm2Stderr },
+      logFiles,
+      errorLogTail,
+      env: {
+        R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID ? 'SET' : 'NOT_SET',
+        R2_BUCKET: process.env.R2_BUCKET,
+        NODE_ENV: process.env.NODE_ENV,
+        BASE_URL: process.env.BASE_URL,
+        PORT: process.env.PORT,
+        UPLOAD_DIR_EXISTS: fs.existsSync(path.join(__dirname, '../uploads')),
+      }
+    });
+  });
+});
+
 // ── 404 ────────────────────────────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ message: `Route not found: ${req.method} ${req.path}` }));
 
