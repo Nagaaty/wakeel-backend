@@ -109,7 +109,7 @@ router.post('/initiate', requireAuth, async (req, res, next) => {
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, body, link)
          VALUES ($1,'booking','📅 حجز جديد',$2,'/lawyer/dashboard')`,
-        [booking.lawyer_id, `${booking.client_name} حجز معك بتاريخ ${formattedDate} الساعة ${formattedTime}. المبلغ: ${amount} جم`]
+        [booking.lawyer_id, `لديك حجز جديد من ${booking.client_name} بتاريخ ${formattedDate} الساعة ${formattedTime}. المبلغ: ${amount} جم`]
       ).catch(console.error);
 
       await notifyNewBooking(booking.lawyer_id, {
@@ -210,7 +210,7 @@ router.post('/confirm', requireAuth, async (req, res, next) => {
         await pool.query(
           `INSERT INTO notifications (user_id, type, title, body, link)
            VALUES ($1,'booking','📅 حجز جديد',$2,'/lawyer/dashboard')`,
-          [pmt.lawyer_id, `${pmt.client_name} حجز معك بتاريخ ${formattedDate} الساعة ${formattedTime}. المبلغ: ${pmt.amount} جم`]
+          [pmt.lawyer_id, `لديك حجز جديد من ${pmt.client_name} بتاريخ ${formattedDate} الساعة ${formattedTime}. المبلغ: ${pmt.amount} جم`]
         ).catch(console.error);
 
         // Emit real-time notification via Socket.io if available
@@ -291,7 +291,7 @@ router.post('/webhook', async (req, res) => {
             await pool.query(
               `INSERT INTO notifications (user_id, type, title, body, link)
                VALUES ($1,'booking','📅 حجز جديد',$2,'/lawyer/dashboard')`,
-              [booking.lawyer_id, `${booking.client_name} حجز معك بتاريخ ${formattedDate} الساعة ${formattedTime}. المبلغ: ${pmt.amount} جم`]
+              [booking.lawyer_id, `لديك حجز جديد من ${booking.client_name} بتاريخ ${formattedDate} الساعة ${formattedTime}. المبلغ: ${pmt.amount} جم`]
             ).catch(console.error);
 
             // Emit via socket if available

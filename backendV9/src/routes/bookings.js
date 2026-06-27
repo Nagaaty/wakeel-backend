@@ -255,7 +255,7 @@ router.patch('/:id/status', requireAuth, async (req, res, next) => {
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, body, link)
          VALUES ($1,'booking','تم تأكيد حجزك',$2,'/bookings')`,
-        [booking.client_id, `${booking.lawyer_name} قبل حجزك ${booking.booking_date}`]
+        [booking.client_id, `تم قبول حجزك من قبل ${booking.lawyer_name} بتاريخ ${booking.booking_date}`]
       ).catch(console.error);
     }
 
