@@ -84,7 +84,7 @@ async function removeToken(userId, token) {
 async function notifyNewBooking(lawyerId, { clientName, date, time }) {
   return sendToUser(lawyerId, {
     title: '📅 حجز جديد!',
-    body:  `${clientName} حجز معك ${date} الساعة ${time}`,
+    body:  `تم حجز موعد جديد من قبل ${clientName} بتاريخ ${date} الساعة ${time}`,
     data:  { type: 'new_booking', link: '/lawyer/dashboard' },
   });
 }
@@ -92,7 +92,7 @@ async function notifyNewBooking(lawyerId, { clientName, date, time }) {
 async function notifyBookingConfirmed(clientId, { lawyerName, date, time }) {
   return sendToUser(clientId, {
     title: '✅ تم تأكيد حجزك',
-    body:  `${lawyerName} قبل حجزك ${date} الساعة ${time}`,
+    body:  `تم قبول حجزك من قبل ${lawyerName} بتاريخ ${date} الساعة ${time}`,
     data:  { type: 'booking_confirmed', link: '/bookings' },
   });
 }
@@ -116,7 +116,7 @@ async function notifyNewMessage(userId, { senderName, preview }) {
 async function notifyPaymentReceived(lawyerId, { clientName, amount }) {
   return sendToUser(lawyerId, {
     title: '💰 تم استلام دفعة',
-    body:  `${clientName} دفع ${amount} جنيه`,
+    body:  `تم استلام دفعة من ${clientName} بقيمة ${amount} جنيه`,
     data:  { type: 'payment', link: '/lawyer/dashboard' },
   });
 }

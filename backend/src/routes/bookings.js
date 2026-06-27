@@ -123,9 +123,18 @@ router.post('/', requireAuth, async (req, res, next) => {
       }).catch(console.error);
     }
 
-    // NOTE: DB notification is intentionally NOT sent here.
-    // The lawyer receives their confirmed notification after payment succeeds (payments.js).
-    // Sending one here (pending state) would be a duplicate.
+    // Save DB notification for lawyer
+    const { rows: [notif] } = await pool.query(
+      `INSERT INTO notifications (user_id, type, title, body, link)
+       VALUES ($1, 'booking', '📅 حجز جديد', $2, '/lawyer/dashboard')
+       RETURNING *`,
+      [lawyerId, `لديك حجز جديد من ${client.name} بتاريخ ${bookingDate} الساعة ${startTime}`]
+    ).catch(console.error) || { rows: [] };
+
+    if (notif) {
+      const io = req.app.get('io');
+      if (io) io.to(`user:${lawyerId}`).emit('notification:new', notif);
+    }
 
     res.status(201).json({ booking, conversationId: conv.id });
   } catch (err) { next(err); }
@@ -151,11 +160,14 @@ router.get('/', requireAuth, async (req, res, next) => {
         lp.specialization, lp.avg_rating, lp.is_verified,
         lp.office AS lawyer_office, lp.city AS lawyer_city,
         lp.user_id AS lawyer_profile_id,
-        lu.id AS lawyer_user_id
+        lp.zoom_link AS lawyer_zoom_link,
+        lu.id AS lawyer_user_id,
+        cv.id AS conversation_id
       FROM bookings b
       JOIN users cu ON cu.id = b.client_id
       JOIN users lu ON lu.id = b.lawyer_id
       LEFT JOIN lawyer_profiles lp ON lp.user_id = b.lawyer_id
+      LEFT JOIN conversations cv ON (cv.client_id = b.client_id AND cv.lawyer_id = b.lawyer_id)
       WHERE ${isLawyer ? 'b.lawyer_id' : 'b.client_id'} = $1
     `;
     const params = [req.user.id];
@@ -243,7 +255,7 @@ router.patch('/:id/status', requireAuth, async (req, res, next) => {
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, body, link)
          VALUES ($1,'booking','تم تأكيد حجزك',$2,'/bookings')`,
-        [booking.client_id, `${booking.lawyer_name} قبل حجزك ${booking.booking_date}`]
+        [booking.client_id, `تم قبول حجزك من قبل ${booking.lawyer_name} بتاريخ ${booking.booking_date}`]
       ).catch(console.error);
     }
 
@@ -274,7 +286,8 @@ router.get('/:id', requireAuth, async (req, res, next) => {
               TO_CHAR(b.scheduled_at, 'HH24:MI') AS start_time,
               LOWER(b.type) AS service_type,
               cu.name AS client_name, lu.name AS lawyer_name, lu.email AS lawyer_email,
-              lp.specialization, lp.office AS lawyer_office, lp.city AS lawyer_city
+              lp.specialization, lp.office AS lawyer_office, lp.city AS lawyer_city,
+              lp.zoom_link AS lawyer_zoom_link
        FROM bookings b
        JOIN users cu ON cu.id=b.client_id
        JOIN users lu ON lu.id=b.lawyer_id

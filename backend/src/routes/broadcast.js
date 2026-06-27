@@ -31,7 +31,7 @@ router.post('/', requireAuth, async (req, res, next) => {
       await pool.query(
         `INSERT INTO notifications (user_id, type, title, body, link)
          VALUES ($1,'broadcast','طلب جديد في تخصصك',$2,'/lawyer/dashboard')`,
-        [lawyer.id, `${req.user.name || 'عميل'} نشر طلباً في ${category}`]
+        [lawyer.id, `هناك طلب جديد منشور من قبل ${req.user.name || 'عميل'} في تخصص ${category}`]
       ).catch(() => {});
     }
 
@@ -105,7 +105,7 @@ router.post('/:id/bid', requireAuth, requireRole('lawyer'), async (req, res, nex
     await pool.query(
       `INSERT INTO notifications (user_id, type, title, body, link)
        VALUES ($1,'broadcast','عرض جديد على طلبك',$2,'/my-requests')`,
-      [request.client_id, `${req.user.name} أرسل عرضاً بسعر ${price} جنيه`]
+      [request.client_id, `تم إرسال عرض جديد من قبل ${req.user.name} بقيمة ${price} جنيه`]
     ).catch(() => {});
 
     res.status(201).json({ bid });
