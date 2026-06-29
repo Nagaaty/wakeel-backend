@@ -45,7 +45,7 @@ async function callGemini(messages, systemText, maxTokens = 1000) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null; // Not configured
 
-  const MODEL = 'gemini-2.0-flash';
+  const MODEL = 'gemini-1.5-flash';
   const url   = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
 
   // Convert messages to Gemini format
