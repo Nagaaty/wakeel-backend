@@ -97,15 +97,24 @@ async function callClaude(messages, systemText, maxTokens = 1000) {
 // ── Main dispatcher — tries Groq → Gemini → Claude ───────────────────────────
 async function callAI(messages, systemText, maxTokens = 1000) {
   // Try Groq first (fastest + free)
-  const groqResult = await callGroq(messages, systemText, maxTokens).catch(() => null);
+  const groqResult = await callGroq(messages, systemText, maxTokens).catch((err) => {
+    console.error('[AI] Groq failed:', err.message || err);
+    return null;
+  });
   if (groqResult) return groqResult;
 
   // Try Gemini second (free)
-  const geminiResult = await callGemini(messages, systemText, maxTokens).catch(() => null);
+  const geminiResult = await callGemini(messages, systemText, maxTokens).catch((err) => {
+    console.error('[AI] Gemini failed:', err.message || err);
+    return null;
+  });
   if (geminiResult) return geminiResult;
 
   // Try Claude fallback (paid)
-  const claudeResult = await callClaude(messages, systemText, maxTokens).catch(() => null);
+  const claudeResult = await callClaude(messages, systemText, maxTokens).catch((err) => {
+    console.error('[AI] Claude failed:', err.message || err);
+    return null;
+  });
   if (claudeResult) return claudeResult;
 
   // Nothing configured
