@@ -46,7 +46,7 @@ async function callGemini(messages, systemText, maxTokens = 1000) {
   if (!key) return null; // Not configured
 
   const MODEL = 'gemini-1.5-flash';
-  const url   = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${key}`;
+  const url   = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
 
   // Convert messages to Gemini format
   const contents = messages.map(m => ({
