@@ -172,16 +172,20 @@ async function seed() {
 
       await client.query(
         `INSERT INTO lawyer_profiles (
-          user_id, title, bar_id, specialization, experience, price, bio, city,
-          rating, review_count, is_verified, is_available, subscription_plan
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, true, $11)
+          user_id, title, bar_id, specialization, experience, experience_years, price, consultation_fee, bio, city,
+          rating, avg_rating, review_count, total_reviews, is_verified, is_available, subscription_plan
+         ) VALUES ($1, $2, $3, $4, $5, $5, $6, $6, $7, $8, $9, $9, $10, $10, true, true, $11)
          ON CONFLICT (user_id) DO UPDATE SET
           specialization = EXCLUDED.specialization,
           price = EXCLUDED.price,
+          consultation_fee = EXCLUDED.consultation_fee,
           experience = EXCLUDED.experience,
+          experience_years = EXCLUDED.experience_years,
           bio = EXCLUDED.bio,
           rating = EXCLUDED.rating,
+          avg_rating = EXCLUDED.avg_rating,
           review_count = EXCLUDED.review_count,
+          total_reviews = EXCLUDED.total_reviews,
           subscription_plan = EXCLUDED.subscription_plan,
           is_verified = true,
           is_available = true`,
