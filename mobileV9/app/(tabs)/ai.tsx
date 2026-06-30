@@ -32,21 +32,20 @@ function detectTopic(text: string): string | null {
 }
 
 const SPEC_MAP: Record<string, string> = {
-  criminal: 'القانون الجنائي',
-  family: 'الأحوال الشخصية',
-  corporate: 'قانون الشركات والتجارة',
-  realestate: 'قانون العقارات',
-  labor: 'قانون العمل',
-  civil: 'قانون مدني',
+  criminal: 'جنائي',
+  family: 'أسرة',
+  corporate: 'شركات',
+  realestate: 'عقار',
+  labor: 'عمل',
+  civil: 'مدني',
 };
 
 const QUICK = [
-  { ar: 'ما حقوقي إذا طُردت من العمل؟', en: 'What are my rights if fired from work?' },
-  { ar: 'كيف أرفع دعوى طلاق؟', en: 'How do I file for divorce?' },
-  { ar: 'ما عقوبة الاحتيال في مصر؟', en: 'What is the penalty for fraud in Egypt?' },
-  { ar: 'كيف أسجل شركة في مصر؟', en: 'How do I register a company in Egypt?' },
-  { ar: 'ما حقوق المستأجر في القانون؟', en: 'What are tenant rights under Egyptian law?' },
-  { ar: 'كيف أحصل على نفقة الأطفال؟', en: 'How do I get child support?' },
+  { ar: 'عندي قضية طلاق ونفقة وأبحث عن محامٍ', en: 'I have a divorce and alimony case and need a lawyer' },
+  { ar: 'أريد تأسيس شركة تجارية جديدة في مصر', en: 'I want to register a new commercial company in Egypt' },
+  { ar: 'حدثت مشكلة في العمل وتم فصلي تعسفياً', en: 'I had an issue at work and was wrongfully terminated' },
+  { ar: 'أحتاج لمحامٍ لمراجعة عقد إيجار شقة', en: 'I need a lawyer to review a property rental contract' },
+  { ar: 'أبحث عن محامٍ جنائي شاطر لقضية جنحة', en: 'I am looking for a criminal lawyer for a misdemeanor' },
 ];
 
 interface Message {
@@ -105,8 +104,8 @@ export default function AIScreen() {
   const [messages, setMessages] = useState<Message[]>([{
     id: '0', role: 'assistant',
     content: isRTL
-      ? `أهلاً ${user?.name?.split(' ')[0] || ''}! أنا المستشار القانوني الذكي لـ Wakeel 🇪🇬\n\nأستطيع مساعدتك في:\n• قانون الأسرة والطلاق والميراث\n• القانون الجنائي\n• قانون العمل والفصل التعسفي\n• قانون العقارات والإيجارات\n• تأسيس الشركات\n• القانون المدني\n\nاسألني أي سؤال قانوني!`
-      : `Hello ${user?.name?.split(' ')[0] || ''}! I'm Wakeel's AI Legal Advisor 🇪🇬\n\nI can help with Egyptian law on:\n• Family law, divorce & inheritance\n• Criminal law\n• Labor law & wrongful termination\n• Real estate & rental law\n• Company registration\n• Civil law & compensation\n\nAsk me anything!`,
+      ? `أهلاً ${user?.name?.split(' ')[0] || ''}! أنا مساعدك الذكي لمطابقة وتوصية المحامين المناسبين لقضيتك 🤖\n\nأخبرني بكلماتك الخاصة عن مشكلتك أو قضيتك القانونية، وسأقوم بتحليلها فوراً لأرشح لك أفضل المحامين المعتمدين المتخصصين لمساعدتك!`
+      : `Hello ${user?.name?.split(' ')[0] || ''}! I'm your AI Lawyer Matcher & Recommendation assistant 🤖\n\nSimply describe your legal case or situation, and I will analyze it to recommend the best certified lawyers to help you immediately!`,
     lawyers: [],
   }]);
   const [input, setInput] = useState('');
@@ -117,36 +116,37 @@ export default function AIScreen() {
     const userContext = user
       ? `The user's name is ${user.name}, role: ${user.role}.`
       : '';
-    return `You are Justice Advisor — Wakeel.eg's expert AI legal assistant, specialized exclusively in Egyptian law.
+    return `You are Wakeel AI (مساعد وكيل الذكي) — a smart matching assistant for Wakeel.eg, Egypt's premier legal marketplace.
 
 ${userContext}
 
-Your expertise covers:
-- Civil Code (Law 131/1948)
-- Criminal/Penal Code
-- Commercial Code (Law 17/1999)  
-- Family & Personal Status Law (Laws 1/2000 and 10/2004)
-- Labor Law (Law 12/2003)
-- Real Estate registration laws
-- Company Law (Law 159/1981)
-- Administrative Law
+Your ONLY job is to analyze the client's legal issue, identify which area of Egyptian law it belongs to, and guide them to consult the recommended specialists below.
 
-RULES:
-1. Answer in the same language the user writes (Arabic or English). Default to Arabic.
-2. Be practical, specific, and cite relevant Egyptian law articles when possible.
-3. Structure longer answers with clear sections using emojis as headers.
-4. Always end by noting you are an AI and recommending a certified Egyptian lawyer for their specific case.
-5. If the question involves a legal specialty where a lawyer would genuinely help, append exactly one tag at the very end: [TOPIC:criminal] [TOPIC:family] [TOPIC:labor] [TOPIC:realestate] [TOPIC:corporate] [TOPIC:civil]
-6. If the user is angry, distressed, or urgently needs help, acknowledge their feelings first before giving legal info.
-7. Never refuse to answer legal questions about Egypt. Always try to help.`;
+STRICT RULES:
+1. NEVER give detailed legal advice, cite specific legal articles, or attempt to solve the client's case yourself.
+2. Politely acknowledge their situation in the same language they write (Arabic or English). Default to Arabic.
+3. Clearly identify the legal specialty (e.g., Family Law / الأحوال الشخصية, Criminal Law / القانون الجنائي, Labor Law / قانون العمل, Corporate & Commercial / قانون الشركات والتجارة, Real Estate / قانون العقارات, Civil Law / قانون مدني).
+4. Keep your response friendly and brief (under 3-4 sentences). 
+5. Tell them they should consult one of the recommended verified specialists listed below to get official, safe legal advice.
+6. Append exactly one tag at the very end of your response to trigger the backend filter: [TOPIC:criminal] [TOPIC:family] [TOPIC:labor] [TOPIC:realestate] [TOPIC:corporate] [TOPIC:civil]`;
   };
 
   const fetchMatchingLawyers = async (topic: string | null) => {
-    if (!topic) return [];
     try {
-      const spec = SPEC_MAP[topic];
-      const d: any = await lawyersAPI.list({ cat: spec, limit: 3, sort: 'rating' });
-      return (d?.lawyers || d?.data || []).slice(0, 3);
+      const spec = topic ? SPEC_MAP[topic] : null;
+      let d: any;
+      if (spec) {
+        d = await lawyersAPI.list({ cat: spec, limit: 3, sort: 'rating' }).catch(() => null);
+      }
+      
+      let list = (d?.lawyers || d?.data || []);
+      if (list.length === 0) {
+        // Fallback: get any top-rated lawyers if specific category is empty or query failed
+        const fallbackRes: any = await lawyersAPI.list({ limit: 3, sort: 'rating' }).catch(() => null);
+        list = (fallbackRes?.lawyers || fallbackRes?.data || []);
+      }
+      
+      return list.slice(0, 3);
     } catch { return []; }
   };
 
