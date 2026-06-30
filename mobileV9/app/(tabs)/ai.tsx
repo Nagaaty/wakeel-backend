@@ -54,6 +54,7 @@ interface Message {
   content: string;
   lawyers: any[];
   isError?: boolean;
+  topic?: string | null;
 }
 
 // ─── Lawyer Mini Card ────────────────────────────────────────────────────────
@@ -110,6 +111,28 @@ export default function AIScreen() {
   }]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [activeSorts, setActiveSorts] = useState<Record<string, string>>({});
+
+  const handleSortChange = async (msgId: string, topic: string | null, sortType: string) => {
+    setActiveSorts(prev => ({ ...prev, [msgId]: sortType }));
+    const spec = topic ? SPEC_MAP[topic] : null;
+    let list: any[] = [];
+    try {
+      let d: any;
+      if (spec) {
+        d = await lawyersAPI.list({ cat: spec, limit: 3, sort: sortType }).catch(() => null);
+      }
+      list = (d?.lawyers || d?.data || []);
+      if (list.length === 0) {
+        const fallbackRes: any = await lawyersAPI.list({ limit: 3, sort: sortType }).catch(() => null);
+        list = (fallbackRes?.lawyers || fallbackRes?.data || []);
+      }
+      list = list.slice(0, 3);
+    } catch {
+      list = [];
+    }
+    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, lawyers: list } : m));
+  };
 
   // Build the system prompt with user context
   const buildSystem = () => {
@@ -178,6 +201,7 @@ STRICT RULES:
         role: 'assistant',
         content: reply,
         lawyers,
+        topic,
       }]);
     } catch (e: any) {
       const isNotConfigured = e?.message?.includes('not configured') || e?.message?.includes('ANTHROPIC');
@@ -190,6 +214,7 @@ STRICT RULES:
           role: 'assistant',
           content: '⚠️ خدمة الذكاء الاصطناعي غير مُفعّلة بعد.\n\nيمكنك التحدث مع أحد محامينا المعتمدين مباشرة 👇',
           lawyers,
+          topic,
           isError: true,
         }]);
       } else {
@@ -198,6 +223,7 @@ STRICT RULES:
           role: 'assistant',
           content: '⚠️ حدث خطأ مؤقت. يمكنك إعادة المحاولة أو التحدث مع محامٍ مباشرة.',
           lawyers,
+          topic,
           isError: true,
         }]);
       }
@@ -258,9 +284,50 @@ STRICT RULES:
         {/* Real lawyer cards from DB */}
         {!isUser && item.lawyers.length > 0 && (
           <View style={{ marginTop: 10, marginLeft: 42 }}>
-            <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 8 }}>
-              ⚡ محامون متخصصون في قضيتك
+            <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 }}>
+              ⚡ ترشيحات المحامين الأكثر ملاءمة لقضيتك:
             </Text>
+
+            {/* Sorting Pills */}
+            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+              <TouchableOpacity
+                onPress={() => handleSortChange(item.id, item.topic || null, 'rating')}
+                style={{
+                  paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
+                  backgroundColor: (activeSorts[item.id] || 'rating') === 'rating' ? C.gold : '#1a1a2e',
+                  borderWidth: 1, borderColor: (activeSorts[item.id] || 'rating') === 'rating' ? C.gold : C.border,
+                }}
+              >
+                <Text style={{ fontSize: 11, color: (activeSorts[item.id] || 'rating') === 'rating' ? '#000' : C.text, fontWeight: 'bold' }}>
+                  ⭐ الأعلى تقييماً
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleSortChange(item.id, item.topic || null, 'price_asc')}
+                style={{
+                  paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
+                  backgroundColor: (activeSorts[item.id] || 'rating') === 'price_asc' ? C.gold : '#1a1a2e',
+                  borderWidth: 1, borderColor: (activeSorts[item.id] || 'rating') === 'price_asc' ? C.gold : C.border,
+                }}
+              >
+                <Text style={{ fontSize: 11, color: (activeSorts[item.id] || 'rating') === 'price_asc' ? '#000' : C.text, fontWeight: 'bold' }}>
+                  💸 الأنسب سعراً
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleSortChange(item.id, item.topic || null, 'experience')}
+                style={{
+                  paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
+                  backgroundColor: (activeSorts[item.id] || 'rating') === 'experience' ? C.gold : '#1a1a2e',
+                  borderWidth: 1, borderColor: (activeSorts[item.id] || 'rating') === 'experience' ? C.gold : C.border,
+                }}
+              >
+                <Text style={{ fontSize: 11, color: (activeSorts[item.id] || 'rating') === 'experience' ? '#000' : C.text, fontWeight: 'bold' }}>
+                  💼 الأكثر خبرة
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {item.lawyers.map((l: any) => (
               <LawyerMiniCard
                 key={l.id}
