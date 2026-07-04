@@ -32,11 +32,11 @@ function detectTopic(text: string): string | null {
 }
 
 const SPEC_MAP: Record<string, string> = {
-  criminal: 'جنائي',
-  family: 'أسرة',
-  corporate: 'شركات',
-  realestate: 'عقار',
-  labor: 'عمل',
+  criminal: 'القانون الجنائي',
+  family: 'الأحوال الشخصية',
+  corporate: 'الشركات والتجارة',
+  realestate: 'قانون العقارات',
+  labor: 'قانون العمل',
   civil: 'مدني',
 };
 
@@ -655,7 +655,7 @@ STRICT RULES:
               {isRTL ? 'المنطقة / المحافظة:' : 'Region / City:'}
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-              {['', 'Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta'].map(city => (
+              {['', 'Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Asyut', 'Port Said', 'Ismailia', 'Luxor', 'Aswan'].map(city => (
                 <TouchableOpacity
                   key={city}
                   onPress={() => setSelectedCity(city)}
@@ -666,7 +666,18 @@ STRICT RULES:
                   }}
                 >
                   <Text style={{ fontSize: 12, color: selectedCity === city ? '#000' : C.text, fontWeight: '600' }}>
-                    {city === '' ? (isRTL ? 'كل المدن' : 'All Cities') : city}
+                    {city === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
+                      city === 'Cairo' ? (isRTL ? 'القاهرة' : 'Cairo') :
+                      city === 'Alexandria' ? (isRTL ? 'الإسكندرية' : 'Alexandria') :
+                      city === 'Giza' ? (isRTL ? 'الجيزة' : 'Giza') :
+                      city === 'Mansoura' ? (isRTL ? 'المنصورة' : 'Mansoura') :
+                      city === 'Tanta' ? (isRTL ? 'طنطا' : 'Tanta') :
+                      city === 'Asyut' ? (isRTL ? 'أسيوط' : 'Asyut') :
+                      city === 'Port Said' ? (isRTL ? 'بورسعيد' : 'Port Said') :
+                      city === 'Ismailia' ? (isRTL ? 'الإسماعيلية' : 'Ismailia') :
+                      city === 'Luxor' ? (isRTL ? 'الأقصر' : 'Luxor') :
+                      city === 'Aswan' ? (isRTL ? 'أسوان' : 'Aswan') : city
+                    )}
                   </Text>
                 </TouchableOpacity>
               ))}
