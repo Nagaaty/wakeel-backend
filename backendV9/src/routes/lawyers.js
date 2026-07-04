@@ -37,8 +37,21 @@ router.get('/', async (req, res, next) => {
       conditions.push(`lp.specialization ILIKE $${params.length}`);
     }
     if (city) {
-      params.push(city);
-      conditions.push(`lp.city=$${params.length}`);
+      const cityMap = {
+        'القاهرة': 'Cairo', 'Cairo': 'Cairo',
+        'الإسكندرية': 'Alexandria', 'Alexandria': 'Alexandria',
+        'الجيزة': 'Giza', 'Giza': 'Giza',
+        'المنصورة': 'Mansoura', 'Mansoura': 'Mansoura',
+        'طنطا': 'Tanta', 'Tanta': 'Tanta',
+        'أسيوط': 'Asyut', 'Asyut': 'Asyut',
+        'بورسعيد': 'Port Said', 'Port Said': 'Port Said',
+        'الإسماعيلية': 'Ismailia', 'Ismailia': 'Ismailia',
+        'الأقصر': 'Luxor', 'Luxor': 'Luxor',
+        'أسوان': 'Aswan', 'Aswan': 'Aswan'
+      };
+      const dbCity = cityMap[city] || city;
+      params.push(dbCity);
+      conditions.push(`lp.city ILIKE $${params.length}`);
     }
     if (minPrice) {
       params.push(parseFloat(minPrice));
