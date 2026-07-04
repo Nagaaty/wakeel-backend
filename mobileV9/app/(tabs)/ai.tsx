@@ -210,7 +210,8 @@ CONVERSATION FLOW:
 STRICT RULES:
 1. NEVER give detailed legal advice, cite specific legal articles, or attempt to solve the client's case yourself.
 2. Politely respond in the same language they write (Arabic or English). Default to Arabic.
-3. Keep your responses friendly and brief (under 3 sentences).`;
+3. Keep your responses friendly and brief (under 3 sentences).
+4. NEVER output Chinese, Japanese, or other non-Arabic/non-English characters (such as 你). Respond ONLY in standard Arabic or English.`;
   };
 
   const fetchMatchingLawyers = async (topic: string | null, sortType: string = 'rating') => {
@@ -259,6 +260,12 @@ STRICT RULES:
       const history = [...messages, userMsg].map(m => ({ role: m.role as any, content: m.content }));
       const d: any = await aiAPI.chat(history, buildSystem());
       let reply = d.reply || d.text || 'عذراً، حاول مرة أخرى.';
+
+      // Clean CJK glitches (e.g. Llama outputting Chinese characters like '你' instead of 'لك')
+      reply = reply.replace(/[\u4e00-\u9fa5]|[\u3040-\u30ff]/g, (match) => {
+        if (match === '\u4f60' || match === '你') return 'لك';
+        return '';
+      }).trim();
 
       let topic: string | null = null;
       let sortType: string = 'rating';
