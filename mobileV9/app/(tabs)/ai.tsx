@@ -687,7 +687,7 @@ STRICT RULES:
 
             {showCityDropdown && (
               <View style={{
-                maxHeight: 140, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+                maxHeight: 220, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
                 borderRadius: 12, marginBottom: 16, overflow: 'hidden',
               }}>
                 <FlatList

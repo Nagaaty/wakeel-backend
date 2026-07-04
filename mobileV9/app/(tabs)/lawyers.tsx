@@ -67,6 +67,18 @@ const CATEGORIES_EN = [
 ];
 const CITIES_AR     = ['','القاهرة','الإسكندرية','الجيزة','المنصورة','طنطا','أسيوط','بورسعيد','الإسماعيلية','الأقصر','أسوان'];
 const CITIES_EN     = ['','Cairo','Alexandria','Giza','Mansoura','Tanta','Asyut','Port Said','Ismailia','Luxor','Aswan'];
+const CITY_TRANSLATIONS: Record<string, string> = {
+  'Cairo': 'القاهرة',
+  'Alexandria': 'الإسكندرية',
+  'Giza': 'الجيزة',
+  'Mansoura': 'المنصورة',
+  'Tanta': 'طنطا',
+  'Asyut': 'أسيوط',
+  'Port Said': 'بورسعيد',
+  'Ismailia': 'الإسماعيلية',
+  'Luxor': 'الأقصر',
+  'Aswan': 'أسوان',
+};
 // sort options: [value, arLabel, enLabel]
 const SORT_OPTS: [string,string,string][] = [
   ['rating',    '⭐ الأعلى تقييماً', '⭐ Top Rated'],
@@ -262,6 +274,9 @@ export default function LawyersTab() {
   const [category, setCategory] = useState(params.specialization || params.cat || '');
   const [city, setCity]       = useState(params.city || '');
   const [sort, setSort]       = useState(params.sort || 'rating');
+  const [maxPrice, setMaxPrice] = useState<number | null>(params.maxPrice ? Number(params.maxPrice) : null);
+  const [minExp, setMinExp]   = useState<number>(params.minExperience ? Number(params.minExperience) : 0);
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
 
   // Sync incoming search params from other screens dynamically (e.g. AI Matcher)
   useEffect(() => {
@@ -274,7 +289,13 @@ export default function LawyersTab() {
     if (params.sort) {
       setSort(params.sort);
     }
-  }, [params.cat, params.specialization, params.city, params.sort]);
+    if (params.maxPrice !== undefined) {
+      setMaxPrice(params.maxPrice ? Number(params.maxPrice) : null);
+    }
+    if (params.minExperience !== undefined) {
+      setMinExp(params.minExperience ? Number(params.minExperience) : 0);
+    }
+  }, [params.cat, params.specialization, params.city, params.sort, params.maxPrice, params.minExperience]);
   const [showSort, setShowSort] = useState(false);
   const [isGrid, setIsGrid]   = useState(true);
   const [page, setPage]       = useState(1);
@@ -289,12 +310,14 @@ export default function LawyersTab() {
         cat:      (opts.category ?? category) || undefined,
         city:     (opts.city     ?? city)     || undefined,
         sort:     opts.sort     ?? sort,
+        maxPrice: (opts.maxPrice !== undefined ? opts.maxPrice : maxPrice) || undefined,
+        minExperience: (opts.minExperience !== undefined ? opts.minExperience : minExp) || undefined,
         page:     reset ? 1 : (opts.page ?? page),
         limit:    20,
       })).unwrap();
       if (reset) setPage(1);
     } catch (e: any) { setError(e?.message || 'Failed to load lawyers'); }
-  }, [dispatch, search, category, sort, page, city]);
+  }, [dispatch, search, category, sort, page, city, maxPrice, minExp]);
 
   useEffect(() => { load({}, true); }, [category, city, sort]);
 
@@ -302,6 +325,22 @@ export default function LawyersTab() {
     setSearch(text);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => load({ search: text }, true), 500);
+  };
+
+  const onMaxPriceChange = (val: string) => {
+    const clean = val.replace(/[^0-9]/g, '');
+    const num = clean ? Number(clean) : null;
+    setMaxPrice(num);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => load({ maxPrice: num }, true), 600);
+  };
+
+  const onMinExpChange = (val: string) => {
+    const clean = val.replace(/[^0-9]/g, '');
+    const num = clean ? Number(clean) : 0;
+    setMinExp(num);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => load({ minExperience: num }, true), 600);
   };
 
   const onEndReached = () => {
@@ -378,23 +417,90 @@ export default function LawyersTab() {
           }}
         />
 
-        {/* City chips */}
-        <FlatList horizontal data={isRTL ? CITIES_AR : CITIES_EN} keyExtractor={i=>i||'all'}
-          showsHorizontalScrollIndicator={true}
-          contentContainerStyle={{ gap:8 }}
-          renderItem={({ item, index }) => {
-            const apiValue = CITIES_AR[index];
-            const active = city === apiValue;
-            return (
-              <TouchableOpacity onPress={()=>setCity(active ? '' : apiValue)}
-                style={{ paddingHorizontal:12, paddingVertical:6, borderRadius:20, borderWidth:1, borderColor:active?C.accent:C.border, backgroundColor:active?`${C.accent}15`:'transparent' }}>
-                <Text style={{ color:active?C.accent:C.muted, fontSize:11, fontWeight:active?'700':'400' }}>
-                  {item || (isRTL ? '📍 كل المدن' : '📍 All Cities')}
-                </Text>
-              </TouchableOpacity>
-            );
+        {/* City Selection Collapsible Dropdown */}
+        <TouchableOpacity
+          onPress={() => setShowCityDropdown(!showCityDropdown)}
+          style={{
+            flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+            backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+            borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+            marginBottom: showCityDropdown ? 4 : 10,
           }}
-        />
+        >
+          <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }}>
+            📍 {city === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
+              isRTL ? CITY_TRANSLATIONS[city] : city
+            )}
+          </Text>
+          <Text style={{ color: C.muted, fontSize: 10 }}>{showCityDropdown ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
+
+        {showCityDropdown && (
+          <View style={{
+            maxHeight: 220, backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+            borderRadius: 12, marginBottom: 10, overflow: 'hidden',
+          }}>
+            <FlatList
+              nestedScrollEnabled={true}
+              data={['', 'Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Asyut', 'Port Said', 'Ismailia', 'Luxor', 'Aswan']}
+              keyExtractor={item => item || 'all'}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  onPress={() => {
+                    setCity(item);
+                    setShowCityDropdown(false);
+                  }}
+                  style={{
+                    paddingVertical: 10, paddingHorizontal: 12,
+                    borderBottomWidth: 1, borderBottomColor: C.border,
+                    backgroundColor: city === item ? `${C.gold}15` : 'transparent',
+                  }}
+                >
+                  <Text style={{ color: city === item ? C.gold : C.text, fontSize: 13, fontWeight: city === item ? 'bold' : 'normal' }}>
+                    {item === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
+                      isRTL ? CITY_TRANSLATIONS[item] : item
+                    )}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        )}
+
+        {/* Written Inputs for Price and Experience (Side-by-Side) */}
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+          {/* Max Consultation Fee */}
+          <View style={{ flex: 1 }}>
+            <TextInput
+              placeholder={isRTL ? 'أقصى سعر استشارة (ج.م)...' : 'Max Fee (EGP)...'}
+              placeholderTextColor={C.muted}
+              keyboardType="numeric"
+              value={maxPrice ? String(maxPrice) : ''}
+              onChangeText={onMaxPriceChange}
+              style={{
+                backgroundColor: C.card2, borderWidth: 1, borderColor: C.border,
+                borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+                color: C.text, fontSize: 13,
+              }}
+            />
+          </View>
+
+          {/* Min Experience Years */}
+          <View style={{ flex: 1 }}>
+            <TextInput
+              placeholder={isRTL ? 'أقل سنوات خبرة...' : 'Min Exp (Years)...'}
+              placeholderTextColor={C.muted}
+              keyboardType="numeric"
+              value={minExp ? String(minExp) : ''}
+              onChangeText={onMinExpChange}
+              style={{
+                backgroundColor: C.card2, borderWidth: 1, borderColor: C.border,
+                borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+                color: C.text, fontSize: 13,
+              }}
+            />
+          </View>
+        </View>
       </View>
 
       {error ? <View style={{ paddingHorizontal:16, paddingTop:8 }}><ErrMsg C={C} msg={error} /></View> : null}
