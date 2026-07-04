@@ -39,15 +39,32 @@ router.get('/', async (req, res, next) => {
     if (city) {
       const cityMap = {
         'القاهرة': 'Cairo', 'Cairo': 'Cairo',
-        'الإسكندرية': 'Alexandria', 'Alexandria': 'Alexandria',
         'الجيزة': 'Giza', 'Giza': 'Giza',
-        'المنصورة': 'Mansoura', 'Mansoura': 'Mansoura',
-        'طنطا': 'Tanta', 'Tanta': 'Tanta',
-        'أسيوط': 'Asyut', 'Asyut': 'Asyut',
+        'الإسكندرية': 'Alexandria', 'Alexandria': 'Alexandria',
+        'القليوبية': 'Qalyubia', 'Qalyubia': 'Qalyubia',
+        'الغربية': 'Gharbia', 'Gharbia': 'Gharbia',
+        'المنوفية': 'Monufia', 'Monufia': 'Monufia',
+        'الدقهلية': 'Dakahlia', 'Dakahlia': 'Dakahlia',
+        'الشرقية': 'Sharqia', 'Sharqia': 'Sharqia',
+        'البحيرة': 'Beheira', 'Beheira': 'Beheira',
+        'دمياط': 'Damietta', 'Damietta': 'Damietta',
         'بورسعيد': 'Port Said', 'Port Said': 'Port Said',
         'الإسماعيلية': 'Ismailia', 'Ismailia': 'Ismailia',
+        'السويس': 'Suez', 'Suez': 'Suez',
+        'كفر الشيخ': 'Kafr El Sheikh', 'Kafr El Sheikh': 'Kafr El Sheikh',
+        'الفيوم': 'Faiyum', 'Faiyum': 'Faiyum',
+        'بني سويف': 'Beni Suef', 'Beni Suef': 'Beni Suef',
+        'المنيا': 'Minya', 'Minya': 'Minya',
+        'أسيوط': 'Asyut', 'Asyut': 'Asyut',
+        'سوهاج': 'Sohag', 'Sohag': 'Sohag',
+        'قنا': 'Qena', 'Qena': 'Qena',
         'الأقصر': 'Luxor', 'Luxor': 'Luxor',
-        'أسوان': 'Aswan', 'Aswan': 'Aswan'
+        'أسوان': 'Aswan', 'Aswan': 'Aswan',
+        'البحر الأحمر': 'Red Sea', 'Red Sea': 'Red Sea',
+        'الوادي الجديد': 'New Valley', 'New Valley': 'New Valley',
+        'مطروح': 'Matrouh', 'Matrouh': 'Matrouh',
+        'شمال سيناء': 'North Sinai', 'North Sinai': 'North Sinai',
+        'جنوب سيناء': 'South Sinai', 'South Sinai': 'South Sinai'
       };
       const dbCity = cityMap[city] || city;
       params.push(dbCity);

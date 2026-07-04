@@ -65,19 +65,36 @@ const CATEGORIES_EN = [
   'Cybercrime & IT Law',
   'Contract Drafting'
 ];
-const CITIES_AR     = ['','القاهرة','الإسكندرية','الجيزة','المنصورة','طنطا','أسيوط','بورسعيد','الإسماعيلية','الأقصر','أسوان'];
-const CITIES_EN     = ['','Cairo','Alexandria','Giza','Mansoura','Tanta','Asyut','Port Said','Ismailia','Luxor','Aswan'];
+const CITIES_AR     = ['', 'القاهرة', 'الجيزة', 'الإسكندرية', 'القليوبية', 'الغربية', 'المنوفية', 'الدقهلية', 'الشرقية', 'البحيرة', 'دمياط', 'بورسعيد', 'الإسماعيلية', 'السويس', 'كفر الشيخ', 'الفيوم', 'بني سويف', 'المنيا', 'أسيوط', 'سوهاج', 'قنا', 'الأقصر', 'أسوان', 'البحر الأحمر', 'الوادي الجديد', 'مطروح', 'شمال سيناء', 'جنوب سيناء'];
+const CITIES_EN     = ['', 'Cairo', 'Giza', 'Alexandria', 'Qalyubia', 'Gharbia', 'Monufia', 'Dakahlia', 'Sharqia', 'Beheira', 'Damietta', 'Port Said', 'Ismailia', 'Suez', 'Kafr El Sheikh', 'Faiyum', 'Beni Suef', 'Minya', 'Asyut', 'Sohag', 'Qena', 'Luxor', 'Aswan', 'Red Sea', 'New Valley', 'Matrouh', 'North Sinai', 'South Sinai'];
 const CITY_TRANSLATIONS: Record<string, string> = {
   'Cairo': 'القاهرة',
   'Alexandria': 'الإسكندرية',
   'Giza': 'الجيزة',
-  'Mansoura': 'المنصورة',
-  'Tanta': 'طنطا',
-  'Asyut': 'أسيوط',
+  'Qalyubia': 'القليوبية',
+  'Gharbia': 'الغربية',
+  'Monufia': 'المنوفية',
+  'Dakahlia': 'الدقهلية',
+  'Sharqia': 'الشرقية',
+  'Beheira': 'البحيرة',
+  'Damietta': 'دمياط',
   'Port Said': 'بورسعيد',
   'Ismailia': 'الإسماعيلية',
+  'Suez': 'السويس',
+  'Kafr El Sheikh': 'كفر الشيخ',
+  'Faiyum': 'الفيوم',
+  'Beni Suef': 'بني سويف',
+  'Minya': 'المنيا',
+  'Asyut': 'أسيوط',
+  'Sohag': 'سوهاج',
+  'Qena': 'قنا',
   'Luxor': 'الأقصر',
   'Aswan': 'أسوان',
+  'Red Sea': 'البحر الأحمر',
+  'New Valley': 'الوادي الجديد',
+  'Matrouh': 'مطروح',
+  'North Sinai': 'شمال سيناء',
+  'South Sinai': 'جنوب سيناء'
 };
 // sort options: [value, arLabel, enLabel]
 const SORT_OPTS: [string,string,string][] = [
@@ -274,8 +291,6 @@ export default function LawyersTab() {
   const [category, setCategory] = useState(params.specialization || params.cat || '');
   const [city, setCity]       = useState(params.city || '');
   const [sort, setSort]       = useState(params.sort || 'rating');
-  const [maxPrice, setMaxPrice] = useState<number | null>(params.maxPrice ? Number(params.maxPrice) : null);
-  const [minExp, setMinExp]   = useState<number>(params.minExperience ? Number(params.minExperience) : 0);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
 
   // Sync incoming search params from other screens dynamically (e.g. AI Matcher)
@@ -289,13 +304,7 @@ export default function LawyersTab() {
     if (params.sort) {
       setSort(params.sort);
     }
-    if (params.maxPrice !== undefined) {
-      setMaxPrice(params.maxPrice ? Number(params.maxPrice) : null);
-    }
-    if (params.minExperience !== undefined) {
-      setMinExp(params.minExperience ? Number(params.minExperience) : 0);
-    }
-  }, [params.cat, params.specialization, params.city, params.sort, params.maxPrice, params.minExperience]);
+  }, [params.cat, params.specialization, params.city, params.sort]);
   const [showSort, setShowSort] = useState(false);
   const [isGrid, setIsGrid]   = useState(true);
   const [page, setPage]       = useState(1);
@@ -310,14 +319,12 @@ export default function LawyersTab() {
         cat:      (opts.category ?? category) || undefined,
         city:     (opts.city     ?? city)     || undefined,
         sort:     opts.sort     ?? sort,
-        maxPrice: (opts.maxPrice !== undefined ? opts.maxPrice : maxPrice) || undefined,
-        minExperience: (opts.minExperience !== undefined ? opts.minExperience : minExp) || undefined,
         page:     reset ? 1 : (opts.page ?? page),
         limit:    20,
       })).unwrap();
       if (reset) setPage(1);
     } catch (e: any) { setError(e?.message || 'Failed to load lawyers'); }
-  }, [dispatch, search, category, sort, page, city, maxPrice, minExp]);
+  }, [dispatch, search, category, sort, page, city]);
 
   useEffect(() => { load({}, true); }, [category, city, sort]);
 
@@ -325,22 +332,6 @@ export default function LawyersTab() {
     setSearch(text);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => load({ search: text }, true), 500);
-  };
-
-  const onMaxPriceChange = (val: string) => {
-    const clean = val.replace(/[^0-9]/g, '');
-    const num = clean ? Number(clean) : null;
-    setMaxPrice(num);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => load({ maxPrice: num }, true), 600);
-  };
-
-  const onMinExpChange = (val: string) => {
-    const clean = val.replace(/[^0-9]/g, '');
-    const num = clean ? Number(clean) : 0;
-    setMinExp(num);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => load({ minExperience: num }, true), 600);
   };
 
   const onEndReached = () => {
@@ -417,18 +408,18 @@ export default function LawyersTab() {
           }}
         />
 
-        {/* City Selection Collapsible Dropdown */}
+        {/* City Selection Collapsible Grid of Chips */}
         <TouchableOpacity
           onPress={() => setShowCityDropdown(!showCityDropdown)}
           style={{
             flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
             backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
             borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
-            marginBottom: showCityDropdown ? 4 : 10,
+            marginBottom: 10,
           }}
         >
           <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }}>
-            📍 {city === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
+            📍 {isRTL ? 'المنطقة / المحافظة:' : 'Region / City:'} {city === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
               isRTL ? CITY_TRANSLATIONS[city] : city
             )}
           </Text>
@@ -437,70 +428,32 @@ export default function LawyersTab() {
 
         {showCityDropdown && (
           <View style={{
-            maxHeight: 220, backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-            borderRadius: 12, marginBottom: 10, overflow: 'hidden',
+            flexDirection: 'row', flexWrap: 'wrap', gap: 6,
+            backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+            borderRadius: 12, padding: 10, marginBottom: 10,
           }}>
-            <FlatList
-              nestedScrollEnabled={true}
-              data={['', 'Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Asyut', 'Port Said', 'Ismailia', 'Luxor', 'Aswan']}
-              keyExtractor={item => item || 'all'}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  onPress={() => {
-                    setCity(item);
-                    setShowCityDropdown(false);
-                  }}
-                  style={{
-                    paddingVertical: 10, paddingHorizontal: 12,
-                    borderBottomWidth: 1, borderBottomColor: C.border,
-                    backgroundColor: city === item ? `${C.gold}15` : 'transparent',
-                  }}
-                >
-                  <Text style={{ color: city === item ? C.gold : C.text, fontSize: 13, fontWeight: city === item ? 'bold' : 'normal' }}>
-                    {item === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
-                      isRTL ? CITY_TRANSLATIONS[item] : item
-                    )}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
+            {['', 'Cairo', 'Giza', 'Alexandria', 'Qalyubia', 'Gharbia', 'Monufia', 'Dakahlia', 'Sharqia', 'Beheira', 'Damietta', 'Port Said', 'Ismailia', 'Suez', 'Kafr El Sheikh', 'Faiyum', 'Beni Suef', 'Minya', 'Asyut', 'Sohag', 'Qena', 'Luxor', 'Aswan', 'Red Sea', 'New Valley', 'Matrouh', 'North Sinai', 'South Sinai'].map(item => (
+              <TouchableOpacity
+                key={item || 'all'}
+                onPress={() => {
+                  setCity(item);
+                  setShowCityDropdown(false);
+                }}
+                style={{
+                  paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16,
+                  backgroundColor: city === item ? C.gold : C.card2,
+                  borderWidth: 1, borderColor: city === item ? C.gold : C.border,
+                }}
+              >
+                <Text style={{ fontSize: 11, color: city === item ? '#000' : C.text, fontWeight: '600' }}>
+                  {item === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
+                    isRTL ? CITY_TRANSLATIONS[item] : item
+                  )}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         )}
-
-        {/* Written Inputs for Price and Experience (Side-by-Side) */}
-        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
-          {/* Max Consultation Fee */}
-          <View style={{ flex: 1 }}>
-            <TextInput
-              placeholder={isRTL ? 'أقصى سعر استشارة (ج.م)...' : 'Max Fee (EGP)...'}
-              placeholderTextColor={C.muted}
-              keyboardType="numeric"
-              value={maxPrice ? String(maxPrice) : ''}
-              onChangeText={onMaxPriceChange}
-              style={{
-                backgroundColor: C.card2, borderWidth: 1, borderColor: C.border,
-                borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
-                color: C.text, fontSize: 13,
-              }}
-            />
-          </View>
-
-          {/* Min Experience Years */}
-          <View style={{ flex: 1 }}>
-            <TextInput
-              placeholder={isRTL ? 'أقل سنوات خبرة...' : 'Min Exp (Years)...'}
-              placeholderTextColor={C.muted}
-              keyboardType="numeric"
-              value={minExp ? String(minExp) : ''}
-              onChangeText={onMinExpChange}
-              style={{
-                backgroundColor: C.card2, borderWidth: 1, borderColor: C.border,
-                borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
-                color: C.text, fontSize: 13,
-              }}
-            />
-          </View>
-        </View>
       </View>
 
       {error ? <View style={{ paddingHorizontal:16, paddingTop:8 }}><ErrMsg C={C} msg={error} /></View> : null}

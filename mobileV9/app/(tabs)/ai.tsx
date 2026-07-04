@@ -44,13 +44,30 @@ const CITY_TRANSLATIONS: Record<string, string> = {
   'Cairo': 'القاهرة',
   'Alexandria': 'الإسكندرية',
   'Giza': 'الجيزة',
-  'Mansoura': 'المنصورة',
-  'Tanta': 'طنطا',
-  'Asyut': 'أسيوط',
+  'Qalyubia': 'القليوبية',
+  'Gharbia': 'الغربية',
+  'Monufia': 'المنوفية',
+  'Dakahlia': 'الدقهلية',
+  'Sharqia': 'الشرقية',
+  'Beheira': 'البحيرة',
+  'Damietta': 'دمياط',
   'Port Said': 'بورسعيد',
   'Ismailia': 'الإسماعيلية',
+  'Suez': 'السويس',
+  'Kafr El Sheikh': 'كفر الشيخ',
+  'Faiyum': 'الفيوم',
+  'Beni Suef': 'بني سويف',
+  'Minya': 'المنيا',
+  'Asyut': 'أسيوط',
+  'Sohag': 'سوهاج',
+  'Qena': 'قنا',
   'Luxor': 'الأقصر',
   'Aswan': 'أسوان',
+  'Red Sea': 'البحر الأحمر',
+  'New Valley': 'الوادي الجديد',
+  'Matrouh': 'مطروح',
+  'North Sinai': 'شمال سيناء',
+  'South Sinai': 'جنوب سيناء'
 };
 
 const QUICK = [
@@ -687,7 +704,7 @@ STRICT RULES:
                 backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
                 borderRadius: 12, padding: 12, marginBottom: 16,
               }}>
-                {['', 'Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Asyut', 'Port Said', 'Ismailia', 'Luxor', 'Aswan'].map(item => (
+                {['', 'Cairo', 'Giza', 'Alexandria', 'Qalyubia', 'Gharbia', 'Monufia', 'Dakahlia', 'Sharqia', 'Beheira', 'Damietta', 'Port Said', 'Ismailia', 'Suez', 'Kafr El Sheikh', 'Faiyum', 'Beni Suef', 'Minya', 'Asyut', 'Sohag', 'Qena', 'Luxor', 'Aswan', 'Red Sea', 'New Valley', 'Matrouh', 'North Sinai', 'South Sinai'].map(item => (
                   <TouchableOpacity
                     key={item || 'all'}
                     onPress={() => {
