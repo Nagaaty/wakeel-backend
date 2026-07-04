@@ -815,3 +815,89 @@ STRICT RULES:
     </KeyboardAvoidingView>
   );
 }
+
+// ─── Searchable City Overlay Modal (UX Best Practice) ──────────────────────────
+interface CitySelectModalProps {
+  visible: boolean;
+  onClose: () => void;
+  selectedCity: string;
+  onSelect: (city: string) => void;
+  isRTL: boolean;
+  C: any;
+}
+
+function CitySelectModal({ visible, onClose, selectedCity, onSelect, isRTL, C }: CitySelectModalProps) {
+  const [search, setSearch] = useState('');
+  
+  const filteredCities = ['', 'Cairo', 'Giza', 'Alexandria', 'Qalyubia', 'Gharbia', 'Monufia', 'Dakahlia', 'Sharqia', 'Beheira', 'Damietta', 'Port Said', 'Ismailia', 'Suez', 'Kafr El Sheikh', 'Faiyum', 'Beni Suef', 'Minya', 'Asyut', 'Sohag', 'Qena', 'Luxor', 'Aswan', 'Red Sea', 'New Valley', 'Matrouh', 'North Sinai', 'South Sinai'].filter(city => {
+    if (!city) return true; // "All Cities" option
+    const ar = CITY_TRANSLATIONS[city] || '';
+    const en = city;
+    const term = search.toLowerCase();
+    return en.toLowerCase().includes(term) || ar.toLowerCase().includes(term);
+  });
+
+  return (
+    <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <View style={{ width: '100%', maxHeight: '70%', backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, padding: 20, overflow: 'hidden' }}>
+          {/* Header */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text style={{ color: C.text, fontSize: 16, fontWeight: 'bold', fontFamily: 'Cairo-Bold' }}>
+              {isRTL ? 'اختر المنطقة أو المحافظة' : 'Select Region or City'}
+            </Text>
+            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+              <Text style={{ color: C.muted, fontSize: 16, fontWeight: 'bold' }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Search Input */}
+          <View style={{ flexDirection: 'row', backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Text style={{ fontSize: 14 }}>🔍</Text>
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder={isRTL ? 'ابحث عن محافظة...' : 'Search for a city...'}
+              placeholderTextColor={C.muted}
+              style={{ flex: 1, color: C.text, fontSize: 13, padding: 0 }}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')}>
+                <Text style={{ color: C.muted, fontSize: 16 }}>×</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* List of Cities */}
+          <FlatList
+            data={filteredCities}
+            keyExtractor={item => item || 'all'}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => {
+                  onSelect(item);
+                  setSearch('');
+                  onClose();
+                }}
+                style={{
+                  flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                  paddingVertical: 12, paddingHorizontal: 12,
+                  borderBottomWidth: 1, borderBottomColor: C.border,
+                  backgroundColor: selectedCity === item ? `${C.gold}15` : 'transparent',
+                }}
+              >
+                <Text style={{ color: selectedCity === item ? C.gold : C.text, fontSize: 13, fontWeight: selectedCity === item ? 'bold' : 'normal' }}>
+                  {item === '' ? (isRTL ? '📍 كل المدن' : '📍 All Cities') : (
+                    isRTL ? CITY_TRANSLATIONS[item] : item
+                  )}
+                </Text>
+                {selectedCity === item && <Text style={{ color: C.gold, fontSize: 12 }}>✓</Text>}
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+}
