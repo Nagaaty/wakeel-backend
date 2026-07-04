@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, Alert,
+  KeyboardAvoidingView, Platform, Alert, Modal,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -113,6 +113,63 @@ export default function AIScreen() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeSorts, setActiveSorts] = useState<Record<string, string>>({});
+  
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [activeMsgId, setActiveMsgId] = useState<string | null>(null);
+  const [selectedCity, setSelectedCity] = useState<string>('');
+  const [maxPrice, setMaxPrice] = useState<number | null>(null);
+  const [minExp, setMinExp] = useState<number>(0);
+  const [selectedSort, setSelectedSort] = useState<string>('rating');
+
+  const openFilterModal = (msgId: string, currentTopic: string | null) => {
+    setActiveMsgId(msgId);
+    
+    // Default to the user's city if not set yet
+    if (!selectedCity && user?.city) {
+      setSelectedCity(user.city);
+    }
+    
+    setFilterModalVisible(true);
+  };
+
+  const applyFilters = async () => {
+    if (!activeMsgId) return;
+    setFilterModalVisible(false);
+
+    const msg = messages.find(m => m.id === activeMsgId);
+    if (!msg) return;
+
+    const topic = msg.topic || null;
+    const spec = topic ? SPEC_MAP[topic] : null;
+
+    let list: any[] = [];
+    try {
+      const params: any = {
+        limit: 3,
+        sort: selectedSort,
+      };
+      if (spec) params.cat = spec;
+      if (selectedCity) params.city = selectedCity;
+      if (maxPrice) params.maxPrice = maxPrice;
+      if (minExp) params.minExperience = minExp;
+
+      const d = await lawyersAPI.list(params).catch(() => null);
+      list = (d?.lawyers || d?.data || []);
+      
+      if (list.length === 0) {
+        // Fallback: relax filters to get matching lawyers
+        const fallbackParams: any = { limit: 3, sort: selectedSort };
+        if (spec) fallbackParams.cat = spec;
+        const fallbackRes = await lawyersAPI.list(fallbackParams).catch(() => null);
+        list = (fallbackRes?.lawyers || fallbackRes?.data || []);
+      }
+      list = list.slice(0, 3);
+    } catch {
+      list = [];
+    }
+
+    setMessages(prev => prev.map(m => m.id === activeMsgId ? { ...m, lawyers: list } : m));
+  };
 
   const handleSortChange = async (msgId: string, topic: string | null, sortType: string) => {
     setActiveSorts(prev => ({ ...prev, [msgId]: sortType }));
@@ -168,15 +225,29 @@ STRICT RULES:
     try {
       const spec = topic ? SPEC_MAP[topic] : null;
       let d: any;
+      const params: any = { limit: 3, sort: sortType };
+      if (spec) params.cat = spec;
+      // Prioritize regional matches based on user's city
+      if (user?.city) params.city = user.city;
+
       if (spec) {
-        d = await lawyersAPI.list({ cat: spec, limit: 3, sort: sortType }).catch(() => null);
+        d = await lawyersAPI.list(params).catch(() => null);
       }
       
       let list = (d?.lawyers || d?.data || []);
       if (list.length === 0) {
-        // Fallback: get any top-rated lawyers if specific category is empty or query failed
-        const fallbackRes: any = await lawyersAPI.list({ limit: 3, sort: sortType }).catch(() => null);
-        list = (fallbackRes?.lawyers || fallbackRes?.data || []);
+        // Fallback: relax city filter to find any matching specialists nationally
+        if (params.city) {
+          delete params.city;
+          const fallbackRes = await lawyersAPI.list(params).catch(() => null);
+          list = (fallbackRes?.lawyers || fallbackRes?.data || []);
+        }
+      }
+      
+      if (list.length === 0) {
+        // Absolute fallback: get any top-rated lawyers
+        const absoluteFallback = await lawyersAPI.list({ limit: 3, sort: sortType }).catch(() => null);
+        list = (absoluteFallback?.lawyers || absoluteFallback?.data || []);
       }
       
       return list.slice(0, 3);
@@ -314,46 +385,21 @@ STRICT RULES:
         {/* Real lawyer cards from DB */}
         {!isUser && item.lawyers.length > 0 && (
           <View style={{ marginTop: 10, marginLeft: 42 }}>
-            <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 }}>
-              ⚡ ترشيحات المحامين الأكثر ملاءمة لقضيتك:
-            </Text>
-
-            {/* Sorting Pills */}
-            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+              <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, flex: 1 }}>
+                ⚡ ترشيحات المحامين الأكثر ملاءمة لقضيتك:
+              </Text>
               <TouchableOpacity
-                onPress={() => handleSortChange(item.id, item.topic || null, 'rating')}
+                onPress={() => openFilterModal(item.id, item.topic || null)}
                 style={{
-                  paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
-                  backgroundColor: (activeSorts[item.id] || 'rating') === 'rating' ? C.gold : C.card,
-                  borderWidth: 1, borderColor: (activeSorts[item.id] || 'rating') === 'rating' ? C.gold : C.border,
+                  flexDirection: 'row', alignItems: 'center', gap: 4,
+                  backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+                  borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5,
                 }}
               >
-                <Text style={{ fontSize: 11, color: (activeSorts[item.id] || 'rating') === 'rating' ? '#000' : C.text, fontWeight: 'bold' }}>
-                  ⭐ الأعلى تقييماً
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleSortChange(item.id, item.topic || null, 'price_asc')}
-                style={{
-                  paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
-                  backgroundColor: (activeSorts[item.id] || 'rating') === 'price_asc' ? C.gold : C.card,
-                  borderWidth: 1, borderColor: (activeSorts[item.id] || 'rating') === 'price_asc' ? C.gold : C.border,
-                }}
-              >
-                <Text style={{ fontSize: 11, color: (activeSorts[item.id] || 'rating') === 'price_asc' ? '#000' : C.text, fontWeight: 'bold' }}>
-                  💸 الأنسب سعراً
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => handleSortChange(item.id, item.topic || null, 'experience')}
-                style={{
-                  paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
-                  backgroundColor: (activeSorts[item.id] || 'rating') === 'experience' ? C.gold : C.card,
-                  borderWidth: 1, borderColor: (activeSorts[item.id] || 'rating') === 'experience' ? C.gold : C.border,
-                }}
-              >
-                <Text style={{ fontSize: 11, color: (activeSorts[item.id] || 'rating') === 'experience' ? '#000' : C.text, fontWeight: 'bold' }}>
-                  💼 الأكثر خبرة
+                <Text style={{ fontSize: 11 }}>⚙️</Text>
+                <Text style={{ color: C.text, fontSize: 10, fontWeight: 'bold' }}>
+                  {isRTL ? 'تصفية وترتيب' : 'Filter / Sort'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -541,6 +587,135 @@ STRICT RULES:
           معلومات قانونية عامة فقط • استشر محامياً معتمداً للحالات المعقدة
         </Text>
       </View>
+
+      {/* Filter Bottom Sheet Modal */}
+      <Modal
+        visible={filterModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{
+            backgroundColor: C.card,
+            borderTopLeftRadius: 24, borderTopRightRadius: 24,
+            padding: 24,
+            maxHeight: '80%',
+          }}>
+            {/* Modal Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ color: C.text, fontSize: 18, fontWeight: 'bold' }}>
+                {isRTL ? 'تصفية وترتيب المحامين' : 'Filter & Sort Lawyers'}
+              </Text>
+              <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
+                <Text style={{ color: C.muted, fontSize: 18, fontWeight: 'bold' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* City Selection */}
+            <Text style={{ color: C.text, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+              {isRTL ? 'المنطقة / المحافظة:' : 'Region / City:'}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {['', 'Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta'].map(city => (
+                <TouchableOpacity
+                  key={city}
+                  onPress={() => setSelectedCity(city)}
+                  style={{
+                    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
+                    backgroundColor: selectedCity === city ? C.gold : C.surface,
+                    borderWidth: 1, borderColor: selectedCity === city ? C.gold : C.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: selectedCity === city ? '#000' : C.text, fontWeight: '600' }}>
+                    {city === '' ? (isRTL ? 'كل المدن' : 'All Cities') : city}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Price Selection */}
+            <Text style={{ color: C.text, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+              {isRTL ? 'الحد الأقصى لسعر الاستشارة:' : 'Max Consultation Fee:'}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {[{ label: isRTL ? 'أي سعر' : 'Any', val: null }, { label: '300 ج.م', val: 300 }, { label: '600 ج.م', val: 600 }, { label: '1000 ج.م', val: 1000 }].map(p => (
+                <TouchableOpacity
+                  key={String(p.val)}
+                  onPress={() => setMaxPrice(p.val)}
+                  style={{
+                    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
+                    backgroundColor: maxPrice === p.val ? C.gold : C.surface,
+                    borderWidth: 1, borderColor: maxPrice === p.val ? C.gold : C.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: maxPrice === p.val ? '#000' : C.text, fontWeight: '600' }}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Experience Selection */}
+            <Text style={{ color: C.text, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+              {isRTL ? 'الحد الأدنى للخبرة:' : 'Min Experience:'}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+              {[{ label: isRTL ? 'أي خبرة' : 'Any', val: 0 }, { label: '5+ سنوات', val: 5 }, { label: '10+ سنوات', val: 10 }, { label: '15+ سنة', val: 15 }].map(e => (
+                <TouchableOpacity
+                  key={e.val}
+                  onPress={() => setMinExp(e.val)}
+                  style={{
+                    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
+                    backgroundColor: minExp === e.val ? C.gold : C.surface,
+                    borderWidth: 1, borderColor: minExp === e.val ? C.gold : C.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: minExp === e.val ? '#000' : C.text, fontWeight: '600' }}>
+                    {e.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Sorting Order */}
+            <Text style={{ color: C.text, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+              {isRTL ? 'ترتيب النتائج حسب:' : 'Sort By:'}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 24 }}>
+              {[{ label: isRTL ? '⭐ الأعلى تقييماً' : '⭐ Rating', val: 'rating' }, { label: isRTL ? '💸 الأنسب سعراً' : '💸 Budget', val: 'price_asc' }, { label: isRTL ? '💼 الأكثر خبرة' : '💼 Experience', val: 'experience' }].map(s => (
+                <TouchableOpacity
+                  key={s.val}
+                  onPress={() => setSelectedSort(s.val)}
+                  style={{
+                    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
+                    backgroundColor: selectedSort === s.val ? C.gold : C.surface,
+                    borderWidth: 1, borderColor: selectedSort === s.val ? C.gold : C.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: selectedSort === s.val ? '#000' : C.text, fontWeight: '600' }}>
+                    {s.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Apply Action Button */}
+            <TouchableOpacity
+              onPress={applyFilters}
+              style={{
+                backgroundColor: C.gold, borderRadius: 12,
+                paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
+                marginBottom: 8,
+              }}
+            >
+              <Text style={{ color: '#000', fontWeight: 'bold', fontSize: 14 }}>
+                {isRTL ? 'تطبيق التصفية' : 'Apply Filters'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
