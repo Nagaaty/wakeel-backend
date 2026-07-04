@@ -16,6 +16,7 @@ function sanitizeServiceTypes(arr) {
 // GET /api/lawyers — search with filters + pagination
 router.get('/', async (req, res, next) => {
   try {
+    console.log('GET /api/lawyers query:', req.query);
     const {
       search, cat, city, minPrice, maxPrice, minRating, minExperience,
       available, verified, sort = 'rating',
