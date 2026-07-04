@@ -55,6 +55,7 @@ interface Message {
   lawyers: any[];
   isError?: boolean;
   topic?: string | null;
+  sortType?: string;
 }
 
 // ─── Lawyer Mini Card ────────────────────────────────────────────────────────
@@ -143,29 +144,38 @@ export default function AIScreen() {
 
 ${userContext}
 
-Your ONLY job is to analyze the client's legal issue, identify which area of Egyptian law it belongs to, and guide them to consult the recommended specialists below.
+Your job is to analyze the client's legal issue, identify the area of Egyptian law, ask how they want to sort the recommendations, and then match them with lawyers.
+
+CONVERSATION FLOW:
+1. When the client first describes their legal issue, politely acknowledge their situation, identify the legal specialty, and ask them if they want to sort the recommended lawyers by:
+   - 1. Highest Rated (التقييم الأعلى)
+   - 2. Budget Friendly (الأنسب سعراً)
+   - 3. Most Experienced (الأكثر خبرة)
+   At the very end of your response, append the tag: [ASK_SORT:specialty] (where specialty is one of: criminal, family, labor, realestate, corporate, civil). Do NOT append any other tags.
+
+2. When the user responds with their sorting preference (e.g. "Highest Rated", "Budget", "Experience"), reply briefly and append the tag: [TOPIC:specialty:sort_type] at the very end of your response.
+   - specialty: one of: criminal, family, labor, realestate, corporate, civil.
+   - sort_type: rating (for highest rated), price_asc (for budget/cheap), experience (for most experienced).
+   Example: [TOPIC:labor:price_asc] or [TOPIC:family:rating].
 
 STRICT RULES:
 1. NEVER give detailed legal advice, cite specific legal articles, or attempt to solve the client's case yourself.
-2. Politely acknowledge their situation in the same language they write (Arabic or English). Default to Arabic.
-3. Clearly identify the legal specialty (e.g., Family Law / الأحوال الشخصية, Criminal Law / القانون الجنائي, Labor Law / قانون العمل, Corporate & Commercial / قانون الشركات والتجارة, Real Estate / قانون العقارات, Civil Law / قانون مدني).
-4. Keep your response friendly and brief (under 3-4 sentences). 
-5. Tell them they should consult one of the recommended verified specialists listed below to get official, safe legal advice.
-6. Append exactly one tag at the very end of your response to trigger the backend filter: [TOPIC:criminal] [TOPIC:family] [TOPIC:labor] [TOPIC:realestate] [TOPIC:corporate] [TOPIC:civil]`;
+2. Politely respond in the same language they write (Arabic or English). Default to Arabic.
+3. Keep your responses friendly and brief (under 3 sentences).`;
   };
 
-  const fetchMatchingLawyers = async (topic: string | null) => {
+  const fetchMatchingLawyers = async (topic: string | null, sortType: string = 'rating') => {
     try {
       const spec = topic ? SPEC_MAP[topic] : null;
       let d: any;
       if (spec) {
-        d = await lawyersAPI.list({ cat: spec, limit: 3, sort: 'rating' }).catch(() => null);
+        d = await lawyersAPI.list({ cat: spec, limit: 3, sort: sortType }).catch(() => null);
       }
       
       let list = (d?.lawyers || d?.data || []);
       if (list.length === 0) {
         // Fallback: get any top-rated lawyers if specific category is empty or query failed
-        const fallbackRes: any = await lawyersAPI.list({ limit: 3, sort: 'rating' }).catch(() => null);
+        const fallbackRes: any = await lawyersAPI.list({ limit: 3, sort: sortType }).catch(() => null);
         list = (fallbackRes?.lawyers || fallbackRes?.data || []);
       }
       
@@ -187,14 +197,33 @@ STRICT RULES:
       const d: any = await aiAPI.chat(history, buildSystem());
       let reply = d.reply || d.text || 'عذراً، حاول مرة أخرى.';
 
-      // Extract topic tag
       let topic: string | null = null;
-      const tagMatch = reply.match(/\[TOPIC:(\w+)\]/);
-      if (tagMatch) { topic = tagMatch[1]; reply = reply.replace(/\[TOPIC:\w+\]/g, '').trim(); }
-      if (!topic) topic = detectTopic(content + ' ' + reply);
+      let sortType: string = 'rating';
+      let lawyers: any[] = [];
+      let isWaitingForSort = false;
 
-      // Fetch real lawyers from DB matching the topic
-      const lawyers = await fetchMatchingLawyers(topic);
+      // Check for ASK_SORT tag first
+      const askSortMatch = reply.match(/\[ASK_SORT:(\w+)\]/);
+      if (askSortMatch) {
+        topic = askSortMatch[1];
+        isWaitingForSort = true;
+        reply = reply.replace(/\[ASK_SORT:\w+\]/g, '').trim();
+      } else {
+        // Check for TOPIC tag with sort
+        const topicMatch = reply.match(/\[TOPIC:(\w+):?(\w+)?\]/);
+        if (topicMatch) {
+          topic = topicMatch[1];
+          sortType = topicMatch[2] || 'rating';
+          reply = reply.replace(/\[TOPIC:\w+:?\w*\]/g, '').trim();
+          
+          // Fetch lawyers with the specified sort type
+          lawyers = await fetchMatchingLawyers(topic, sortType);
+        } else {
+          // Fallback detection
+          topic = detectTopic(content + ' ' + reply);
+          lawyers = await fetchMatchingLawyers(topic);
+        }
+      }
 
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
@@ -202,6 +231,7 @@ STRICT RULES:
         content: reply,
         lawyers,
         topic,
+        sortType: isWaitingForSort ? 'ask' : sortType,
       }]);
     } catch (e: any) {
       const isNotConfigured = e?.message?.includes('not configured') || e?.message?.includes('ANTHROPIC');
@@ -294,7 +324,7 @@ STRICT RULES:
                 onPress={() => handleSortChange(item.id, item.topic || null, 'rating')}
                 style={{
                   paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
-                  backgroundColor: (activeSorts[item.id] || 'rating') === 'rating' ? C.gold : '#1a1a2e',
+                  backgroundColor: (activeSorts[item.id] || 'rating') === 'rating' ? C.gold : C.card,
                   borderWidth: 1, borderColor: (activeSorts[item.id] || 'rating') === 'rating' ? C.gold : C.border,
                 }}
               >
@@ -306,7 +336,7 @@ STRICT RULES:
                 onPress={() => handleSortChange(item.id, item.topic || null, 'price_asc')}
                 style={{
                   paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
-                  backgroundColor: (activeSorts[item.id] || 'rating') === 'price_asc' ? C.gold : '#1a1a2e',
+                  backgroundColor: (activeSorts[item.id] || 'rating') === 'price_asc' ? C.gold : C.card,
                   borderWidth: 1, borderColor: (activeSorts[item.id] || 'rating') === 'price_asc' ? C.gold : C.border,
                 }}
               >
@@ -318,7 +348,7 @@ STRICT RULES:
                 onPress={() => handleSortChange(item.id, item.topic || null, 'experience')}
                 style={{
                   paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
-                  backgroundColor: (activeSorts[item.id] || 'rating') === 'experience' ? C.gold : '#1a1a2e',
+                  backgroundColor: (activeSorts[item.id] || 'rating') === 'experience' ? C.gold : C.card,
                   borderWidth: 1, borderColor: (activeSorts[item.id] || 'rating') === 'experience' ? C.gold : C.border,
                 }}
               >
@@ -438,6 +468,40 @@ STRICT RULES:
           </View>
         </View>
       )}
+
+      {/* Quick Sorting replies */}
+      {(() => {
+        const lastMsg = messages[messages.length - 1];
+        const isWaitingForSort = lastMsg && lastMsg.role === 'assistant' && lastMsg.sortType === 'ask';
+        if (!isWaitingForSort) return null;
+        return (
+          <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
+            <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 8 }}>
+              {isRTL ? 'اختر ترتيب التوصيات:' : 'Select recommendation order:'}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+              <TouchableOpacity
+                onPress={() => send(isRTL ? 'الأعلى تقييماً' : 'Highest Rated')}
+                style={{ backgroundColor: C.gold, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 }}
+              >
+                <Text style={{ color: '#000', fontSize: 12, fontWeight: 'bold' }}>⭐ {isRTL ? 'الأعلى تقييماً' : 'Top Rated'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => send(isRTL ? 'الأنسب سعراً' : 'Budget Friendly')}
+                style={{ backgroundColor: C.gold, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 }}
+              >
+                <Text style={{ color: '#000', fontSize: 12, fontWeight: 'bold' }}>💸 {isRTL ? 'الأنسب سعراً' : 'Budget'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => send(isRTL ? 'الأكثر خبرة' : 'Most Experienced')}
+                style={{ backgroundColor: C.gold, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 }}
+              >
+                <Text style={{ color: '#000', fontSize: 12, fontWeight: 'bold' }}>💼 {isRTL ? 'الأكثر خبرة' : 'Experience'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+      })()}
 
       {/* Input */}
       <View style={{
