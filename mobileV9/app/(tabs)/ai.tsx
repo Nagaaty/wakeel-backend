@@ -40,6 +40,19 @@ const SPEC_MAP: Record<string, string> = {
   civil: 'مدني',
 };
 
+const CITY_TRANSLATIONS: Record<string, string> = {
+  'Cairo': 'القاهرة',
+  'Alexandria': 'الإسكندرية',
+  'Giza': 'الجيزة',
+  'Mansoura': 'المنصورة',
+  'Tanta': 'طنطا',
+  'Asyut': 'أسيوط',
+  'Port Said': 'بورسعيد',
+  'Ismailia': 'الإسماعيلية',
+  'Luxor': 'الأقصر',
+  'Aswan': 'أسوان',
+};
+
 const QUICK = [
   { ar: 'عندي قضية طلاق ونفقة وأبحث عن محامٍ', en: 'I have a divorce and alimony case and need a lawyer' },
   { ar: 'أريد تأسيس شركة تجارية جديدة في مصر', en: 'I want to register a new commercial company in Egypt' },
@@ -120,6 +133,7 @@ export default function AIScreen() {
   const [maxPrice, setMaxPrice] = useState<number | null>(null);
   const [minExp, setMinExp] = useState<number>(0);
   const [selectedSort, setSelectedSort] = useState<string>('rating');
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
 
   const openFilterModal = (msgId: string, currentTopic: string | null) => {
     setActiveMsgId(msgId);
@@ -650,81 +664,104 @@ STRICT RULES:
               </TouchableOpacity>
             </View>
 
-            {/* City Selection */}
+            {/* City Selection Collapsible Dropdown */}
             <Text style={{ color: C.text, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
               {isRTL ? 'المنطقة / المحافظة:' : 'Region / City:'}
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-              {['', 'Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Asyut', 'Port Said', 'Ismailia', 'Luxor', 'Aswan'].map(city => (
-                <TouchableOpacity
-                  key={city}
-                  onPress={() => setSelectedCity(city)}
-                  style={{
-                    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
-                    backgroundColor: selectedCity === city ? C.gold : C.surface,
-                    borderWidth: 1, borderColor: selectedCity === city ? C.gold : C.border,
-                  }}
-                >
-                  <Text style={{ fontSize: 12, color: selectedCity === city ? '#000' : C.text, fontWeight: '600' }}>
-                    {city === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
-                      city === 'Cairo' ? (isRTL ? 'القاهرة' : 'Cairo') :
-                      city === 'Alexandria' ? (isRTL ? 'الإسكندرية' : 'Alexandria') :
-                      city === 'Giza' ? (isRTL ? 'الجيزة' : 'Giza') :
-                      city === 'Mansoura' ? (isRTL ? 'المنصورة' : 'Mansoura') :
-                      city === 'Tanta' ? (isRTL ? 'طنطا' : 'Tanta') :
-                      city === 'Asyut' ? (isRTL ? 'أسيوط' : 'Asyut') :
-                      city === 'Port Said' ? (isRTL ? 'بورسعيد' : 'Port Said') :
-                      city === 'Ismailia' ? (isRTL ? 'الإسماعيلية' : 'Ismailia') :
-                      city === 'Luxor' ? (isRTL ? 'الأقصر' : 'Luxor') :
-                      city === 'Aswan' ? (isRTL ? 'أسوان' : 'Aswan') : city
-                    )}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <TouchableOpacity
+              onPress={() => setShowCityDropdown(!showCityDropdown)}
+              style={{
+                flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+                borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+                marginBottom: showCityDropdown ? 4 : 16,
+              }}
+            >
+              <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>
+                {selectedCity === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
+                  isRTL ? CITY_TRANSLATIONS[selectedCity] : selectedCity
+                )}
+              </Text>
+              <Text style={{ color: C.muted, fontSize: 12 }}>{showCityDropdown ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
 
-            {/* Price Selection */}
-            <Text style={{ color: C.text, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
-              {isRTL ? 'الحد الأقصى لسعر الاستشارة:' : 'Max Consultation Fee:'}
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-              {[{ label: isRTL ? 'أي سعر' : 'Any', val: null }, { label: '300 ج.م', val: 300 }, { label: '600 ج.م', val: 600 }, { label: '1000 ج.م', val: 1000 }].map(p => (
-                <TouchableOpacity
-                  key={String(p.val)}
-                  onPress={() => setMaxPrice(p.val)}
-                  style={{
-                    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
-                    backgroundColor: maxPrice === p.val ? C.gold : C.surface,
-                    borderWidth: 1, borderColor: maxPrice === p.val ? C.gold : C.border,
-                  }}
-                >
-                  <Text style={{ fontSize: 12, color: maxPrice === p.val ? '#000' : C.text, fontWeight: '600' }}>
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {showCityDropdown && (
+              <View style={{
+                maxHeight: 140, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+                borderRadius: 12, marginBottom: 16, overflow: 'hidden',
+              }}>
+                <FlatList
+                  nestedScrollEnabled={true}
+                  data={['', 'Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Asyut', 'Port Said', 'Ismailia', 'Luxor', 'Aswan']}
+                  keyExtractor={item => item || 'all'}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedCity(item);
+                        setShowCityDropdown(false);
+                      }}
+                      style={{
+                        paddingVertical: 10, paddingHorizontal: 14,
+                        borderBottomWidth: 1, borderBottomColor: C.border,
+                        backgroundColor: selectedCity === item ? `${C.gold}15` : 'transparent',
+                      }}
+                    >
+                      <Text style={{ color: selectedCity === item ? C.gold : C.text, fontSize: 13, fontWeight: selectedCity === item ? 'bold' : 'normal' }}>
+                        {item === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
+                          isRTL ? CITY_TRANSLATIONS[item] : item
+                        )}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            )}
 
-            {/* Experience Selection */}
-            <Text style={{ color: C.text, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
-              {isRTL ? 'الحد الأدنى للخبرة:' : 'Min Experience:'}
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-              {[{ label: isRTL ? 'أي خبرة' : 'Any', val: 0 }, { label: '5+ سنوات', val: 5 }, { label: '10+ سنوات', val: 10 }, { label: '15+ سنة', val: 15 }].map(e => (
-                <TouchableOpacity
-                  key={e.val}
-                  onPress={() => setMinExp(e.val)}
-                  style={{
-                    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
-                    backgroundColor: minExp === e.val ? C.gold : C.surface,
-                    borderWidth: 1, borderColor: minExp === e.val ? C.gold : C.border,
+            {/* Custom written inputs for Fee and Experience (Side-by-Side) */}
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+              {/* Max Consultation Fee */}
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: C.text, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+                  {isRTL ? 'أقصى سعر استشارة:' : 'Max Fee (EGP):'}
+                </Text>
+                <TextInput
+                  value={maxPrice ? String(maxPrice) : ''}
+                  onChangeText={(val) => {
+                    const clean = val.replace(/[^0-9]/g, '');
+                    setMaxPrice(clean ? Number(clean) : null);
                   }}
-                >
-                  <Text style={{ fontSize: 12, color: minExp === e.val ? '#000' : C.text, fontWeight: '600' }}>
-                    {e.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                  placeholder={isRTL ? 'مثال: 500' : 'e.g. 500'}
+                  placeholderTextColor={C.muted}
+                  keyboardType="numeric"
+                  style={{
+                    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+                    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
+                    color: C.text, fontSize: 14,
+                  }}
+                />
+              </View>
+
+              {/* Min Experience Years */}
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: C.text, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+                  {isRTL ? 'أقل سنوات خبرة:' : 'Min Experience (Yrs):'}
+                </Text>
+                <TextInput
+                  value={minExp ? String(minExp) : ''}
+                  onChangeText={(val) => {
+                    const clean = val.replace(/[^0-9]/g, '');
+                    setMinExp(clean ? Number(clean) : 0);
+                  }}
+                  placeholder={isRTL ? 'مثال: 10' : 'e.g. 10'}
+                  placeholderTextColor={C.muted}
+                  keyboardType="numeric"
+                  style={{
+                    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+                    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
+                    color: C.text, fontSize: 14,
+                  }}
+                />
+              </View>
             </View>
 
             {/* Sorting Order */}
