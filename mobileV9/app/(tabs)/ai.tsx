@@ -129,10 +129,10 @@ export default function AIScreen() {
   
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [activeMsgId, setActiveMsgId] = useState<string | null>(null);
+  const [selectedSort, setSelectedSort] = useState<string>('rating');
   const [selectedCity, setSelectedCity] = useState<string>('');
   const [maxPrice, setMaxPrice] = useState<number | null>(null);
   const [minExp, setMinExp] = useState<number>(0);
-  const [selectedSort, setSelectedSort] = useState<string>('rating');
   const [showCityDropdown, setShowCityDropdown] = useState(false);
 
   const openFilterModal = (msgId: string, currentTopic: string | null) => {
@@ -142,7 +142,6 @@ export default function AIScreen() {
     if (!selectedCity && user?.city) {
       setSelectedCity(user.city);
     }
-    
     setFilterModalVisible(true);
   };
 
@@ -664,21 +663,18 @@ STRICT RULES:
               </TouchableOpacity>
             </View>
 
-            {/* City Selection Collapsible Dropdown */}
-            <Text style={{ color: C.text, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
-              {isRTL ? 'المنطقة / المحافظة:' : 'Region / City:'}
-            </Text>
+            {/* City Selection Collapsible Grid of Chips */}
             <TouchableOpacity
               onPress={() => setShowCityDropdown(!showCityDropdown)}
               style={{
                 flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                 backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
                 borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-                marginBottom: showCityDropdown ? 4 : 16,
+                marginBottom: 16,
               }}
             >
               <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>
-                {selectedCity === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
+                📍 {isRTL ? 'المنطقة / المحافظة:' : 'Region / City:'} {selectedCity === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
                   isRTL ? CITY_TRANSLATIONS[selectedCity] : selectedCity
                 )}
               </Text>
@@ -687,33 +683,30 @@ STRICT RULES:
 
             {showCityDropdown && (
               <View style={{
-                maxHeight: 220, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
-                borderRadius: 12, marginBottom: 16, overflow: 'hidden',
+                flexDirection: 'row', flexWrap: 'wrap', gap: 6,
+                backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
+                borderRadius: 12, padding: 12, marginBottom: 16,
               }}>
-                <FlatList
-                  nestedScrollEnabled={true}
-                  data={['', 'Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Asyut', 'Port Said', 'Ismailia', 'Luxor', 'Aswan']}
-                  keyExtractor={item => item || 'all'}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      onPress={() => {
-                        setSelectedCity(item);
-                        setShowCityDropdown(false);
-                      }}
-                      style={{
-                        paddingVertical: 10, paddingHorizontal: 14,
-                        borderBottomWidth: 1, borderBottomColor: C.border,
-                        backgroundColor: selectedCity === item ? `${C.gold}15` : 'transparent',
-                      }}
-                    >
-                      <Text style={{ color: selectedCity === item ? C.gold : C.text, fontSize: 13, fontWeight: selectedCity === item ? 'bold' : 'normal' }}>
-                        {item === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
-                          isRTL ? CITY_TRANSLATIONS[item] : item
-                        )}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                />
+                {['', 'Cairo', 'Giza', 'Alexandria', 'Mansoura', 'Tanta', 'Asyut', 'Port Said', 'Ismailia', 'Luxor', 'Aswan'].map(item => (
+                  <TouchableOpacity
+                    key={item || 'all'}
+                    onPress={() => {
+                      setSelectedCity(item);
+                      setShowCityDropdown(false);
+                    }}
+                    style={{
+                      paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
+                      backgroundColor: selectedCity === item ? C.gold : C.card,
+                      borderWidth: 1, borderColor: selectedCity === item ? C.gold : C.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, color: selectedCity === item ? '#000' : C.text, fontWeight: '600' }}>
+                      {item === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
+                        isRTL ? CITY_TRANSLATIONS[item] : item
+                      )}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             )}
 
