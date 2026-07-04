@@ -155,14 +155,6 @@ export default function AIScreen() {
 
       const d = await lawyersAPI.list(params).catch(() => null);
       list = (d?.lawyers || d?.data || []);
-      
-      if (list.length === 0) {
-        // Fallback: relax filters to get matching lawyers
-        const fallbackParams: any = { limit: 3, sort: selectedSort };
-        if (spec) fallbackParams.cat = spec;
-        const fallbackRes = await lawyersAPI.list(fallbackParams).catch(() => null);
-        list = (fallbackRes?.lawyers || fallbackRes?.data || []);
-      }
       list = list.slice(0, 3);
     } catch {
       list = [];
@@ -383,7 +375,7 @@ STRICT RULES:
         </View>
 
         {/* Real lawyer cards from DB */}
-        {!isUser && item.lawyers.length > 0 && (
+        {!isUser && item.topic && (
           <View style={{ marginTop: 10, marginLeft: 42 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
               <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, flex: 1 }}>
@@ -404,14 +396,28 @@ STRICT RULES:
               </TouchableOpacity>
             </View>
 
-            {item.lawyers.map((l: any) => (
-              <LawyerMiniCard
-                key={l.id}
-                lawyer={l}
-                C={C}
-                onBook={(lawyer: any) => router.push({ pathname: '/book', params: { lawyer: lawyer.id } } as any)}
-              />
-            ))}
+            {item.lawyers.length > 0 ? (
+              item.lawyers.map((l: any) => (
+                <LawyerMiniCard
+                  key={l.id}
+                  lawyer={l}
+                  C={C}
+                  onBook={(lawyer: any) => router.push({ pathname: '/book', params: { lawyer: lawyer.id } } as any)}
+                />
+              ))
+            ) : (
+              <View style={{
+                backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+                borderRadius: 12, padding: 14, alignItems: 'center', justifyContent: 'center',
+                marginVertical: 4,
+              }}>
+                <Text style={{ color: C.muted, fontSize: 11, textAlign: 'center', lineHeight: 18 }}>
+                  {isRTL 
+                    ? '⚠️ لا توجد نتائج تطابق هذه الفلاتر حالياً. اضغط على زر "تصفية وترتيب" لتغيير خياراتك.' 
+                    : '⚠️ No matching lawyers found. Tap "Filter / Sort" to adjust your search options.'}
+                </Text>
+              </View>
+            )}
             <Text style={{ fontSize: 10, color: C.muted, fontStyle: 'italic', marginTop: 4 }}>
               ⚠️ معلومات عامة — استشر محامياً معتمداً لحالتك.
             </Text>

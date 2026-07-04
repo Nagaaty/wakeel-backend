@@ -17,7 +17,7 @@ function sanitizeServiceTypes(arr) {
 router.get('/', async (req, res, next) => {
   try {
     const {
-      search, cat, city, minPrice, maxPrice, minRating,
+      search, cat, city, minPrice, maxPrice, minRating, minExperience,
       available, verified, sort = 'rating',
       page = 1, limit = 20,
     } = req.query;
@@ -50,6 +50,10 @@ router.get('/', async (req, res, next) => {
     if (minRating) {
       params.push(parseFloat(minRating));
       conditions.push(`lp.avg_rating >= $${params.length}`);
+    }
+    if (minExperience) {
+      params.push(parseInt(minExperience));
+      conditions.push(`lp.experience_years >= $${params.length}`);
     }
     if (verified === 'true') conditions.push('lp.is_verified=true');
     if (available === 'true') conditions.push('u.is_online=true');
