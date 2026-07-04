@@ -375,7 +375,7 @@ STRICT RULES:
         </View>
 
         {/* Real lawyer cards from DB */}
-        {!isUser && item.topic && (
+        {!isUser && item.topic && item.sortType !== 'ask' && (
           <View style={{ marginTop: 10, marginLeft: 42 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
               <Text style={{ color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5, flex: 1 }}>
