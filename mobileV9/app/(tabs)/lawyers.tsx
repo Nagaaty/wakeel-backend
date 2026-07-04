@@ -232,7 +232,7 @@ const LawyerCardList = memo(function LawyerCardList({ lawyer, C, onBook, onProfi
 export default function LawyersTab() {
   const C        = useTheme();
   const dispatch = useDispatch<AppDispatch>();
-  const params   = useLocalSearchParams<{ cat?: string; specialization?: string; search?: string }>();
+  const params   = useLocalSearchParams<{ cat?: string; specialization?: string; search?: string; city?: string; sort?: string }>();
   const lawyers  = useSelector(selLawyers) as LawyerProfile[];
   const loading  = useSelector(selLawyersLoad);
   const total    = useSelector(selLawyersTotal);
@@ -260,8 +260,21 @@ export default function LawyersTab() {
   }, [isLoggedIn, isRTL]);
   const [search,   setSearch]   = useState(params.search || '');
   const [category, setCategory] = useState(params.specialization || params.cat || '');
-  const [city, setCity]       = useState('');
-  const [sort, setSort]       = useState('rating');
+  const [city, setCity]       = useState(params.city || '');
+  const [sort, setSort]       = useState(params.sort || 'rating');
+
+  // Sync incoming search params from other screens dynamically (e.g. AI Matcher)
+  useEffect(() => {
+    if (params.specialization || params.cat) {
+      setCategory(params.specialization || params.cat || '');
+    }
+    if (params.city !== undefined) {
+      setCity(params.city || '');
+    }
+    if (params.sort) {
+      setSort(params.sort);
+    }
+  }, [params.cat, params.specialization, params.city, params.sort]);
   const [showSort, setShowSort] = useState(false);
   const [isGrid, setIsGrid]   = useState(true);
   const [page, setPage]       = useState(1);

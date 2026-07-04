@@ -397,14 +397,39 @@ STRICT RULES:
             </View>
 
             {item.lawyers.length > 0 ? (
-              item.lawyers.map((l: any) => (
-                <LawyerMiniCard
-                  key={l.id}
-                  lawyer={l}
-                  C={C}
-                  onBook={(lawyer: any) => router.push({ pathname: '/book', params: { lawyer: lawyer.id } } as any)}
-                />
-              ))
+              <>
+                {item.lawyers.map((l: any) => (
+                  <LawyerMiniCard
+                    key={l.id}
+                    lawyer={l}
+                    C={C}
+                    onBook={(lawyer: any) => router.push({ pathname: '/book', params: { lawyer: lawyer.id } } as any)}
+                  />
+                ))}
+                <TouchableOpacity
+                  onPress={() => {
+                    const spec = item.topic ? SPEC_MAP[item.topic] : null;
+                    router.push({
+                      pathname: '/lawyers' as any,
+                      params: {
+                        cat: spec || undefined,
+                        city: selectedCity || undefined,
+                        sort: selectedSort || undefined,
+                      }
+                    });
+                  }}
+                  style={{
+                    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+                    borderRadius: 12, paddingVertical: 10, alignItems: 'center', justifyContent: 'center',
+                    marginTop: 8, flexDirection: 'row', gap: 6,
+                  }}
+                >
+                  <Text style={{ fontSize: 13 }}>🔎</Text>
+                  <Text style={{ color: C.text, fontSize: 12, fontWeight: 'bold' }}>
+                    {isRTL ? 'عرض كل المحامين المطابقين لهذه التصفية' : 'View all matching lawyers'}
+                  </Text>
+                </TouchableOpacity>
+              </>
             ) : (
               <View style={{
                 backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
