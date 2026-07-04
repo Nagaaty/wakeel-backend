@@ -151,6 +151,7 @@ export default function AIScreen() {
   const [maxPrice, setMaxPrice] = useState<number | null>(null);
   const [minExp, setMinExp] = useState<number>(0);
   const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [citySelectModalVisible, setCitySelectModalVisible] = useState(false);
 
   const openFilterModal = (msgId: string, currentTopic: string | null) => {
     setActiveMsgId(msgId);
@@ -680,9 +681,12 @@ STRICT RULES:
               </TouchableOpacity>
             </View>
 
-            {/* City Selection Collapsible Grid of Chips */}
+            {/* City Selection Collapsible Trigger Button */}
+            <Text style={{ color: C.text, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+              {isRTL ? 'المنطقة / المحافظة:' : 'Region / City:'}
+            </Text>
             <TouchableOpacity
-              onPress={() => setShowCityDropdown(!showCityDropdown)}
+              onPress={() => setCitySelectModalVisible(true)}
               style={{
                 flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                 backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
@@ -691,41 +695,24 @@ STRICT RULES:
               }}
             >
               <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>
-                📍 {isRTL ? 'المنطقة / المحافظة:' : 'Region / City:'} {selectedCity === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
+                📍 {selectedCity === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
                   isRTL ? CITY_TRANSLATIONS[selectedCity] : selectedCity
                 )}
               </Text>
-              <Text style={{ color: C.muted, fontSize: 12 }}>{showCityDropdown ? '▲' : '▼'}</Text>
+              <Text style={{ color: C.muted, fontSize: 12 }}>▼</Text>
             </TouchableOpacity>
 
-            {showCityDropdown && (
-              <View style={{
-                flexDirection: 'row', flexWrap: 'wrap', gap: 6,
-                backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
-                borderRadius: 12, padding: 12, marginBottom: 16,
-              }}>
-                {['', 'Cairo', 'Giza', 'Alexandria', 'Qalyubia', 'Gharbia', 'Monufia', 'Dakahlia', 'Sharqia', 'Beheira', 'Damietta', 'Port Said', 'Ismailia', 'Suez', 'Kafr El Sheikh', 'Faiyum', 'Beni Suef', 'Minya', 'Asyut', 'Sohag', 'Qena', 'Luxor', 'Aswan', 'Red Sea', 'New Valley', 'Matrouh', 'North Sinai', 'South Sinai'].map(item => (
-                  <TouchableOpacity
-                    key={item || 'all'}
-                    onPress={() => {
-                      setSelectedCity(item);
-                      setShowCityDropdown(false);
-                    }}
-                    style={{
-                      paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
-                      backgroundColor: selectedCity === item ? C.gold : C.card,
-                      borderWidth: 1, borderColor: selectedCity === item ? C.gold : C.border,
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, color: selectedCity === item ? '#000' : C.text, fontWeight: '600' }}>
-                      {item === '' ? (isRTL ? 'كل المدن' : 'All Cities') : (
-                        isRTL ? CITY_TRANSLATIONS[item] : item
-                      )}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+            {/* City Search Modal Overlay */}
+            <CitySelectModal
+              visible={citySelectModalVisible}
+              onClose={() => setCitySelectModalVisible(false)}
+              selectedCity={selectedCity}
+              onSelect={(selected) => {
+                setSelectedCity(selected);
+              }}
+              isRTL={isRTL}
+              C={C}
+            />
 
             {/* Custom written inputs for Fee and Experience (Side-by-Side) */}
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
