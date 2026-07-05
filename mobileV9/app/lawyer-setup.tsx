@@ -8,7 +8,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { setUser, selUser } from '../src/features/auth/authSlice';
 import { useTheme } from '../src/hooks/useTheme';
 import { Btn, Inp } from '../src/components/ui';
-import { lawyersAPI, authAPI, uploadAPI } from '../src/services/api';
+import { lawyersAPI, authAPI, uploadAPI, firmsAPI } from '../src/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import type { AppDispatch } from '../src/store';
@@ -58,7 +58,19 @@ export default function LawyerSetupScreen() {
   const [profile, setProfile] = useState({
     specialization: '', city: '', experience_years: '', bar_number: '',
     bio: '', consultation_fee: 400, office: '',
+    practitioner_type: 'independent', firm_id: null as string | null,
   });
+
+  const [firmsList, setFirmsList] = useState<any[]>([]);
+  const [showFirmDropdown, setShowFirmDropdown] = useState(false);
+
+  useEffect(() => {
+    // Fetch firms list to let users choose during setup
+    firmsAPI.list({ limit: 100 }).then((res: any) => {
+      setFirmsList(res.firms || []);
+    }).catch(() => {});
+  }, []);
+
   const [schedule, setSchedule] = useState<Record<number, string[]>>({
     0: [], 1: ['9:00','10:00','11:00','14:00','15:00'],
     2: ['9:00','10:00','11:00','14:00','15:00'], 3: ['9:00','10:00','11:00'],
@@ -81,6 +93,10 @@ export default function LawyerSetupScreen() {
   const saveStep1 = async () => {
     if (!profile.specialization || !profile.city || !profile.experience_years || !profile.bar_number) {
       Alert.alert('', isRTL ? 'يرجى ملء جميع الحقول الإلزامية' : 'Please fill all required fields');
+      return;
+    }
+    if (profile.practitioner_type === 'firm_member' && !profile.firm_id) {
+      Alert.alert('', isRTL ? 'يرجى اختيار شركة المحاماة التي تنتمي إليها' : 'Please select the Law Firm you belong to');
       return;
     }
     setLoading(true);
@@ -191,6 +207,108 @@ export default function LawyerSetupScreen() {
             <Text style={{ color: C.text, fontWeight: '700', fontSize: 16, marginBottom: 16 }}>
               {isRTL ? 'معلوماتك المهنية' : 'Professional Information'}
             </Text>
+
+            {/* Practitioner Type Selection Cards */}
+            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>
+              {isRTL ? 'نوع الممارسة *' : 'Practitioner Type *'}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  updP('practitioner_type', 'independent');
+                  updP('firm_id', null);
+                }}
+                style={{
+                  flex: 1, backgroundColor: profile.practitioner_type === 'independent' ? `${C.gold}15` : C.card,
+                  borderWidth: 1, borderColor: profile.practitioner_type === 'independent' ? C.gold : C.border,
+                  borderRadius: 12, padding: 12, alignItems: 'center'
+                }}
+              >
+                <Text style={{ fontSize: 20, marginBottom: 4 }}>👤</Text>
+                <Text style={{ color: profile.practitioner_type === 'independent' ? C.gold : C.text, fontSize: 13, fontWeight: 'bold', fontFamily: 'Cairo-Bold' }}>
+                  {isRTL ? 'مستقل (فريلانسر)' : 'Independent'}
+                </Text>
+                <Text style={{ color: C.muted, fontSize: 10, textAlign: 'center', marginTop: 2 }}>
+                  {isRTL ? 'ممارس حر لحسابك الخاص' : 'Solo practitioner'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => updP('practitioner_type', 'firm_member')}
+                style={{
+                  flex: 1, backgroundColor: profile.practitioner_type === 'firm_member' ? `${C.gold}15` : C.card,
+                  borderWidth: 1, borderColor: profile.practitioner_type === 'firm_member' ? C.gold : C.border,
+                  borderRadius: 12, padding: 12, alignItems: 'center'
+                }}
+              >
+                <Text style={{ fontSize: 20, marginBottom: 4 }}>🏢</Text>
+                <Text style={{ color: profile.practitioner_type === 'firm_member' ? C.gold : C.text, fontSize: 13, fontWeight: 'bold', fontFamily: 'Cairo-Bold' }}>
+                  {isRTL ? 'شركة محاماة' : 'Law Firm'}
+                </Text>
+                <Text style={{ color: C.muted, fontSize: 10, textAlign: 'center', marginTop: 2 }}>
+                  {isRTL ? 'تعمل مع مؤسسة قانونية' : 'Work under a firm'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Firm Dropdown Selection */}
+            {profile.practitioner_type === 'firm_member' && (
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>
+                  {isRTL ? 'اختر شركة المحاماة التي تنتمي إليها *' : 'Select your Law Firm *'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowFirmDropdown(!showFirmDropdown)}
+                  style={{
+                    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+                    borderRadius: 10, padding: 12
+                  }}
+                >
+                  <Text style={{ color: profile.firm_id ? C.text : C.muted, fontSize: 14 }}>
+                    {profile.firm_id 
+                      ? (firmsList.find(f => f.id === profile.firm_id)?.name || (isRTL ? 'تم الاختيار' : 'Selected'))
+                      : (isRTL ? 'اختر الشركة...' : 'Choose a firm...')}
+                  </Text>
+                  <Text style={{ color: C.muted, fontSize: 12 }}>{showFirmDropdown ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+
+                {showFirmDropdown && (
+                  <View style={{
+                    maxHeight: 180, backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+                    borderRadius: 10, marginTop: 4, overflow: 'hidden'
+                  }}>
+                    <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 180 }}>
+                      {firmsList.map((firm: any) => (
+                        <TouchableOpacity
+                          key={firm.id}
+                          onPress={() => {
+                            updP('firm_id', firm.id);
+                            setShowFirmDropdown(false);
+                          }}
+                          style={{
+                            paddingVertical: 10, paddingHorizontal: 12,
+                            borderBottomWidth: 1, borderBottomColor: C.border,
+                            backgroundColor: profile.firm_id === firm.id ? `${C.gold}15` : 'transparent'
+                          }}
+                        >
+                          <Text style={{ color: profile.firm_id === firm.id ? C.gold : C.text, fontSize: 13, fontWeight: profile.firm_id === firm.id ? 'bold' : 'normal' }}>
+                            {firm.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                      {firmsList.length === 0 && (
+                        <View style={{ padding: 12, alignItems: 'center' }}>
+                          <Text style={{ color: C.muted, fontSize: 12 }}>
+                            {isRTL ? 'لا توجد شركات مسجلة' : 'No firms registered'}
+                          </Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            )}
 
             <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>
               {isRTL ? 'التخصص القانوني *' : 'Legal Specialization *'}

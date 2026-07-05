@@ -342,6 +342,7 @@ router.post('/me/profile', requireAuth, async (req, res, next) => {
       // NEW: office address + coordinates for the map preview
       office, office_lat, office_lng,
       zoom_link,
+      practitioner_type, firm_id,
     } = req.body;
 
     // Sanitize service_prices: only allow the 4 supported types
@@ -358,9 +359,9 @@ router.post('/me/profile', requireAuth, async (req, res, next) => {
       `INSERT INTO lawyer_profiles (
          user_id, specialization, city, consultation_fee, experience_years,
          bio, bar_number, service_prices, office, office_lat, office_lng,
-         zoom_link, is_visible
+         zoom_link, practitioner_type, firm_id, is_visible
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true)
        ON CONFLICT (user_id) DO UPDATE SET
          specialization   = COALESCE(EXCLUDED.specialization,   lawyer_profiles.specialization),
          city             = COALESCE(EXCLUDED.city,             lawyer_profiles.city),
@@ -373,6 +374,8 @@ router.post('/me/profile', requireAuth, async (req, res, next) => {
          office_lat       = COALESCE(EXCLUDED.office_lat,       lawyer_profiles.office_lat),
          office_lng       = COALESCE(EXCLUDED.office_lng,       lawyer_profiles.office_lng),
          zoom_link        = COALESCE(EXCLUDED.zoom_link,        lawyer_profiles.zoom_link),
+         practitioner_type = COALESCE(EXCLUDED.practitioner_type, lawyer_profiles.practitioner_type),
+         firm_id          = EXCLUDED.firm_id,
          is_visible       = true
        RETURNING *`,
       [
@@ -388,6 +391,8 @@ router.post('/me/profile', requireAuth, async (req, res, next) => {
         (office_lat !== undefined && office_lat !== null) ? Number(office_lat) : null,
         (office_lng !== undefined && office_lng !== null) ? Number(office_lng) : null,
         zoom_link || null,
+        practitioner_type || 'independent',
+        firm_id || null,
       ]
     );
     res.json(profile);
