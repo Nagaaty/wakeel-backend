@@ -108,6 +108,7 @@ app.use('/api/health', require('./routes/health'));
 // ─── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/auth',        require('./routes/auth'));
 app.use('/api/lawyers',     require('./routes/lawyers'));
+app.use('/api/firms',       require('./routes/firms'));
 app.use('/api/bookings',    require('./routes/bookings'));
 app.use('/api/upload',      require('./routes/upload'));
 app.use('/api/messages',    require('./routes/messages'));

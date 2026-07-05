@@ -8,10 +8,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchLawyers, selLawyers, selLawyersLoad, selLawyersTotal,
+  fetchFirms, selFirms, selFirmsLoading, selFirmsTotal
 } from '../../src/features/lawyers/lawyersSlice';
 import { selLoggedIn, selUser } from '../../src/features/auth/authSlice';
 import { useTheme } from '../../src/theme';
 import { Avatar, WinBar, Stars, Tag, Btn, Spinner, Empty, ErrMsg } from '../../src/components/ui';
+import { FirmCard } from '../../src/components/FirmCard';
 import { favoritesAPI } from '../../src/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppDispatch } from '../../src/store';
@@ -144,9 +146,17 @@ const LawyerCardGrid = memo(function LawyerCardGrid({ lawyer, C, onBook, onProfi
       <Text style={{ color:C.text, fontWeight:'700', fontSize:13, textAlign: 'center', marginBottom: 2 }} numberOfLines={1}>
         {lawyer.name} {lawyer.is_verified && <Text style={{ color:C.green, fontSize:11 }}>✅</Text>}
       </Text>
-      <Text style={{ color:C.muted, fontSize:11, textAlign: 'center', marginBottom: 6 }} numberOfLines={1}>
+      <Text style={{ color:C.muted, fontSize:11, textAlign: 'center', marginBottom: 4 }} numberOfLines={1}>
         {lawyer.specialization} • {lawyer.city}
       </Text>
+      
+      {lawyer.firm_name && (
+        <TouchableOpacity onPress={() => router.push(`/firm/${lawyer.firm_id}`)} style={{ marginBottom: 6 }}>
+          <Text style={{ color: C.gold, fontSize: 10, fontWeight: '700', textDecorationLine: 'underline', textAlign: 'center' }} numberOfLines={1}>
+            🏢 {lawyer.firm_name}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <View style={{ marginBottom: 6 }}>
         <Stars rating={parseFloat(String(lawyer.avg_rating))||0} C={C} size={12} />
@@ -215,6 +225,13 @@ const LawyerCardList = memo(function LawyerCardList({ lawyer, C, onBook, onProfi
           <Text style={{ color:C.muted, fontSize:12, marginBottom: lawyer.office ? 2 : 4 }}>
             {lawyer.specialization} • {lawyer.city}
           </Text>
+          {lawyer.firm_name && (
+            <TouchableOpacity onPress={() => router.push(`/firm/${lawyer.firm_id}`)} style={{ alignSelf: 'flex-start', marginBottom: 6 }}>
+              <Text style={{ color: C.gold, fontSize: 11, fontWeight: '700', textDecorationLine: 'underline' }}>
+                🏢 {lawyer.firm_name}
+              </Text>
+            </TouchableOpacity>
+          )}
           {lawyer.office && (
             <Text style={{ color:C.muted, fontSize:11, marginBottom: 4 }} numberOfLines={1}>
               📍 {lawyer.office}
@@ -262,16 +279,13 @@ export default function LawyersTab() {
   const C        = useTheme();
   const dispatch = useDispatch<AppDispatch>();
   const params   = useLocalSearchParams<{ cat?: string; specialization?: string; search?: string; city?: string; sort?: string }>();
-  const lawyers  = useSelector(selLawyers) as LawyerProfile[];
-  const loading  = useSelector(selLawyersLoad);
-  const total    = useSelector(selLawyersTotal);
   const insets   = useSafeAreaInsets();
   const isLoggedIn = useSelector(selLoggedIn);
   const currentUser = useSelector(selUser);
   const { isRTL } = useI18n();
   const [favorites, setFavorites] = useState<number[]>([]);
 
-  // Memoize onToggleFav to avoid re-rendering LawyerCard grid/list pointlessly
+  // Memoize onToggleFav
   const handleToggleFav = useCallback(async (id: number) => {
     if (!isLoggedIn) { router.push('/(auth)/login'); return; }
     try {
@@ -287,14 +301,32 @@ export default function LawyersTab() {
       setFavorites(f => f.includes(id) ? f.filter(x => x !== id) : [...f, id]);
     }
   }, [isLoggedIn, isRTL]);
+
   const [search,   setSearch]   = useState(params.search || '');
   const [category, setCategory] = useState(params.specialization || params.cat || '');
   const [city, setCity]       = useState(params.city || '');
   const [sort, setSort]       = useState(params.sort || 'rating');
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [citySelectModalVisible, setCitySelectModalVisible] = useState(false);
+  
+  // Tab control feed selection
+  const [feedType, setFeedType] = useState<'independent' | 'firm'>('independent');
 
-  // Sync incoming search params from other screens dynamically (e.g. AI Matcher)
+  // Redux selects
+  const lawyers = useSelector(selLawyers);
+  const totalLawyers = useSelector(selLawyersTotal);
+  const lawyersLoading = useSelector(selLawyersLoad);
+
+  const firms = useSelector(selFirms);
+  const totalFirms = useSelector(selFirmsTotal);
+  const firmsLoading = useSelector(selFirmsLoading);
+
+  // Mapped display lists
+  const dataList = feedType === 'independent' ? lawyers : firms;
+  const totalCount = feedType === 'independent' ? totalLawyers : totalFirms;
+  const isLoading = feedType === 'independent' ? lawyersLoading : firmsLoading;
+
+  // Sync incoming search params
   useEffect(() => {
     if (params.specialization || params.cat) {
       setCategory(params.specialization || params.cat || '');
@@ -315,19 +347,29 @@ export default function LawyersTab() {
   const load = useCallback(async (opts: any = {}, reset = false) => {
     setError('');
     try {
-      await dispatch(fetchLawyers({
-        search:   (opts.search   ?? search)   || undefined,
-        cat:      (opts.category ?? category) || undefined,
-        city:     (opts.city     ?? city)     || undefined,
-        sort:     opts.sort     ?? sort,
-        page:     reset ? 1 : (opts.page ?? page),
-        limit:    20,
-      })).unwrap();
+      const activeFeed = opts.feedType ?? feedType;
+      if (activeFeed === 'independent') {
+        await dispatch(fetchLawyers({
+          search:   (opts.search   ?? search)   || undefined,
+          cat:      (opts.category ?? category) || undefined,
+          city:     (opts.city     ?? city)     || undefined,
+          sort:     opts.sort     ?? sort,
+          page:     reset ? 1 : (opts.page ?? page),
+          limit:    20,
+        })).unwrap();
+      } else {
+        await dispatch(fetchFirms({
+          search:   (opts.search   ?? search)   || undefined,
+          city:     (opts.city     ?? city)     || undefined,
+          page:     reset ? 1 : (opts.page ?? page),
+          limit:    20,
+        })).unwrap();
+      }
       if (reset) setPage(1);
-    } catch (e: any) { setError(e?.message || 'Failed to load lawyers'); }
-  }, [dispatch, search, category, sort, page, city]);
+    } catch (e: any) { setError(e?.message || 'Failed to load data'); }
+  }, [dispatch, search, category, sort, page, city, feedType]);
 
-  useEffect(() => { load({}, true); }, [category, city, sort]);
+  useEffect(() => { load({}, true); }, [category, city, sort, feedType]);
 
   const onSearchChange = (text: string) => {
     setSearch(text);
@@ -336,7 +378,7 @@ export default function LawyersTab() {
   };
 
   const onEndReached = () => {
-    if (lawyers.length < total && !loading) {
+    if (dataList.length < totalCount && !isLoading) {
       const next = page + 1; setPage(next); load({ page: next });
     }
   };
@@ -391,23 +433,53 @@ export default function LawyersTab() {
           )}
         </View>
 
-        {/* Category chips */}
-        <FlatList horizontal data={isRTL ? CATEGORIES_AR : CATEGORIES_EN} keyExtractor={i=>i||'all'}
-          showsHorizontalScrollIndicator={true}
-          contentContainerStyle={{ gap:8, marginBottom:8 }}
-          renderItem={({ item, index }) => {
-            const apiValue = CATEGORIES_AR[index]; // always send Arabic to backend
-            const active = category === apiValue;
-            return (
-              <TouchableOpacity onPress={()=>setCategory(active ? '' : apiValue)}
-                style={{ paddingHorizontal:14, paddingVertical:7, borderRadius:20, borderWidth:1, borderColor:active?C.gold:C.border, backgroundColor:active?`${C.gold}15`:'transparent' }}>
-                <Text style={{ color:active?C.gold:C.text, fontSize:12, fontWeight:active?'700':'400' }}>
-                  {item || (isRTL ? 'الكل' : 'All')}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-        />
+        {/* Segmented Control Toggle */}
+        <View style={{ flexDirection: 'row', backgroundColor: C.card2, borderRadius: 12, padding: 4, marginBottom: 10, borderWidth: 1, borderColor: C.border }}>
+          <TouchableOpacity
+            onPress={() => setFeedType('independent')}
+            style={{
+              flex: 1, paddingVertical: 8, alignItems: 'center', justifyContent: 'center',
+              backgroundColor: feedType === 'independent' ? C.gold : 'transparent',
+              borderRadius: 8
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '700', color: feedType === 'independent' ? '#000' : C.text, fontFamily: 'Cairo-Bold' }}>
+              {isRTL ? '⚖️ محامون مستقلون' : '⚖️ Independent Lawyers'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setFeedType('firm')}
+            style={{
+              flex: 1, paddingVertical: 8, alignItems: 'center', justifyContent: 'center',
+              backgroundColor: feedType === 'firm' ? C.gold : 'transparent',
+              borderRadius: 8
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '700', color: feedType === 'firm' ? '#000' : C.text, fontFamily: 'Cairo-Bold' }}>
+              {isRTL ? '🏢 شركات محاماة' : '🏢 Law Firms'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Category chips (only shown for independent freelance lawyers) */}
+        {feedType === 'independent' && (
+          <FlatList horizontal data={isRTL ? CATEGORIES_AR : CATEGORIES_EN} keyExtractor={i=>i||'all'}
+            showsHorizontalScrollIndicator={true}
+            contentContainerStyle={{ gap:8, marginBottom:8 }}
+            renderItem={({ item, index }) => {
+              const apiValue = CATEGORIES_AR[index]; // always send Arabic to backend
+              const active = category === apiValue;
+              return (
+                <TouchableOpacity onPress={()=>setCategory(active ? '' : apiValue)}
+                  style={{ paddingHorizontal:14, paddingVertical:7, borderRadius:20, borderWidth:1, borderColor:active?C.gold:C.border, backgroundColor:active?`${C.gold}15`:'transparent' }}>
+                  <Text style={{ color:active?C.gold:C.text, fontSize:12, fontWeight:active?'700':'400' }}>
+                    {item || (isRTL ? 'الكل' : 'All')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        )}
 
         {/* City Selection Collapsible Trigger Button */}
         <TouchableOpacity
@@ -445,11 +517,19 @@ export default function LawyersTab() {
       {/* List */}
       <View style={{ flex: 1 }}>
         <FlashList
-          data={lawyers.filter((l: any) => l.id !== currentUser?.id)}
+          data={dataList.filter((l: any) => l.id !== currentUser?.id)}
           key={isGrid ? 'g' : 'l'}
           keyExtractor={item => String(item.id)}
           numColumns={isGrid ? 2 : 1}
           renderItem={({ item }) => {
+            if (feedType === 'firm') {
+              return (
+                <FirmCard
+                  firm={item} C={C} isGrid={isGrid}
+                  onPress={() => router.push(`/firm/${item.id}`)}
+                />
+              );
+            }
             const CardComponent = isGrid ? LawyerCardGrid : LawyerCardList;
             return (
               <CardComponent
@@ -464,16 +544,16 @@ export default function LawyersTab() {
           contentContainerStyle={{ paddingTop:14, paddingBottom:100, paddingHorizontal: isGrid ? 10 : 0 }}
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
-          refreshControl={<RefreshControl refreshing={loading && page===1} onRefresh={()=>load({},true)} tintColor={C.gold} />}
-          ListHeaderComponent={total > 0 ? (
+          refreshControl={<RefreshControl refreshing={isLoading && page===1} onRefresh={()=>load({},true)} tintColor={C.gold} />}
+          ListHeaderComponent={totalCount > 0 ? (
             <Text style={{ color:C.muted, fontSize:12, paddingHorizontal:16, marginBottom:4 }}>
-              Showing {lawyers.length} of {total.toLocaleString()} lawyers
+              Showing {dataList.length} of {totalCount.toLocaleString()} {feedType === 'independent' ? 'lawyers' : 'firms'}
             </Text>
           ) : null}
-          ListFooterComponent={loading && page > 1 ? <ActivityIndicator color={C.gold} style={{ padding:20 }} /> : null}
+          ListFooterComponent={isLoading && page > 1 ? <ActivityIndicator color={C.gold} style={{ padding:20 }} /> : null}
           ListEmptyComponent={
-            !loading
-              ? <Empty C={C} icon="🔍" title={isRTL ? 'لا توجد نتائج' : 'No results'} subtitle={isRTL ? 'جرب بحثاً مختلفاً' : 'Try a different search or category'} action={{ label: isRTL ? 'عرض كل المحامين' : 'View All Lawyers', onPress:()=>{ setSearch(''); setCategory(''); setCity(''); load({search:'',category:'',city:''},true); }}} />
+            !isLoading
+              ? <Empty C={C} icon="🔍" title={isRTL ? 'لا توجد نتائج' : 'No results'} subtitle={isRTL ? 'جرب بحثاً مختلفاً' : 'Try a different search or category'} action={{ label: isRTL ? 'عرض الكل' : 'View All', onPress:()=>{ setSearch(''); setCategory(''); setCity(''); load({search:'',category:'',city:''},true); }}} />
               : <View style={{ padding:40, alignItems:'center' }}><Spinner C={C} size="large" /></View>
           }
         />

@@ -20,6 +20,7 @@ router.get('/', async (req, res, next) => {
     const {
       search, cat, city, minPrice, maxPrice, minRating, minExperience,
       available, verified, sort = 'rating',
+      practitioner_type = 'independent',
       page = 1, limit = 20,
     } = req.query;
 
@@ -27,6 +28,11 @@ router.get('/', async (req, res, next) => {
     const params = [];
     const conditions = ['u.role=$1', 'u.deleted_at IS NULL', 'lp.is_visible IS NOT FALSE'];
     params.push('lawyer');
+
+    if (practitioner_type && practitioner_type !== 'all') {
+      params.push(practitioner_type);
+      conditions.push(`lp.practitioner_type=$${params.length}`);
+    }
 
     if (search) {
       params.push(`%${search}%`);
@@ -104,7 +110,7 @@ router.get('/', async (req, res, next) => {
 
     // Count total
     const { rows: [{ count }] } = await pool.query(
-      `SELECT COUNT(*) FROM users u JOIN lawyer_profiles lp ON lp.user_id=u.id WHERE ${where}`,
+      `SELECT COUNT(*) FROM users u JOIN lawyer_profiles lp ON lp.user_id=u.id LEFT JOIN firms f ON lp.firm_id=f.id WHERE ${where}`,
       params
     );
 
@@ -116,9 +122,11 @@ router.get('/', async (req, res, next) => {
               lp.avg_rating, lp.total_reviews, lp.wins, lp.losses,
               lp.is_verified, lp.response_time_hours, lp.bio, lp.bar_number,
               lp.subscription_plan AS sub, lp.karma_score,
+              lp.practitioner_type, lp.firm_id, f.name AS firm_name, f.logo_url AS firm_logo,
               COALESCE(lp.wins,0) + COALESCE(lp.losses,0) AS total_cases
        FROM users u
        JOIN lawyer_profiles lp ON lp.user_id=u.id
+       LEFT JOIN firms f ON lp.firm_id=f.id
        WHERE ${where}
        ORDER BY ${orderBy}
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -141,12 +149,14 @@ router.get('/:id', async (req, res, next) => {
     const { rows: [lawyer] } = await pool.query(
       `SELECT lp.*,
               u.id, u.name, u.avatar_url, u.is_online, u.last_active_at, u.created_at,
+              f.name AS firm_name, f.logo_url AS firm_logo,
               (SELECT json_agg(r ORDER BY r.created_at DESC) FROM reviews r WHERE r.lawyer_id=u.id LIMIT 20) AS reviews,
               (SELECT json_agg(json_build_object('day_of_week', la.day_of_week, 'start_time', la.start_time)) FROM lawyer_availability la WHERE la.lawyer_id=u.id) AS availability_map,
               (SELECT json_agg(json_build_object('override_date', lo.override_date, 'is_off', lo.is_off, 'slots', lo.slots)) FROM lawyer_schedule_overrides lo WHERE lo.lawyer_id=u.id) AS schedule_overrides,
               (SELECT json_agg(json_build_object('day_of_week', sd.day_of_week, 'service_types', sd.service_types)) FROM lawyer_service_defaults sd WHERE sd.lawyer_id=u.id) AS service_defaults
        FROM users u
        JOIN lawyer_profiles lp ON lp.user_id=u.id
+       LEFT JOIN firms f ON lp.firm_id=f.id
        WHERE u.id=$1 AND u.deleted_at IS NULL`,
       [req.params.id]
     );

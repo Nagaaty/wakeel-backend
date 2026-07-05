@@ -278,6 +278,28 @@ const MIGRATIONS = [
       `ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS zoom_link VARCHAR(255)`
     ]
   },
+
+  {
+    version: '017_firms_and_corporate_accounts',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS firms (
+        id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name          VARCHAR(150) NOT NULL,
+        bio           TEXT,
+        logo_url      VARCHAR(255),
+        city          VARCHAR(100) DEFAULT 'Cairo',
+        rating        DECIMAL(3,2) DEFAULT 4.5,
+        review_count  INTEGER DEFAULT 0,
+        office_hours  VARCHAR(100) DEFAULT 'Sun-Thu 10AM-5PM',
+        phone         VARCHAR(30),
+        website       VARCHAR(200),
+        created_at    TIMESTAMPTZ DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ DEFAULT NOW()
+      )`,
+      `ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS practitioner_type VARCHAR(20) DEFAULT 'independent' CHECK (practitioner_type IN ('independent', 'firm_member'))`,
+      `ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS firm_id UUID REFERENCES firms(id) ON DELETE SET NULL`
+    ]
+  },
 ];
 
 // ─── Runner ────────────────────────────────────────────────────────────────

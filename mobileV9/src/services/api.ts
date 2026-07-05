@@ -114,6 +114,12 @@ export const lawyersAPI = {
   review:          (id: string | number, data: any) => api.post(`/lawyers/${id}/review`, data),
 };
 
+export const firmsAPI = {
+  list:       (params?: any)        => api.get('/firms', { params }),
+  get:        (id: string | number) => api.get(`/firms/${id}`),
+  getLawyers: (id: string | number) => api.get(`/firms/${id}/lawyers`),
+};
+
 export const bookingsAPI = {
   create: (data: any)              => api.post('/bookings', data),
   list:   (params?: any)           => api.get('/bookings', { params }),
