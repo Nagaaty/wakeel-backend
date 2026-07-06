@@ -188,6 +188,7 @@ export default function RegisterLawyerScreen() {
               bar_number: form.syndicateId,
               practitioner_type: form.practitioner_type,
               firm_id: form.firm_id,
+              invite_code: form.invite_code,
             });
           } catch (e) {}
         }

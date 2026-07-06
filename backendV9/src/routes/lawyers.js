@@ -331,7 +331,11 @@ router.get('/:id/availability', async (req, res, next) => {
 router.get('/me/profile', requireAuth, async (req, res, next) => {
   try {
     const { rows: [profile] } = await pool.query(
-      'SELECT * FROM lawyer_profiles WHERE user_id=$1', [req.user.id]
+      `SELECT lp.*, f.name AS firm_name, f.logo_url AS firm_logo, f.is_verified AS firm_verified
+       FROM lawyer_profiles lp
+       LEFT JOIN firms f ON lp.firm_id = f.id
+       WHERE lp.user_id = $1`,
+      [req.user.id]
     );
     res.json(profile || {});
   } catch (err) { next(err); }

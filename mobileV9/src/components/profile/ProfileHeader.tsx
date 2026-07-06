@@ -149,6 +149,50 @@ export function ProfileHeader({
               {computedSubline}
             </Text>
           ) : null}
+
+          {user?.firm_name && (
+            <TouchableOpacity
+              onPress={() => {
+                if (user.firm_approved && user.firm_id) {
+                  router.push(`/firm/${user.firm_id}` as any);
+                }
+              }}
+              disabled={!user.firm_approved}
+              style={{
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 5,
+                borderRadius: 14,
+                backgroundColor: C.gold + '10',
+                borderWidth: 1,
+                borderColor: user.firm_approved ? C.gold + '25' : C.border,
+              }}
+            >
+              <Text style={{ fontSize: 13 }}>🏢</Text>
+              <Text style={{
+                color: user.firm_approved ? C.gold : C.muted,
+                fontSize: 13,
+                fontWeight: '700',
+                fontFamily: 'Cairo-Bold'
+              }}>
+                {user.firm_name}
+              </Text>
+              {!user.firm_approved && (
+                <Text style={{
+                  color: C.red,
+                  fontSize: 11,
+                  fontFamily: 'Cairo-Regular',
+                  marginLeft: isRTL ? 0 : 4,
+                  marginRight: isRTL ? 4 : 0
+                }}>
+                  {isRTL ? '(قيد المراجعة)' : '(Pending Verification)'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ── Actions ── */}
