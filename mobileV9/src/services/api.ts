@@ -361,7 +361,7 @@ export const verificationAPI = {
   setAvailability:  (data: any)    => api.patch('/verification/availability', data),
   setServicePrices: (data: any)    => api.patch('/verification/service-prices', data),
   availableNow:     ()             => api.get('/verification/available-now'),
-  faceMatch:        (data: FormData) => api.post('/verification/face-match', data),
+  faceMatch:        (data: FormData) => api.post('/verification/face-match', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
 };
 
 
