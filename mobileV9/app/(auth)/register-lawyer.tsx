@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useDispatch } from 'react-redux';
 import { register } from '../../src/features/auth/authSlice';
-import { lawyersAPI, authAPI, uploadAPI } from '../../src/services/api';
+import { lawyersAPI, authAPI, uploadAPI, firmsAPI } from '../../src/services/api';
 import { useTheme } from '../../src/theme';
 import { Btn, Inp } from '../../src/components/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +28,17 @@ export default function RegisterLawyerScreen() {
   const [matchError, setMatchError] = useState('');
   const otpInputs = React.useRef<(TextInput | null)[]>([]);
   const [timeLeft, setTimeLeft] = useState(60);
+
+  // Firms list state
+  const [firmsList, setFirmsList] = useState<any[]>([]);
+  const [showFirmDropdown, setShowFirmDropdown] = useState(false);
+
+  React.useEffect(() => {
+    // Fetch firms list to let users choose during signup
+    firmsAPI.list({ limit: 100 }).then((res: any) => {
+      setFirmsList(res.firms || []);
+    }).catch(() => {});
+  }, []);
 
   React.useEffect(() => {
     if (step === 3 && timeLeft > 0) {
@@ -58,7 +69,8 @@ export default function RegisterLawyerScreen() {
     otp: ['', '', '', '', '', ''],
     syndicateId: '', officeName: '', courtDegree: '',
     specialization: '', city: 'Cairo', experience: '', fee: '',
-    idPhotoUri: '', idBackUri: '', selfieUri: ''
+    idPhotoUri: '', idBackUri: '', selfieUri: '',
+    practitioner_type: 'independent', firm_id: null as string | null
   });
   const [verifying, setVerifying] = useState(false);
   const [verifiedAi, setVerifiedAi] = useState(false);
@@ -123,17 +135,17 @@ export default function RegisterLawyerScreen() {
         const d = res.payload as any;
         if (d.token) {
           try {
+            const selectedFirm = firmsList.find(f => f.id === form.firm_id);
             await lawyersAPI.saveProfile({
               city: form.city,
               experience_years: Number(form.experience) || 0,
               specialization: specAr,
               consultation_fee: Number(form.fee) || 0,
-              office_name: form.officeName,
+              office_name: selectedFirm ? selectedFirm.name : form.officeName,
               court_degree: courtAr,
               bar_number: form.syndicateId,
-              // Ideally send ID photo and selfie URLs if needed by your schema
-              // id_photo_url: form.idPhotoUri,
-              // selfie_url: form.selfieUri,
+              practitioner_type: form.practitioner_type,
+              firm_id: form.firm_id,
             });
           } catch (e) {}
         }
@@ -282,7 +294,112 @@ export default function RegisterLawyerScreen() {
             </View>
 
             <Inp C={C} label={isRTL ? 'رقم القيد بنقابة المحامين * 🏛️' : 'Bar Association ID * 🏛️'} value={form.syndicateId} onChangeText={(v: string) => updateForm('syndicateId', v)} placeholder={isRTL ? 'مثال: 123456' : 'e.g. 123456'} keyboardType="number-pad" />
-            <Inp C={C} label={isRTL ? 'اسم المكتب / الشركة (اختياري) 🏢' : 'Law Firm / Office Name (Optional) 🏢'} value={form.officeName} onChangeText={(v: string) => updateForm('officeName', v)} placeholder={isRTL ? 'مثال: مكتب حسن وشركاه للمحاماة' : 'e.g. Hassan & Associates Law Firm'} />
+
+            {/* Practitioner Type Selection Cards */}
+            <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
+              {isRTL ? 'نوع الممارسة *' : 'Practitioner Type *'}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  updateForm('practitioner_type', 'independent');
+                  updateForm('firm_id', null);
+                }}
+                style={{
+                  flex: 1, backgroundColor: form.practitioner_type === 'independent' ? `${C.gold}15` : C.card,
+                  borderWidth: 1, borderColor: form.practitioner_type === 'independent' ? C.gold : C.border,
+                  borderRadius: 12, padding: 12, alignItems: 'center'
+                }}
+              >
+                <Text style={{ fontSize: 20, marginBottom: 4 }}>👤</Text>
+                <Text style={{ color: form.practitioner_type === 'independent' ? C.gold : C.text, fontSize: 13, fontWeight: 'bold', fontFamily: 'Cairo-Bold' }}>
+                  {isRTL ? 'مستقل (فريلانسر)' : 'Independent'}
+                </Text>
+                <Text style={{ color: C.muted, fontSize: 10, textAlign: 'center', marginTop: 2 }}>
+                  {isRTL ? 'ممارس حر لحسابك الخاص' : 'Solo practitioner'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => updateForm('practitioner_type', 'firm_member')}
+                style={{
+                  flex: 1, backgroundColor: form.practitioner_type === 'firm_member' ? `${C.gold}15` : C.card,
+                  borderWidth: 1, borderColor: form.practitioner_type === 'firm_member' ? C.gold : C.border,
+                  borderRadius: 12, padding: 12, alignItems: 'center'
+                }}
+              >
+                <Text style={{ fontSize: 20, marginBottom: 4 }}>🏢</Text>
+                <Text style={{ color: form.practitioner_type === 'firm_member' ? C.gold : C.text, fontSize: 13, fontWeight: 'bold', fontFamily: 'Cairo-Bold' }}>
+                  {isRTL ? 'شركة محاماة' : 'Law Firm'}
+                </Text>
+                <Text style={{ color: C.muted, fontSize: 10, textAlign: 'center', marginTop: 2 }}>
+                  {isRTL ? 'تعمل مع مؤسسة قانونية' : 'Work under a firm'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Firm Dropdown Selection */}
+            {form.practitioner_type === 'firm_member' && (
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
+                  {isRTL ? 'اختر شركة المحاماة التي تنتمي إليها *' : 'Select your Law Firm *'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowFirmDropdown(!showFirmDropdown)}
+                  style={{
+                    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+                    borderRadius: 10, padding: 14
+                  }}
+                >
+                  <Text style={{ color: form.firm_id ? C.text : C.muted, fontSize: 14 }}>
+                    {form.firm_id 
+                      ? (firmsList.find(f => f.id === form.firm_id)?.name || (isRTL ? 'تم الاختيار' : 'Selected'))
+                      : (isRTL ? 'اختر الشركة...' : 'Choose a firm...')}
+                  </Text>
+                  <Text style={{ color: C.muted, fontSize: 12 }}>{showFirmDropdown ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+
+                {showFirmDropdown && (
+                  <View style={{
+                    maxHeight: 180, backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+                    borderRadius: 10, marginTop: 4, overflow: 'hidden'
+                  }}>
+                    <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 180 }}>
+                      {firmsList.map((firm: any) => (
+                        <TouchableOpacity
+                          key={firm.id}
+                          onPress={() => {
+                            updateForm('firm_id', firm.id);
+                            setShowFirmDropdown(false);
+                          }}
+                          style={{
+                            paddingVertical: 10, paddingHorizontal: 12,
+                            borderBottomWidth: 1, borderBottomColor: C.border,
+                            backgroundColor: form.firm_id === firm.id ? `${C.gold}15` : 'transparent'
+                          }}
+                        >
+                          <Text style={{ color: form.firm_id === firm.id ? C.gold : C.text, fontSize: 13, fontWeight: form.firm_id === firm.id ? 'bold' : 'normal' }}>
+                            {firm.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                      {firmsList.length === 0 && (
+                        <View style={{ padding: 12, alignItems: 'center' }}>
+                          <Text style={{ color: C.muted, fontSize: 12 }}>
+                            {isRTL ? 'لا توجد شركات مسجلة' : 'No firms registered'}
+                          </Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {form.practitioner_type === 'independent' && (
+              <Inp C={C} label={isRTL ? 'اسم المكتب (اختياري) 🏢' : 'Office Name (Optional) 🏢'} value={form.officeName} onChangeText={(v: string) => updateForm('officeName', v)} placeholder={isRTL ? 'مثال: مكتب حسن وشركاه للمحاماة' : 'e.g. Hassan & Associates Law Firm'} />
+            )}
 
             <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
               {isRTL ? 'درجة المحكمة' : 'Court Level'}
@@ -314,7 +431,7 @@ export default function RegisterLawyerScreen() {
               <Btn C={C} variant="ghost" onPress={() => setStep(3)} style={{ flex: 1, borderWidth: 1, borderColor: C.border }}>
                 {isRTL ? '← رجوع' : '← Back'}
               </Btn>
-              <Btn C={C} onPress={() => setStep(5)} style={{ flex: 2 }} disabled={!form.syndicateId || !form.experience}>
+              <Btn C={C} onPress={() => setStep(5)} style={{ flex: 2 }} disabled={!form.syndicateId || !form.experience || (form.practitioner_type === 'firm_member' && !form.firm_id)}>
                 {isRTL ? 'متابعة ←' : 'Continue →'}
               </Btn>
             </View>
