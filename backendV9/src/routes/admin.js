@@ -120,6 +120,13 @@ router.patch('/lawyers/:id/verify', ...adminOnly, async (req, res, next) => {
     );
     if (status === 'approved') {
       await pool.query(`UPDATE lawyer_profiles SET is_verified=true WHERE user_id=$1`, [req.params.id]);
+      
+      // Auto-approve the lawyer's firm link and verify the firm if it is currently unverified
+      const { rows: [profile] } = await pool.query('SELECT firm_id FROM lawyer_profiles WHERE user_id=$1', [req.params.id]);
+      if (profile && profile.firm_id) {
+        await pool.query('UPDATE lawyer_profiles SET firm_approved=true WHERE user_id=$1', [req.params.id]);
+        await pool.query('UPDATE firms SET is_verified=true WHERE id=$1 AND is_verified=false', [profile.firm_id]);
+      }
     }
 
     // Notify lawyer

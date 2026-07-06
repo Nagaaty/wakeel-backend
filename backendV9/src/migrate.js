@@ -300,6 +300,17 @@ const MIGRATIONS = [
       `ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS firm_id UUID REFERENCES firms(id) ON DELETE SET NULL`
     ]
   },
+
+  {
+    version: '018_secure_firm_association',
+    sql: [
+      `ALTER TABLE firms ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT true`,
+      `ALTER TABLE firms ADD COLUMN IF NOT EXISTS invite_code VARCHAR(10) UNIQUE`,
+      `UPDATE firms SET invite_code = UPPER(SUBSTRING(MD5(id::text) FROM 1 FOR 6)) WHERE invite_code IS NULL`,
+      `ALTER TABLE lawyer_profiles ADD COLUMN IF NOT EXISTS firm_approved BOOLEAN DEFAULT false`,
+      `UPDATE lawyer_profiles SET firm_approved = true WHERE firm_id IS NOT NULL`
+    ]
+  },
 ];
 
 // ─── Runner ────────────────────────────────────────────────────────────────

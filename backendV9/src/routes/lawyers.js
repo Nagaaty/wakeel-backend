@@ -122,7 +122,10 @@ router.get('/', async (req, res, next) => {
               lp.avg_rating, lp.total_reviews, lp.wins, lp.losses,
               lp.is_verified, lp.response_time_hours, lp.bio, lp.bar_number,
               lp.subscription_plan AS sub, lp.karma_score,
-              lp.practitioner_type, lp.firm_id, f.name AS firm_name, f.logo_url AS firm_logo,
+              lp.practitioner_type,
+              CASE WHEN lp.firm_approved = true THEN lp.firm_id ELSE NULL END AS firm_id,
+              CASE WHEN lp.firm_approved = true THEN f.name ELSE NULL END AS firm_name,
+              CASE WHEN lp.firm_approved = true THEN f.logo_url ELSE NULL END AS firm_logo,
               COALESCE(lp.wins,0) + COALESCE(lp.losses,0) AS total_cases
        FROM users u
        JOIN lawyer_profiles lp ON lp.user_id=u.id
@@ -149,7 +152,8 @@ router.get('/:id', async (req, res, next) => {
     const { rows: [lawyer] } = await pool.query(
       `SELECT lp.*,
               u.id, u.name, u.avatar_url, u.is_online, u.last_active_at, u.created_at,
-              f.name AS firm_name, f.logo_url AS firm_logo,
+              CASE WHEN lp.firm_approved = true THEN f.name ELSE NULL END AS firm_name,
+              CASE WHEN lp.firm_approved = true THEN f.logo_url ELSE NULL END AS firm_logo,
               (SELECT json_agg(r ORDER BY r.created_at DESC) FROM reviews r WHERE r.lawyer_id=u.id LIMIT 20) AS reviews,
               (SELECT json_agg(json_build_object('day_of_week', la.day_of_week, 'start_time', la.start_time)) FROM lawyer_availability la WHERE la.lawyer_id=u.id) AS availability_map,
               (SELECT json_agg(json_build_object('override_date', lo.override_date, 'is_off', lo.is_off, 'slots', lo.slots)) FROM lawyer_schedule_overrides lo WHERE lo.lawyer_id=u.id) AS schedule_overrides,
@@ -342,7 +346,7 @@ router.post('/me/profile', requireAuth, async (req, res, next) => {
       // NEW: office address + coordinates for the map preview
       office, office_lat, office_lng,
       zoom_link,
-      practitioner_type, firm_id,
+      practitioner_type, firm_id, invite_code
     } = req.body;
 
     // Sanitize service_prices: only allow the 4 supported types
@@ -355,13 +359,38 @@ router.post('/me/profile', requireAuth, async (req, res, next) => {
       }
     }
 
+    // Determine firm association & approval based on invite code validation
+    let finalFirmId = firm_id || null;
+    let firmApproved = false;
+
+    if (practitioner_type === 'firm_member') {
+      if (invite_code) {
+        const { rows: [matchedFirm] } = await pool.query(
+          'SELECT id FROM firms WHERE invite_code = $1',
+          [invite_code.toUpperCase().trim()]
+        );
+        if (matchedFirm) {
+          finalFirmId = matchedFirm.id;
+          firmApproved = true;
+        } else {
+          return res.status(400).json({ message: 'Invalid invite code' });
+        }
+      } else if (finalFirmId) {
+        // Linked but needs approval from system/firm admin
+        firmApproved = false;
+      }
+    } else {
+      finalFirmId = null;
+      firmApproved = false;
+    }
+
     const { rows: [profile] } = await pool.query(
       `INSERT INTO lawyer_profiles (
          user_id, specialization, city, consultation_fee, experience_years,
          bio, bar_number, service_prices, office, office_lat, office_lng,
-         zoom_link, practitioner_type, firm_id, is_visible
+         zoom_link, practitioner_type, firm_id, firm_approved, is_visible
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,true)
        ON CONFLICT (user_id) DO UPDATE SET
          specialization   = COALESCE(EXCLUDED.specialization,   lawyer_profiles.specialization),
          city             = COALESCE(EXCLUDED.city,             lawyer_profiles.city),
@@ -376,6 +405,7 @@ router.post('/me/profile', requireAuth, async (req, res, next) => {
          zoom_link        = COALESCE(EXCLUDED.zoom_link,        lawyer_profiles.zoom_link),
          practitioner_type = COALESCE(EXCLUDED.practitioner_type, lawyer_profiles.practitioner_type),
          firm_id          = EXCLUDED.firm_id,
+         firm_approved    = EXCLUDED.firm_approved,
          is_visible       = true
        RETURNING *`,
       [
@@ -392,7 +422,8 @@ router.post('/me/profile', requireAuth, async (req, res, next) => {
         (office_lng !== undefined && office_lng !== null) ? Number(office_lng) : null,
         zoom_link || null,
         practitioner_type || 'independent',
-        firm_id || null,
+        finalFirmId,
+        firmApproved,
       ]
     );
     res.json(profile);

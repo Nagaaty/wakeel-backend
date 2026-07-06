@@ -118,7 +118,8 @@ export const firmsAPI = {
   list:       (params?: any)        => api.get('/firms', { params }),
   get:        (id: string | number) => api.get(`/firms/${id}`),
   getLawyers: (id: string | number) => api.get(`/firms/${id}/lawyers`),
-  create:     (data: { name: string; city?: string }) => api.post('/firms', data),
+  create:     (data: { name: string; city?: string; website?: string; phone?: string }) => api.post('/firms', data),
+  verifyCode: (code: string) => api.get(`/firms/verify-code/${code}`),
 };
 
 export const bookingsAPI = {

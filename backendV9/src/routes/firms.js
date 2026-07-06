@@ -126,7 +126,27 @@ router.get('/:id/lawyers', async (req, res, next) => {
   }
 });
 
-// POST /api/firms - create/register a new firm on the fly
+// GET /api/firms/verify-code/:code - verify a firm join code
+router.get('/verify-code/:code', async (req, res, next) => {
+  try {
+    const { code } = req.params;
+    if (!code) {
+      return res.status(400).json({ message: 'Code is required' });
+    }
+    const { rows } = await pool.query(
+      'SELECT id, name, city, is_verified FROM firms WHERE invite_code = $1',
+      [code.toUpperCase().trim()]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Invalid invite code' });
+    }
+    res.json({ firm: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/firms - create/register a new firm on the fly (unverified by default)
 router.post('/', async (req, res, next) => {
   try {
     const { name, city } = req.body;
@@ -142,9 +162,17 @@ router.post('/', async (req, res, next) => {
       return res.json({ firm: checkRes.rows[0], message: 'Existing firm found' });
     }
 
+    // Generate unique 6-character alphanumeric invite code
+    let inviteCode = '';
+    while (true) {
+      inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const codeCheck = await pool.query('SELECT id FROM firms WHERE invite_code = $1', [inviteCode]);
+      if (codeCheck.rows.length === 0) break;
+    }
+
     const insertRes = await pool.query(
-      `INSERT INTO firms (name, city) VALUES ($1, $2) RETURNING *`,
-      [trimmedName, city || 'Cairo']
+      `INSERT INTO firms (name, city, is_verified, invite_code) VALUES ($1, $2, false, $3) RETURNING *`,
+      [trimmedName, city || 'Cairo', inviteCode]
     );
     res.status(201).json({ firm: insertRes.rows[0], message: 'New firm created successfully' });
   } catch (err) {

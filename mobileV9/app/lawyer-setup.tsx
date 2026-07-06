@@ -59,12 +59,51 @@ export default function LawyerSetupScreen() {
     specialization: '', city: '', experience_years: '', bar_number: '',
     bio: '', consultation_fee: 400, office: '',
     practitioner_type: 'independent', firm_id: null as string | null,
+    invite_code: '',
   });
 
   const [firmsList, setFirmsList] = useState<any[]>([]);
   const [showFirmDropdown, setShowFirmDropdown] = useState(false);
   const [firmSearch, setFirmSearch] = useState('');
   const [creatingFirm, setCreatingFirm] = useState(false);
+
+  // New secure firm selection states
+  const [firmMode, setFirmMode] = useState<'join' | 'create'>('join');
+  const [inviteCode, setInviteCode] = useState('');
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
+  const [newFirmName, setNewFirmName] = useState('');
+  const [newFirmWebsite, setNewFirmWebsite] = useState('');
+  const [newFirmPhone, setNewFirmPhone] = useState('');
+
+  const handleVerifyInviteCode = async (code: string) => {
+    const trimmedCode = code.trim().toUpperCase();
+    setInviteCode(trimmedCode);
+    if (trimmedCode.length === 6) {
+      setVerifyingCode(true);
+      setInviteCodeValid(null);
+      try {
+        const res: any = await firmsAPI.verifyCode(trimmedCode);
+        if (res.firm) {
+          setInviteCodeValid(true);
+          updP('firm_id', res.firm.id);
+          updP('invite_code', trimmedCode);
+          setShowFirmDropdown(false);
+        } else {
+          setInviteCodeValid(false);
+          updP('invite_code', '');
+        }
+      } catch (e) {
+        setInviteCodeValid(false);
+        updP('invite_code', '');
+      } finally {
+        setVerifyingCode(false);
+      }
+    } else {
+      setInviteCodeValid(null);
+      updP('invite_code', '');
+    }
+  };
 
   useEffect(() => {
     // Fetch firms list to let users choose during setup
@@ -99,12 +138,48 @@ export default function LawyerSetupScreen() {
       Alert.alert('', isRTL ? 'يرجى ملء جميع الحقول الإلزامية' : 'Please fill all required fields');
       return;
     }
-    if (profile.practitioner_type === 'firm_member' && !profile.firm_id) {
-      Alert.alert('', isRTL ? 'يرجى اختيار شركة المحاماة التي تنتمي إليها' : 'Please select the Law Firm you belong to');
-      return;
+    if (profile.practitioner_type === 'firm_member') {
+      if (firmMode === 'join' && !profile.firm_id) {
+        Alert.alert('', isRTL ? 'يرجى اختيار شركة المحاماة التي تنتمي إليها' : 'Please select the Law Firm you belong to');
+        return;
+      }
+      if (firmMode === 'create' && !newFirmName.trim()) {
+        Alert.alert('', isRTL ? 'يرجى إدخال اسم الشركة' : 'Please enter the firm name');
+        return;
+      }
     }
     setLoading(true);
     try {
+      let finalFirmId = profile.firm_id;
+      let finalInviteCode = profile.invite_code;
+
+      if (profile.practitioner_type === 'firm_member' && firmMode === 'create') {
+        const res: any = await firmsAPI.create({
+          name: newFirmName.trim(),
+          city: profile.city || 'Cairo',
+          website: newFirmWebsite.trim() || undefined,
+          phone: newFirmPhone.trim() || undefined
+        });
+        const newFirm = res.firm;
+        if (newFirm) {
+          finalFirmId = newFirm.id;
+          finalInviteCode = newFirm.invite_code;
+          updP('firm_id', newFirm.id);
+          updP('invite_code', newFirm.invite_code);
+          // Show the generated invite code to the creator
+          Alert.alert(
+            isRTL ? 'تم إنشاء الشركة' : 'Firm Created',
+            isRTL 
+              ? `تم إنشاء شركة "${newFirmName}" بنجاح! كود الدعوة الخاص بك هو: ${newFirm.invite_code}`
+              : `Firm "${newFirmName}" created successfully! Your shareable invite code is: ${newFirm.invite_code}`
+          );
+        } else {
+          Alert.alert(isRTL ? 'خطأ' : 'Error', isRTL ? 'فشل إنشاء الشركة' : 'Failed to create firm');
+          setLoading(false);
+          return;
+        }
+      }
+
       // Always store the Arabic value for the backend
       const specIndexEn = SPECIALIZATIONS_EN.indexOf(profile.specialization);
       const specIndexAr = SPECIALIZATIONS_AR.indexOf(profile.specialization);
@@ -114,9 +189,19 @@ export default function LawyerSetupScreen() {
       const cityIndexAr = CITIES_AR.indexOf(profile.city);
       const cityAr = cityIndexEn >= 0 ? CITIES_AR[cityIndexEn] : (cityIndexAr >= 0 ? profile.city : profile.city);
 
-      await lawyersAPI.saveProfile({ ...profile, specialization: specAr, city: cityAr });
-    } catch {}
-    finally { setLoading(false); setStep(2); }
+      await lawyersAPI.saveProfile({
+        ...profile,
+        firm_id: finalFirmId,
+        invite_code: finalInviteCode,
+        specialization: specAr,
+        city: cityAr
+      });
+      setStep(2);
+    } catch (e: any) {
+      Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'تعذر حفظ البيانات' : 'Could not save profile'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const saveStep2 = async () => {
@@ -221,6 +306,7 @@ export default function LawyerSetupScreen() {
                 onPress={() => {
                   updP('practitioner_type', 'independent');
                   updP('firm_id', null);
+                  updP('invite_code', '');
                 }}
                 style={{
                   flex: 1, backgroundColor: profile.practitioner_type === 'independent' ? `${C.gold}15` : C.card,
@@ -230,10 +316,10 @@ export default function LawyerSetupScreen() {
               >
                 <Text style={{ fontSize: 20, marginBottom: 4 }}>👤</Text>
                 <Text style={{ color: profile.practitioner_type === 'independent' ? C.gold : C.text, fontSize: 13, fontWeight: 'bold', fontFamily: 'Cairo-Bold' }}>
-                  {isRTL ? 'مستقل (فريلانسر)' : 'Independent'}
+                  {isRTL ? 'مكتب خاص / مستقل' : 'Solo Practice / Independent'}
                 </Text>
                 <Text style={{ color: C.muted, fontSize: 10, textAlign: 'center', marginTop: 2 }}>
-                  {isRTL ? 'ممارس حر لحسابك الخاص' : 'Solo practitioner'}
+                  {isRTL ? 'ممارس مستقل أو صاحب مكتب خاص' : 'Solo practitioner or private office owner'}
                 </Text>
               </TouchableOpacity>
 
@@ -255,115 +341,189 @@ export default function LawyerSetupScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Firm Dropdown Selection */}
+            {/* Firm Association / Creation flow */}
             {profile.practitioner_type === 'firm_member' && (
               <View style={{ marginBottom: 14 }}>
-                <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>
-                  {isRTL ? 'اختر شركة المحاماة التي تنتمي إليها *' : 'Select your Law Firm *'}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setShowFirmDropdown(!showFirmDropdown)}
-                  style={{
-                    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-                    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-                    borderRadius: 10, padding: 12
-                  }}
-                >
-                  <Text style={{ color: profile.firm_id ? C.text : C.muted, fontSize: 14 }}>
-                    {profile.firm_id 
-                      ? (firmsList.find(f => f.id === profile.firm_id)?.name || (isRTL ? 'تم الاختيار' : 'Selected'))
-                      : (isRTL ? 'اختر الشركة...' : 'Choose a firm...')}
-                  </Text>
-                  <Text style={{ color: C.muted, fontSize: 12 }}>{showFirmDropdown ? '▲' : '▼'}</Text>
-                </TouchableOpacity>
+                {/* Mode toggle (Join vs Create) */}
+                <View style={{ flexDirection: 'row', backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 8, padding: 3, marginBottom: 14 }}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setFirmMode('join');
+                      updP('firm_id', null);
+                      updP('invite_code', '');
+                      setInviteCode('');
+                      setInviteCodeValid(null);
+                    }}
+                    style={{
+                      flex: 1, paddingVertical: 8, alignItems: 'center',
+                      backgroundColor: firmMode === 'join' ? C.card : 'transparent',
+                      borderRadius: 6
+                    }}
+                  >
+                    <Text style={{ color: firmMode === 'join' ? C.gold : C.muted, fontSize: 12, fontWeight: 'bold', fontFamily: 'Cairo-Bold' }}>
+                      {isRTL ? 'انضمام لشركة مسجلة' : 'Join Existing Firm'}
+                    </Text>
+                  </TouchableOpacity>
 
-                {showFirmDropdown && (
-                  <View style={{
-                    maxHeight: 260, backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-                    borderRadius: 10, marginTop: 4, overflow: 'hidden'
-                  }}>
-                    {/* Search bar inside dropdown */}
-                    <View style={{ padding: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                      <TextInput
-                        value={firmSearch}
-                        onChangeText={setFirmSearch}
-                        placeholder={isRTL ? '🔍 ابحث عن الشركة...' : '🔍 Search for firm...'}
-                        placeholderTextColor={C.muted}
-                        style={{
-                          color: C.text, fontSize: 13, backgroundColor: C.bg,
-                          borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8,
-                          borderWidth: 1, borderColor: C.border, textAlign: isRTL ? 'right' : 'left'
-                        }}
-                      />
-                    </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setFirmMode('create');
+                      updP('firm_id', null);
+                      updP('invite_code', '');
+                      setInviteCode('');
+                      setInviteCodeValid(null);
+                    }}
+                    style={{
+                      flex: 1, paddingVertical: 8, alignItems: 'center',
+                      backgroundColor: firmMode === 'create' ? C.card : 'transparent',
+                      borderRadius: 6
+                    }}
+                  >
+                    <Text style={{ color: firmMode === 'create' ? C.gold : C.muted, fontSize: 12, fontWeight: 'bold', fontFamily: 'Cairo-Bold' }}>
+                      {isRTL ? 'تسجيل شركة جديدة' : 'Create New Firm'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-                    <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 150 }}>
-                      {filteredFirms.map((firm: any) => (
-                        <TouchableOpacity
-                          key={firm.id}
-                          onPress={() => {
-                            updP('firm_id', firm.id);
-                            setShowFirmDropdown(false);
-                            setFirmSearch('');
-                          }}
-                          style={{
-                            paddingVertical: 10, paddingHorizontal: 12,
-                            borderBottomWidth: 1, borderBottomColor: C.border,
-                            backgroundColor: profile.firm_id === firm.id ? `${C.gold}15` : 'transparent'
-                          }}
-                        >
-                          <Text style={{ color: profile.firm_id === firm.id ? C.gold : C.text, fontSize: 13, fontWeight: profile.firm_id === firm.id ? 'bold' : 'normal' }}>
-                            {firm.name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
+                {firmMode === 'join' ? (
+                  <>
+                    <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>
+                      {isRTL ? 'اختر شركة المحاماة التي تنتمي إليها *' : 'Select your Law Firm *'}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowFirmDropdown(!showFirmDropdown)}
+                      style={{
+                        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                        backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+                        borderRadius: 10, padding: 12, marginBottom: 12
+                      }}
+                    >
+                      <Text style={{ color: profile.firm_id ? C.text : C.muted, fontSize: 14 }}>
+                        {profile.firm_id 
+                          ? (firmsList.find(f => f.id === profile.firm_id)?.name || (isRTL ? 'تم الاختيار' : 'Selected'))
+                          : (isRTL ? 'اختر الشركة...' : 'Choose a firm...')}
+                      </Text>
+                      <Text style={{ color: C.muted, fontSize: 12 }}>{showFirmDropdown ? '▲' : '▼'}</Text>
+                    </TouchableOpacity>
 
-                      {filteredFirms.length === 0 && firmSearch.trim().length === 0 && (
-                        <View style={{ padding: 12, alignItems: 'center' }}>
-                          <Text style={{ color: C.muted, fontSize: 12 }}>
-                            {isRTL ? 'لا توجد شركات مسجلة' : 'No firms registered'}
-                          </Text>
+                    {showFirmDropdown && (
+                      <View style={{
+                        maxHeight: 220, backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+                        borderRadius: 10, marginTop: -8, marginBottom: 14, overflow: 'hidden'
+                      }}>
+                        {/* Search bar inside dropdown */}
+                        <View style={{ padding: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                          <TextInput
+                            value={firmSearch}
+                            onChangeText={setFirmSearch}
+                            placeholder={isRTL ? '🔍 ابحث عن الشركة...' : '🔍 Search for firm...'}
+                            placeholderTextColor={C.muted}
+                            style={{
+                              color: C.text, fontSize: 13, backgroundColor: C.bg,
+                              borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8,
+                              borderWidth: 1, borderColor: C.border, textAlign: isRTL ? 'right' : 'left'
+                            }}
+                          />
                         </View>
-                      )}
-                    </ScrollView>
 
-                    {/* Add Custom Firm Button */}
-                    {firmSearch.trim().length > 0 && (
-                      <TouchableOpacity
-                        onPress={async () => {
-                          const newFirmName = firmSearch.trim();
-                          setCreatingFirm(true);
-                          try {
-                            const res: any = await firmsAPI.create({ name: newFirmName, city: profile.city || 'Cairo' });
-                            const newFirm = res.firm;
-                            if (newFirm) {
-                              setFirmsList(prev => [newFirm, ...prev]);
-                              updP('firm_id', newFirm.id);
-                              setShowFirmDropdown(false);
-                              setFirmSearch('');
-                              Alert.alert(isRTL ? 'نجاح' : 'Success', isRTL ? `تمت إضافة شركة "${newFirmName}" بنجاح!` : `Firm "${newFirmName}" created successfully!`);
-                            }
-                          } catch (e: any) {
-                            Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'تعذر إنشاء الشركة' : 'Could not create firm'));
-                          } finally {
-                            setCreatingFirm(false);
-                          }
-                        }}
-                        disabled={creatingFirm}
-                        style={{
-                          paddingVertical: 12, paddingHorizontal: 12,
-                          backgroundColor: `${C.gold}15`, alignItems: 'center', justifyContent: 'center',
-                          borderTopWidth: 1, borderTopColor: C.border
-                        }}
-                      >
-                        <Text style={{ color: C.gold, fontSize: 13, fontWeight: 'bold' }}>
-                          {creatingFirm 
-                            ? (isRTL ? '⏳ جاري الإضافة...' : '⏳ Adding...')
-                            : (isRTL ? `+ إضافة "${firmSearch.trim()}" كشركة جديدة` : `+ Add "${firmSearch.trim()}" as a new firm`)}
-                        </Text>
-                      </TouchableOpacity>
+                        <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 150 }}>
+                          {filteredFirms.map((firm: any) => (
+                            <TouchableOpacity
+                              key={firm.id}
+                              onPress={() => {
+                                updP('firm_id', firm.id);
+                                setShowFirmDropdown(false);
+                                setFirmSearch('');
+                                // Reset invite code verification when selecting manually
+                                setInviteCode('');
+                                setInviteCodeValid(null);
+                              }}
+                              style={{
+                                paddingVertical: 10, paddingHorizontal: 12,
+                                borderBottomWidth: 1, borderBottomColor: C.border,
+                                backgroundColor: profile.firm_id === firm.id ? `${C.gold}15` : 'transparent'
+                              }}
+                            >
+                              <Text style={{ color: profile.firm_id === firm.id ? C.gold : C.text, fontSize: 13, fontWeight: profile.firm_id === firm.id ? 'bold' : 'normal' }}>
+                                {firm.name}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+
+                          {filteredFirms.length === 0 && (
+                            <View style={{ padding: 12, alignItems: 'center' }}>
+                              <Text style={{ color: C.muted, fontSize: 12 }}>
+                                {isRTL ? 'لا توجد شركات مطابقة' : 'No matching firms found'}
+                              </Text>
+                            </View>
+                          )}
+                        </ScrollView>
+                      </View>
                     )}
-                  </View>
+
+                    {/* Invite Code verification input */}
+                    <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>
+                      {isRTL ? 'كود دعوة الشركة (للتوثيق الفوري) 🔑' : 'Firm Invite Code (for instant verification) 🔑'}
+                    </Text>
+                    <TextInput
+                      value={inviteCode}
+                      onChangeText={handleVerifyInviteCode}
+                      placeholder={isRTL ? 'مثال: WAK78A (6 رموز)' : 'e.g. WAK78A (6 chars)'}
+                      maxLength={6}
+                      autoCapitalize="characters"
+                      style={{
+                        backgroundColor: C.card, color: C.text, borderWidth: 1,
+                        borderColor: inviteCodeValid === true ? C.green : (inviteCodeValid === false ? C.red : C.border),
+                        borderRadius: 10, padding: 12, fontSize: 14, textTransform: 'uppercase', marginBottom: 12
+                      }}
+                    />
+                    <View style={{ marginTop: -6, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      {verifyingCode && <Text style={{ color: C.gold, fontSize: 11 }}>{isRTL ? '⏳ جاري التحقق من الكود...' : '⏳ Verifying code...'}</Text>}
+                      {!verifyingCode && inviteCodeValid === true && (
+                        <Text style={{ color: C.green, fontSize: 11, fontWeight: '600' }}>
+                          {isRTL ? '✓ كود صحيح! سيتم ربطك بالشركة وتوثيقك تلقائياً.' : '✓ Valid code! You will be linked and auto-approved.'}
+                        </Text>
+                      )}
+                      {!verifyingCode && inviteCodeValid === false && (
+                        <Text style={{ color: C.red, fontSize: 11, fontWeight: '600' }}>
+                          {isRTL ? '❌ كود غير صحيح. يمكنك التسجيل وسيظل طلبك معلقاً لمراجعة الإدارة.' : '❌ Invalid code. Your link will require admin review.'}
+                        </Text>
+                      )}
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>
+                        {isRTL ? 'اسم الشركة * 🏛️' : 'Firm Name * 🏛️'}
+                      </Text>
+                      <TextInput value={newFirmName} onChangeText={setNewFirmName} placeholder={isRTL ? 'مثال: شركة النصر للاستشارات القانونية' : 'e.g. El-Nasr Law Firm'} placeholderTextColor={C.muted} style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 11, color: C.text, fontSize: 14 }} />
+                    </View>
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>
+                        {isRTL ? 'موقع الشركة الإلكتروني (اختياري) 🌐' : 'Firm Website (Optional) 🌐'}
+                      </Text>
+                      <TextInput value={newFirmWebsite} onChangeText={setNewFirmWebsite} placeholder="https://example.com" placeholderTextColor={C.muted} keyboardType="url" autoCapitalize="none" style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 11, color: C.text, fontSize: 14 }} />
+                    </View>
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>
+                        {isRTL ? 'هاتف الشركة (اختياري) 📞' : 'Firm Phone (Optional) 📞'}
+                      </Text>
+                      <TextInput value={newFirmPhone} onChangeText={setNewFirmPhone} placeholder="02XXXXXXXX" placeholderTextColor={C.muted} keyboardType="phone-pad" style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 11, color: C.text, fontSize: 14 }} />
+                    </View>
+                    
+                    <View style={{
+                      backgroundColor: `${C.gold}10`, borderWidth: 1, borderColor: `${C.gold}30`,
+                      borderRadius: 10, padding: 12, marginTop: 4, marginBottom: 12, flexDirection: 'row', gap: 10, alignItems: 'center'
+                    }}>
+                      <Text style={{ fontSize: 16 }}>ℹ️</Text>
+                      <Text style={{ flex: 1, color: C.muted, fontSize: 11, lineHeight: 16 }}>
+                        {isRTL 
+                          ? 'تنبيه: سيتم تسجيل الشركة كـ "غير موثقة" في النظام بانتظار مراجعة الإدارة. بعد حفظ البيانات ستحصل على كود دعوة لمشاركته مع زملائك.'
+                          : 'Note: The firm will be created as "Unverified" pending admin review. You will receive a join code to share with your colleagues.'}
+                      </Text>
+                    </View>
+                  </>
                 )}
               </View>
             )}
