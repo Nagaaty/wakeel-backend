@@ -31,13 +31,21 @@ router.post('/face-match', uploadPublic.fields([
     const selfie = files.selfie[0];
 
     // 1. Structural Verification: OCR Text Check
-    const Tesseract = require('tesseract.js');
-    const [frontResult, backResult] = await Promise.all([
-      Tesseract.recognize(idPhoto.buffer, 'eng+ara', { logger: () => {} }),
-      Tesseract.recognize(idBackPhoto.buffer, 'eng+ara', { logger: () => {} })
-    ]);
-    const frontText = frontResult.data.text;
-    const backText = backResult.data.text;
+    let frontText = '';
+    let backText = '';
+    try {
+      const Tesseract = require('tesseract.js');
+      console.log('📝 Starting sequential OCR verification...');
+      const frontResult = await Tesseract.recognize(idPhoto.buffer, 'eng+ara', { logger: () => {} });
+      frontText = frontResult?.data?.text || '';
+      console.log('📝 Front ID OCR completed.');
+      
+      const backResult = await Tesseract.recognize(idBackPhoto.buffer, 'eng+ara', { logger: () => {} });
+      backText = backResult?.data?.text || '';
+      console.log('📝 Back ID OCR completed.');
+    } catch (ocrErr) {
+      console.error('⚠️ OCR processing error (likely memory/Tesseract issue):', ocrErr.message);
+    }
     
     // Security Layer 1: Check for explicit Egyptian legal document Arabic keywords
     const keywords = ['جمهور', 'مصر', 'بطاق', 'شخصي', 'قومي', 'نقاب', 'محام', 'كارني', 'قيد'];
@@ -48,29 +56,32 @@ router.post('/face-match', uploadPublic.fields([
     const normalizedText = frontText.replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
     const has14Digits = /(?:\D|^)(\d{14})(?:\D|$)/.test(normalizedText);
     
-    let ocrFailed = false;
-    let ocrNote = '';
-    if (!hasKeyword && !has14Digits) {
-      console.warn('⚠️ OCR check failed: Front photo does not contain expected Egyptian ID keywords or a 14-digit National ID.');
-      ocrFailed = true;
-      ocrNote += 'Front ID keywords/14-digits missing. ';
-    }
-
-    // Clean up whitespace, punctuation, and AI hallucinations
-    // We only keep Arabic letters, English letters, standard numbers, and Hindu-Arabic numerals
-    const validFrontText = frontText.replace(/[^a-zA-Z0-9\u0621-\u064A\u0660-\u0669]/g, '');
-    const validBackText = backText.replace(/[^a-zA-Z0-9\u0621-\u064A\u0660-\u0669]/g, '');
+    let ocrFailed = !frontText || !backText;
+    let ocrNote = ocrFailed ? 'OCR failed/skipped. ' : '';
     
-    // An Egyptian ID contains well over 50 characters of valid text. We check for at least 15 on front, 10 on back.
-    if (validFrontText.length < 15) {
-      console.warn(`⚠️ OCR check failed: Only ${validFrontText.length} characters detected on front ID.`);
-      ocrFailed = true;
-      ocrNote += 'Front text length too short. ';
-    }
-    if (validBackText.length < 10) {
-      console.warn(`⚠️ OCR check failed: Only ${validBackText.length} characters detected on back ID.`);
-      ocrFailed = true;
-      ocrNote += 'Back text length too short. ';
+    if (frontText && backText) {
+      if (!hasKeyword && !has14Digits) {
+        console.warn('⚠️ OCR check failed: Front photo does not contain expected Egyptian ID keywords or a 14-digit National ID.');
+        ocrFailed = true;
+        ocrNote += 'Front ID keywords/14-digits missing. ';
+      }
+
+      // Clean up whitespace, punctuation, and AI hallucinations
+      // We only keep Arabic letters, English letters, standard numbers, and Hindu-Arabic numerals
+      const validFrontText = frontText.replace(/[^a-zA-Z0-9\u0621-\u064A\u0660-\u0669]/g, '');
+      const validBackText = backText.replace(/[^a-zA-Z0-9\u0621-\u064A\u0660-\u0669]/g, '');
+      
+      // An Egyptian ID contains well over 50 characters of valid text. We check for at least 15 on front, 10 on back.
+      if (validFrontText.length < 15) {
+        console.warn(`⚠️ OCR check failed: Only ${validFrontText.length} characters detected on front ID.`);
+        ocrFailed = true;
+        ocrNote += 'Front text length too short. ';
+      }
+      if (validBackText.length < 10) {
+        console.warn(`⚠️ OCR check failed: Only ${validBackText.length} characters detected on back ID.`);
+        ocrFailed = true;
+        ocrNote += 'Back text length too short. ';
+      }
     }
 
     // 2. Face Verification
