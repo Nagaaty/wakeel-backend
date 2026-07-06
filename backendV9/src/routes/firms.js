@@ -126,4 +126,30 @@ router.get('/:id/lawyers', async (req, res, next) => {
   }
 });
 
+// POST /api/firms - create/register a new firm on the fly
+router.post('/', async (req, res, next) => {
+  try {
+    const { name, city } = req.body;
+    if (!name) {
+      return res.status(400).json({ message: 'Firm name is required' });
+    }
+
+    const trimmedName = name.trim();
+
+    // Check if firm name already exists to prevent duplicate entries
+    const checkRes = await pool.query('SELECT * FROM firms WHERE name ILIKE $1', [trimmedName]);
+    if (checkRes.rows.length > 0) {
+      return res.json({ firm: checkRes.rows[0], message: 'Existing firm found' });
+    }
+
+    const insertRes = await pool.query(
+      `INSERT INTO firms (name, city) VALUES ($1, $2) RETURNING *`,
+      [trimmedName, city || 'Cairo']
+    );
+    res.status(201).json({ firm: insertRes.rows[0], message: 'New firm created successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

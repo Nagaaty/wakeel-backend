@@ -87,7 +87,7 @@ export const translations = {
   'home.searchPlaceholder':{ ar: 'ابحث بالاسم أو التخصص...', en: 'Search by name or specialty...' },
   'home.searchBtn':       { ar: 'بحث ←',                 en: 'Search →'                    },
   'home.findLawyerBtn':   { ar: 'ابحث عن محاميك ⚖️',      en: 'Find your lawyer ⚖️'         },
-  'home.askFreeBtn':      { ar: 'اسأل سؤالاً قانونياً مجانياً 🤖', en: 'Ask a free legal question 🤖' },
+  'home.askFreeBtn':      { ar: 'ابحث عن محاميك بالذكاء الاصطناعي 🤖', en: 'Find your lawyer with AI 🤖' },
   'home.categoriesTitle': { ar: 'تخصصات القانون',        en: 'Legal Specialties'           },
   'home.viewAll':         { ar: 'عرض الكل ←',            en: 'View All →'                  },
   'home.topLawyersTitle': { ar: 'أعلى المحامين تقييماً ⭐', en: 'Top Rated Lawyers ⭐'       },

@@ -32,7 +32,7 @@ async function callGroq(messages, systemText, maxTokens = 1000) {
         ...messages,
       ],
       max_tokens: maxTokens,
-      temperature: 0.7,
+      temperature: 0.2,
     }),
   });
   const data = await res.json();
@@ -57,7 +57,7 @@ async function callGemini(messages, systemText, maxTokens = 1000) {
   const body = {
     contents,
     systemInstruction: { parts: [{ text: systemText }] },
-    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 },
+    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.2 },
   };
 
   const res  = await fetch(url, {
@@ -87,6 +87,7 @@ async function callClaude(messages, systemText, maxTokens = 1000) {
       max_tokens: maxTokens,
       system:     systemText,
       messages,
+      temperature: 0.2,
     }),
   });
   const data = await res.json();

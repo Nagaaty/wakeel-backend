@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   Alert, KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -63,6 +63,8 @@ export default function LawyerSetupScreen() {
 
   const [firmsList, setFirmsList] = useState<any[]>([]);
   const [showFirmDropdown, setShowFirmDropdown] = useState(false);
+  const [firmSearch, setFirmSearch] = useState('');
+  const [creatingFirm, setCreatingFirm] = useState(false);
 
   useEffect(() => {
     // Fetch firms list to let users choose during setup
@@ -70,6 +72,8 @@ export default function LawyerSetupScreen() {
       setFirmsList(res.firms || []);
     }).catch(() => {});
   }, []);
+
+  const filteredFirms = firmsList.filter(f => f.name.toLowerCase().includes(firmSearch.toLowerCase()));
 
   const [schedule, setSchedule] = useState<Record<number, string[]>>({
     0: [], 1: ['9:00','10:00','11:00','14:00','15:00'],
@@ -275,16 +279,32 @@ export default function LawyerSetupScreen() {
 
                 {showFirmDropdown && (
                   <View style={{
-                    maxHeight: 180, backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+                    maxHeight: 260, backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
                     borderRadius: 10, marginTop: 4, overflow: 'hidden'
                   }}>
-                    <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 180 }}>
-                      {firmsList.map((firm: any) => (
+                    {/* Search bar inside dropdown */}
+                    <View style={{ padding: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                      <TextInput
+                        value={firmSearch}
+                        onChangeText={setFirmSearch}
+                        placeholder={isRTL ? '🔍 ابحث عن الشركة...' : '🔍 Search for firm...'}
+                        placeholderTextColor={C.muted}
+                        style={{
+                          color: C.text, fontSize: 13, backgroundColor: C.bg,
+                          borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8,
+                          borderWidth: 1, borderColor: C.border, textAlign: isRTL ? 'right' : 'left'
+                        }}
+                      />
+                    </View>
+
+                    <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 150 }}>
+                      {filteredFirms.map((firm: any) => (
                         <TouchableOpacity
                           key={firm.id}
                           onPress={() => {
                             updP('firm_id', firm.id);
                             setShowFirmDropdown(false);
+                            setFirmSearch('');
                           }}
                           style={{
                             paddingVertical: 10, paddingHorizontal: 12,
@@ -297,7 +317,8 @@ export default function LawyerSetupScreen() {
                           </Text>
                         </TouchableOpacity>
                       ))}
-                      {firmsList.length === 0 && (
+
+                      {filteredFirms.length === 0 && firmSearch.trim().length === 0 && (
                         <View style={{ padding: 12, alignItems: 'center' }}>
                           <Text style={{ color: C.muted, fontSize: 12 }}>
                             {isRTL ? 'لا توجد شركات مسجلة' : 'No firms registered'}
@@ -305,6 +326,43 @@ export default function LawyerSetupScreen() {
                         </View>
                       )}
                     </ScrollView>
+
+                    {/* Add Custom Firm Button */}
+                    {firmSearch.trim().length > 0 && (
+                      <TouchableOpacity
+                        onPress={async () => {
+                          const newFirmName = firmSearch.trim();
+                          setCreatingFirm(true);
+                          try {
+                            const res: any = await firmsAPI.create({ name: newFirmName, city: profile.city || 'Cairo' });
+                            const newFirm = res.firm;
+                            if (newFirm) {
+                              setFirmsList(prev => [newFirm, ...prev]);
+                              updP('firm_id', newFirm.id);
+                              setShowFirmDropdown(false);
+                              setFirmSearch('');
+                              Alert.alert(isRTL ? 'نجاح' : 'Success', isRTL ? `تمت إضافة شركة "${newFirmName}" بنجاح!` : `Firm "${newFirmName}" created successfully!`);
+                            }
+                          } catch (e: any) {
+                            Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'تعذر إنشاء الشركة' : 'Could not create firm'));
+                          } finally {
+                            setCreatingFirm(false);
+                          }
+                        }}
+                        disabled={creatingFirm}
+                        style={{
+                          paddingVertical: 12, paddingHorizontal: 12,
+                          backgroundColor: `${C.gold}15`, alignItems: 'center', justifyContent: 'center',
+                          borderTopWidth: 1, borderTopColor: C.border
+                        }}
+                      >
+                        <Text style={{ color: C.gold, fontSize: 13, fontWeight: 'bold' }}>
+                          {creatingFirm 
+                            ? (isRTL ? '⏳ جاري الإضافة...' : '⏳ Adding...')
+                            : (isRTL ? `+ إضافة "${firmSearch.trim()}" كشركة جديدة` : `+ Add "${firmSearch.trim()}" as a new firm`)}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
               </View>

@@ -102,7 +102,7 @@ export default function HomeTab() {
             <Text style={{ color: '#1C1611', fontWeight: '800', fontSize: 18 }}>{t('home.findLawyerBtn')}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => router.push('/forum' as any)}
+          <TouchableOpacity onPress={() => router.push('/ai' as any)}
             style={{ backgroundColor: '#FDFBF7', borderWidth: 1, borderColor: '#EADDCB', borderRadius: 16, width: '100%', paddingVertical: 18, alignItems: 'center' }}>
             <Text style={{ color: '#6B5E4E', fontWeight: '700', fontSize: 18 }}>{t('home.askFreeBtn')}</Text>
           </TouchableOpacity>
