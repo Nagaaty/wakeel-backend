@@ -180,6 +180,18 @@ export function ProfileHeader({
               }}>
                 {user.firm_name}
               </Text>
+              {user.firm_invite_code && (
+                <Text style={{
+                  color: C.gold,
+                  fontSize: 11,
+                  fontWeight: '600',
+                  opacity: 0.8,
+                  marginLeft: isRTL ? 0 : 6,
+                  marginRight: isRTL ? 6 : 0
+                }}>
+                  {isRTL ? `(كود: ${user.firm_invite_code})` : `(Code: ${user.firm_invite_code})`}
+                </Text>
+              )}
               {!user.firm_approved && (
                 <Text style={{
                   color: C.red,
