@@ -504,7 +504,7 @@ export default function RegisterLawyerScreen() {
 
                     {/* Invite Code verification input */}
                     <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
-                      {isRTL ? 'كود دعوة الشركة (للتوثيق الفوري) 🔑' : 'Firm Invite Code (for instant verification) 🔑'}
+                      {isRTL ? 'كود دعوة الشركة (مطلوب للانضمام) 🔑' : 'Firm Invite Code (Required to Join) 🔑'}
                     </Text>
                     <TextInput
                       value={inviteCode}
@@ -522,12 +522,12 @@ export default function RegisterLawyerScreen() {
                       {verifyingCode && <Text style={{ color: C.gold, fontSize: 11 }}>{isRTL ? '⏳ جاري التحقق من الكود...' : '⏳ Verifying code...'}</Text>}
                       {!verifyingCode && inviteCodeValid === true && (
                         <Text style={{ color: C.green, fontSize: 11, fontWeight: '600' }}>
-                          {isRTL ? '✓ كود صحيح! سيتم ربطك بالشركة وتوثيقك تلقائياً.' : '✓ Valid code! You will be linked and auto-approved.'}
+                          {isRTL ? '✓ تم التحقق بنجاح!' : '✓ Verification successful!'}
                         </Text>
                       )}
                       {!verifyingCode && inviteCodeValid === false && (
                         <Text style={{ color: C.red, fontSize: 11, fontWeight: '600' }}>
-                          {isRTL ? '❌ كود غير صحيح. يمكنك التسجيل وسيظل طلبك معلقاً لمراجعة الإدارة.' : '❌ Invalid code. Your link will require admin review.'}
+                          {isRTL ? '❌ كود غير صحيح. يرجى إدخال الكود الصحيح للمتابعة.' : '❌ Invalid code. Please enter the correct code to proceed.'}
                         </Text>
                       )}
                       {!verifyingCode && inviteCodeValid === null && inviteCode.length > 0 && inviteCode.length < 6 && (
@@ -618,14 +618,15 @@ export default function RegisterLawyerScreen() {
                       Alert.alert(isRTL ? 'خطأ' : 'Error', isRTL ? 'فشل إنشاء الشركة' : 'Failed to create firm');
                     }
                   } catch (e: any) {
-                    Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'تعذر إنشاء الشركة' : 'Could not create firm'));
+                    const errorMsg = isRTL ? (e?.message || e?.message_ar) : (e?.message_en || e?.message);
+                    Alert.alert(isRTL ? 'خطأ' : 'Error', errorMsg || (isRTL ? 'تعذر إنشاء الشركة' : 'Could not create firm'));
                   } finally {
                     setLoading(false);
                   }
                 } else {
                   setStep(5);
                 }
-              }} style={{ flex: 2 }} disabled={!form.syndicateId || !form.experience || (form.practitioner_type === 'firm_member' && firmMode === 'join' && !form.firm_id) || loading}>
+              }} style={{ flex: 2 }} disabled={!form.syndicateId || !form.experience || (form.practitioner_type === 'firm_member' && firmMode === 'join' && (!form.firm_id || inviteCodeValid !== true)) || (form.practitioner_type === 'firm_member' && firmMode === 'create' && !newFirmName.trim()) || loading}>
                 {loading ? (isRTL ? '⏳ جاري المعالجة...' : '⏳ Processing...') : (isRTL ? 'متابعة ←' : 'Continue →')}
               </Btn>
             </View>

@@ -159,7 +159,10 @@ router.post('/', async (req, res, next) => {
     // Check if firm name already exists to prevent duplicate entries
     const checkRes = await pool.query('SELECT * FROM firms WHERE name ILIKE $1', [trimmedName]);
     if (checkRes.rows.length > 0) {
-      return res.json({ firm: checkRes.rows[0], message: 'Existing firm found' });
+      return res.status(400).json({
+        message_en: 'A law firm with this name is already registered. Please join it using its invite code, or choose a different name.',
+        message: 'هذه الشركة مسجلة بالفعل. يرجى الانضمام للشركة الحالية باستخدام كود الدعوة، أو اختيار اسم آخر.'
+      });
     }
 
     // Generate unique 6-character alphanumeric invite code

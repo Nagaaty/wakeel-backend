@@ -139,9 +139,15 @@ export default function LawyerSetupScreen() {
       return;
     }
     if (profile.practitioner_type === 'firm_member') {
-      if (firmMode === 'join' && !profile.firm_id) {
-        Alert.alert('', isRTL ? 'يرجى اختيار شركة المحاماة التي تنتمي إليها' : 'Please select the Law Firm you belong to');
-        return;
+      if (firmMode === 'join') {
+        if (!profile.firm_id) {
+          Alert.alert('', isRTL ? 'يرجى اختيار شركة المحاماة التي تنتمي إليها' : 'Please select the Law Firm you belong to');
+          return;
+        }
+        if (inviteCodeValid !== true) {
+          Alert.alert('', isRTL ? 'يرجى إدخال كود الدعوة الصحيح للانضمام للشركة' : 'Please enter the correct invite code to join this firm');
+          return;
+        }
       }
       if (firmMode === 'create' && !newFirmName.trim()) {
         Alert.alert('', isRTL ? 'يرجى إدخال اسم الشركة' : 'Please enter the firm name');
@@ -198,7 +204,8 @@ export default function LawyerSetupScreen() {
       });
       setStep(2);
     } catch (e: any) {
-      Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'تعذر حفظ البيانات' : 'Could not save profile'));
+      const errorMsg = isRTL ? (e?.message || e?.message_ar) : (e?.message_en || e?.message);
+      Alert.alert(isRTL ? 'خطأ' : 'Error', errorMsg || (isRTL ? 'تعذر حفظ البيانات' : 'Could not save profile'));
     } finally {
       setLoading(false);
     }
@@ -463,7 +470,7 @@ export default function LawyerSetupScreen() {
 
                     {/* Invite Code verification input */}
                     <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>
-                      {isRTL ? 'كود دعوة الشركة (للتوثيق الفوري) 🔑' : 'Firm Invite Code (for instant verification) 🔑'}
+                      {isRTL ? 'كود دعوة الشركة (مطلوب للانضمام) 🔑' : 'Firm Invite Code (Required to Join) 🔑'}
                     </Text>
                     <TextInput
                       value={inviteCode}
@@ -481,12 +488,12 @@ export default function LawyerSetupScreen() {
                       {verifyingCode && <Text style={{ color: C.gold, fontSize: 11 }}>{isRTL ? '⏳ جاري التحقق من الكود...' : '⏳ Verifying code...'}</Text>}
                       {!verifyingCode && inviteCodeValid === true && (
                         <Text style={{ color: C.green, fontSize: 11, fontWeight: '600' }}>
-                          {isRTL ? '✓ كود صحيح! سيتم ربطك بالشركة وتوثيقك تلقائياً.' : '✓ Valid code! You will be linked and auto-approved.'}
+                          {isRTL ? '✓ تم التحقق بنجاح!' : '✓ Verification successful!'}
                         </Text>
                       )}
                       {!verifyingCode && inviteCodeValid === false && (
                         <Text style={{ color: C.red, fontSize: 11, fontWeight: '600' }}>
-                          {isRTL ? '❌ كود غير صحيح. يمكنك التسجيل وسيظل طلبك معلقاً لمراجعة الإدارة.' : '❌ Invalid code. Your link will require admin review.'}
+                          {isRTL ? '❌ كود غير صحيح. يرجى إدخال الكود الصحيح للمتابعة.' : '❌ Invalid code. Please enter the correct code to proceed.'}
                         </Text>
                       )}
                     </View>
