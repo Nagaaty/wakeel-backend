@@ -77,6 +77,64 @@ export default function LawyerSetupScreen() {
   const [newFirmWebsite, setNewFirmWebsite] = useState('');
   const [newFirmPhone, setNewFirmPhone] = useState('');
 
+  const [verificationMethod, setVerificationMethod] = useState<'email' | 'code'>('email');
+  const [professionalEmail, setProfessionalEmail] = useState('');
+  const [emailCode, setEmailCode] = useState('');
+  const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
+  const [verifyingEmailOtp, setVerifyingEmailOtp] = useState(false);
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailOtpVerified, setEmailOtpVerified] = useState(false);
+
+  useEffect(() => {
+    if (profile.firm_id) {
+      setVerificationMethod('email');
+      setEmailOtpSent(false);
+      setEmailOtpVerified(false);
+      setInviteCodeValid(null);
+      setInviteCode('');
+      setProfessionalEmail('');
+      setEmailCode('');
+      setRequestPendingJoin(false);
+    }
+  }, [profile.firm_id]);
+
+  const handleSendEmailOtp = async () => {
+    if (!profile.firm_id || !professionalEmail.trim()) return;
+    setSendingEmailOtp(true);
+    try {
+      await firmsAPI.sendVerification(profile.firm_id, professionalEmail.trim());
+      setEmailOtpSent(true);
+      Alert.alert(
+        isRTL ? 'تم الإرسال' : 'Sent',
+        isRTL ? 'تم إرسال رمز التحقق إلى بريدك الإلكتروني المهني.' : 'Verification code sent to your professional email.'
+      );
+    } catch (e: any) {
+      const err = isRTL ? (e?.message || e?.message_ar) : (e?.message_en || e?.message);
+      Alert.alert(isRTL ? 'خطأ' : 'Error', err || (isRTL ? 'فشل إرسال الرمز' : 'Failed to send code'));
+    } finally {
+      setSendingEmailOtp(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async (code: string) => {
+    setEmailCode(code);
+    if (code.length === 6) {
+      setVerifyingEmailOtp(true);
+      try {
+        await firmsAPI.verifyEmailCode(professionalEmail.trim(), code);
+        setEmailOtpVerified(true);
+        setInviteCodeValid(true);
+        updP('invite_code', 'VERIFIED_EMAIL:' + professionalEmail.trim());
+      } catch (e: any) {
+        const err = isRTL ? (e?.message || e?.message_ar) : (e?.message_en || e?.message);
+        Alert.alert(isRTL ? 'خطأ' : 'Error', err || (isRTL ? 'كود التحقق غير صحيح' : 'Invalid code'));
+        setInviteCodeValid(false);
+      } finally {
+        setVerifyingEmailOtp(false);
+      }
+    }
+  };
+
   const handleVerifyInviteCode = async (code: string) => {
     const trimmedCode = code.trim().toUpperCase();
     setInviteCode(trimmedCode);
@@ -475,119 +533,130 @@ export default function LawyerSetupScreen() {
                       return (
                         <>
                           {/* Verification Method Selection */}
-                          {hasWebsite && (
-                            <View style={{
-                              flexDirection: 'row', backgroundColor: C.bg, padding: 3, borderRadius: 8,
-                              marginBottom: 16, borderWidth: 1, borderColor: C.border
-                            }}>
-                              <TouchableOpacity
-                                onPress={() => setVerificationMethod('email')}
-                                style={{
-                                  flex: 1, paddingVertical: 8, alignItems: 'center',
-                                  backgroundColor: verificationMethod === 'email' ? C.card : 'transparent',
-                                  borderRadius: 6
-                                }}
-                              >
-                                <Text style={{ color: verificationMethod === 'email' ? C.gold : C.muted, fontSize: 11, fontFamily: 'Cairo-Bold', fontWeight: 'bold' }}>
-                                  {isRTL ? 'إيميل الشركة المهني 📧' : 'Work Email 📧'}
-                                </Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                onPress={() => setVerificationMethod('code')}
-                                style={{
-                                  flex: 1, paddingVertical: 8, alignItems: 'center',
-                                  backgroundColor: verificationMethod === 'code' ? C.card : 'transparent',
-                                  borderRadius: 6
-                                }}
-                              >
-                                <Text style={{ color: verificationMethod === 'code' ? C.gold : C.muted, fontSize: 11, fontFamily: 'Cairo-Bold', fontWeight: 'bold' }}>
-                                  {isRTL ? 'كود الدعوة 🔑' : 'Invite Code 🔑'}
-                                </Text>
-                              </TouchableOpacity>
-                            </View>
-                          )}
-
-                          {verificationMethod === 'email' && hasWebsite ? (
-                            <View style={{ marginBottom: 14 }}>
-                              <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
-                                {isRTL ? 'البريد الإلكتروني المهني للشركة * 📧' : 'Professional Firm Email * 📧'}
+                          <View style={{
+                            flexDirection: 'row', backgroundColor: C.bg, padding: 3, borderRadius: 8,
+                            marginBottom: 16, borderWidth: 1, borderColor: C.border
+                          }}>
+                            <TouchableOpacity
+                              onPress={() => setVerificationMethod('email')}
+                              style={{
+                                flex: 1, paddingVertical: 8, alignItems: 'center',
+                                backgroundColor: verificationMethod === 'email' ? C.card : 'transparent',
+                                borderRadius: 6
+                              }}
+                            >
+                              <Text style={{ color: verificationMethod === 'email' ? C.gold : C.muted, fontSize: 11, fontFamily: 'Cairo-Bold', fontWeight: 'bold' }}>
+                                {isRTL ? 'إيميل الشركة المهني 📧' : 'Work Email 📧'}
                               </Text>
-                              
-                              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
-                                <TextInput
-                                  value={professionalEmail}
-                                  onChangeText={setProfessionalEmail}
-                                  placeholder={isRTL ? 'مثال: omar@elnasr-law.com' : 'e.g. omar@elnasr-law.com'}
-                                  keyboardType="email-address"
-                                  autoCapitalize="none"
-                                  editable={!emailOtpVerified}
-                                  style={{
-                                    flex: 1, backgroundColor: C.card, color: emailOtpVerified ? C.muted : C.text,
-                                    borderWidth: 1, borderColor: emailOtpVerified ? C.green : C.border,
-                                    borderRadius: 10, padding: 12, fontSize: 14, textAlign: isRTL ? 'right' : 'left'
-                                  }}
-                                />
-                                {!emailOtpVerified && (
-                                  <TouchableOpacity
-                                    onPress={handleSendEmailOtp}
-                                    disabled={sendingEmailOtp || !professionalEmail.trim()}
-                                    style={{
-                                      backgroundColor: C.gold, paddingHorizontal: 16, justifyContent: 'center',
-                                      borderRadius: 10, opacity: (!professionalEmail.trim() || sendingEmailOtp) ? 0.6 : 1
-                                    }}
-                                  >
-                                    <Text style={{ color: C.bg, fontSize: 13, fontWeight: '700', fontFamily: 'Cairo-Bold' }}>
-                                      {sendingEmailOtp ? (isRTL ? '⏳ جاري...' : '⏳ Sending...') : (isRTL ? 'إرسال الرمز' : 'Send Code')}
-                                    </Text>
-                                  </TouchableOpacity>
-                                )}
-                              </View>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => setVerificationMethod('code')}
+                              style={{
+                                flex: 1, paddingVertical: 8, alignItems: 'center',
+                                backgroundColor: verificationMethod === 'code' ? C.card : 'transparent',
+                                borderRadius: 6
+                              }}
+                            >
+                              <Text style={{ color: verificationMethod === 'code' ? C.gold : C.muted, fontSize: 11, fontFamily: 'Cairo-Bold', fontWeight: 'bold' }}>
+                                {isRTL ? 'كود الدعوة 🔑' : 'Invite Code 🔑'}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
 
-                              {selectedFirm?.website && (
-                                <Text style={{ color: C.muted, fontSize: 11, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>
-                                  {isRTL 
-                                    ? `💡 يجب أن ينتهي بريدك بـ @${selectedFirm.website.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0]}`
-                                    : `💡 Email must end with @${selectedFirm.website.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0]}`}
+                          {verificationMethod === 'email' ? (
+                            hasWebsite ? (
+                              <View style={{ marginBottom: 14 }}>
+                                <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
+                                  {isRTL ? 'البريد الإلكتروني المهني للشركة * 📧' : 'Professional Firm Email * 📧'}
                                 </Text>
-                              )}
-
-                              {emailOtpSent && !emailOtpVerified && (
-                                <View style={{ marginTop: 12 }}>
-                                  <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
-                                    {isRTL ? 'كود التحقق (6 أرقام) * 🔢' : 'Verification Code (6-Digits) * 🔢'}
-                                  </Text>
+                                
+                                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
                                   <TextInput
-                                    value={emailCode}
-                                    onChangeText={handleVerifyEmailOtp}
-                                    placeholder="123456"
-                                    keyboardType="number-pad"
-                                    maxLength={6}
+                                    value={professionalEmail}
+                                    onChangeText={setProfessionalEmail}
+                                    placeholder={isRTL ? 'مثال: omar@elnasr-law.com' : 'e.g. omar@elnasr-law.com'}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    editable={!emailOtpVerified}
                                     style={{
-                                      backgroundColor: C.card, color: C.text, borderWidth: 1, borderColor: C.border,
-                                      borderRadius: 10, padding: 12, fontSize: 16, textAlign: 'center', letterSpacing: 4
+                                      flex: 1, backgroundColor: C.card, color: emailOtpVerified ? C.muted : C.text,
+                                      borderWidth: 1, borderColor: emailOtpVerified ? C.green : C.border,
+                                      borderRadius: 10, padding: 12, fontSize: 14, textAlign: isRTL ? 'right' : 'left'
                                     }}
                                   />
-                                  {verifyingEmailOtp && (
-                                    <Text style={{ color: C.gold, fontSize: 11, marginTop: 6 }}>
-                                      {isRTL ? '⏳ جاري التحقق...' : '⏳ Verifying...'}
-                                    </Text>
+                                  {!emailOtpVerified && (
+                                    <TouchableOpacity
+                                      onPress={handleSendEmailOtp}
+                                      disabled={sendingEmailOtp || !professionalEmail.trim()}
+                                      style={{
+                                        backgroundColor: C.gold, paddingHorizontal: 16, justifyContent: 'center',
+                                        borderRadius: 10, opacity: (!professionalEmail.trim() || sendingEmailOtp) ? 0.6 : 1
+                                      }}
+                                    >
+                                      <Text style={{ color: C.bg, fontSize: 13, fontWeight: '700', fontFamily: 'Cairo-Bold' }}>
+                                        {sendingEmailOtp ? (isRTL ? '⏳ جاري...' : '⏳ Sending...') : (isRTL ? 'إرسال الرمز' : 'Send Code')}
+                                      </Text>
+                                    </TouchableOpacity>
                                   )}
                                 </View>
-                              )}
 
-                              {emailOtpVerified && (
-                                <View style={{
-                                  marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: C.green + '15',
-                                  borderWidth: 1, borderColor: C.green + '30', flexDirection: isRTL ? 'row-reverse' : 'row',
-                                  alignItems: 'center', gap: 6
-                                }}>
-                                  <Ionicons name="checkmark-circle" size={16} color={C.green} />
-                                  <Text style={{ color: C.green, fontSize: 12, fontWeight: '600', fontFamily: 'Cairo-Bold', flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
-                                    {isRTL ? '✓ تم التحقق من الإيميل المهني بنجاح! سيتم ربطك بالشركة وتوثيقك تلقائياً.' : '✓ Email verified! You will be linked and approved.'}
+                                {selectedFirm?.website && (
+                                  <Text style={{ color: C.muted, fontSize: 11, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>
+                                    {isRTL 
+                                      ? `💡 يجب أن ينتهي بريدك بـ @${selectedFirm.website.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0]}`
+                                      : `💡 Email must end with @${selectedFirm.website.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0]}`}
                                   </Text>
-                                </View>
-                              )}
-                            </View>
+                                )}
+
+                                {emailOtpSent && !emailOtpVerified && (
+                                  <View style={{ marginTop: 12 }}>
+                                    <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
+                                      {isRTL ? 'كود التحقق (6 أرقام) * 🔢' : 'Verification Code (6-Digits) * 🔢'}
+                                    </Text>
+                                    <TextInput
+                                      value={emailCode}
+                                      onChangeText={handleVerifyEmailOtp}
+                                      placeholder="123456"
+                                      keyboardType="number-pad"
+                                      maxLength={6}
+                                      style={{
+                                        backgroundColor: C.card, color: C.text, borderWidth: 1, borderColor: C.border,
+                                        borderRadius: 10, padding: 12, fontSize: 16, textAlign: 'center', letterSpacing: 4
+                                      }}
+                                    />
+                                    {verifyingEmailOtp && (
+                                      <Text style={{ color: C.gold, fontSize: 11, marginTop: 6 }}>
+                                        {isRTL ? '⏳ جاري التحقق...' : '⏳ Verifying...'}
+                                      </Text>
+                                    )}
+                                  </View>
+                                )}
+
+                                {emailOtpVerified && (
+                                  <View style={{
+                                    marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: C.green + '15',
+                                    borderWidth: 1, borderColor: C.green + '30', flexDirection: isRTL ? 'row-reverse' : 'row',
+                                    alignItems: 'center', gap: 6
+                                  }}>
+                                    <Ionicons name="checkmark-circle" size={16} color={C.green} />
+                                    <Text style={{ color: C.green, fontSize: 12, fontWeight: '600', fontFamily: 'Cairo-Bold', flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
+                                      {isRTL ? '✓ تم التحقق من الإيميل المهني بنجاح! سيتم ربطك بالشركة وتوثيقك تلقائياً.' : '✓ Email verified! You will be linked and approved.'}
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                            ) : (
+                              <View style={{
+                                marginBottom: 14, padding: 12, borderRadius: 10, backgroundColor: `${C.red}10`,
+                                borderWidth: 1, borderColor: `${C.red}20`
+                              }}>
+                                <Text style={{ color: C.red, fontSize: 12, fontFamily: 'Cairo-Bold', fontWeight: '600', textAlign: isRTL ? 'right' : 'left', lineHeight: 18 }}>
+                                  {isRTL 
+                                    ? '⚠️ لا تملك هذه الشركة موقعاً إلكترونياً مسجلاً للتحقق من البريد الإلكتروني. يرجى استخدام "كود الدعوة" للانضمام.'
+                                    : '⚠️ This firm does not have a registered website for email domain verification. Please use "Invite Code" to join.'}
+                                </Text>
+                              </View>
+                            )
                           ) : (
                             <>
                               {/* Invite Code verification input */}
