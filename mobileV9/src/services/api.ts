@@ -120,6 +120,8 @@ export const firmsAPI = {
   getLawyers: (id: string | number) => api.get(`/firms/${id}/lawyers`),
   create:     (data: { name: string; city?: string; website?: string; phone?: string }) => api.post('/firms', data),
   verifyCode: (code: string) => api.get(`/firms/verify-code/${code}`),
+  sendVerification: (firm_id: string | number, email: string) => api.post('/firms/send-verification', { firm_id, email }),
+  verifyEmailCode:  (email: string, code: string) => api.post('/firms/verify-email-code', { email, code }),
 };
 
 export const bookingsAPI = {

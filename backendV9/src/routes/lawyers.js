@@ -363,12 +363,41 @@ router.post('/me/profile', requireAuth, async (req, res, next) => {
       }
     }
 
-    // Determine firm association & approval based on invite code validation
+    // Determine firm association & approval based on invite code or email verification
     let finalFirmId = firm_id || null;
     let firmApproved = false;
 
     if (practitioner_type === 'firm_member') {
-      if (invite_code) {
+      if (invite_code && invite_code.startsWith('VERIFIED_EMAIL:')) {
+        const verifiedEmail = invite_code.substring('VERIFIED_EMAIL:'.length).trim().toLowerCase();
+        
+        // Check if this email was recently verified in otp_codes
+        const { rows: [otpCheck] } = await pool.query(
+          `SELECT id FROM otp_codes 
+           WHERE phone = $1 AND purpose = 'firm_email_verify' AND used_at IS NOT NULL 
+             AND used_at > NOW() - INTERVAL '30 minutes'
+           LIMIT 1`,
+          [verifiedEmail]
+        );
+        
+        if (otpCheck && finalFirmId) {
+          // Verify domain matches firm website domain
+          const { rows: [firm] } = await pool.query('SELECT website FROM firms WHERE id = $1', [finalFirmId]);
+          if (firm && firm.website) {
+            const cleanFirmDomain = firm.website.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
+            const emailDomain = verifiedEmail.split('@')[1];
+            if (cleanFirmDomain === emailDomain) {
+              firmApproved = true;
+            } else {
+              return res.status(400).json({ message: 'Email domain does not match selected firm website domain.' });
+            }
+          } else {
+            return res.status(400).json({ message: 'Selected firm does not have a website registered.' });
+          }
+        } else {
+          return res.status(400).json({ message: 'Email verification code has expired or not found.' });
+        }
+      } else if (invite_code) {
         const { rows: [matchedFirm] } = await pool.query(
           'SELECT id FROM firms WHERE invite_code = $1',
           [invite_code.toUpperCase().trim()]

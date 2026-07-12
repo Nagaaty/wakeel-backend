@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const pool   = require('../config/db');
+const { sendOTPEmail } = require('../utils/email');
 
 // GET /api/firms - list firms with search/city filters
 router.get('/', async (req, res, next) => {
@@ -178,6 +179,114 @@ router.post('/', async (req, res, next) => {
       [trimmedName, city || 'Cairo', inviteCode]
     );
     res.status(201).json({ firm: insertRes.rows[0], message: 'New firm created successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+function getCleanDomain(url) {
+  if (!url) return '';
+  let domain = url.trim().toLowerCase();
+  domain = domain.replace(/^(https?:\/\/)?(www\.)?/, '');
+  domain = domain.split('/')[0];
+  return domain;
+}
+
+// POST /api/firms/send-verification - send verification code to professional email
+router.post('/send-verification', async (req, res, next) => {
+  try {
+    const { firm_id, email } = req.body;
+    if (!firm_id || !email) {
+      return res.status(400).json({
+        message_en: 'Firm ID and professional email are required.',
+        message: 'معرف الشركة والبريد الإلكتروني المهني مطلوبان.'
+      });
+    }
+
+    const { rows: [firm] } = await pool.query('SELECT * FROM firms WHERE id = $1', [firm_id]);
+    if (!firm) {
+      return res.status(404).json({
+        message_en: 'Law firm not found.',
+        message: 'لم يتم العثور على شركة المحاماة.'
+      });
+    }
+
+    if (!firm.website) {
+      return res.status(400).json({
+        message_en: 'This firm does not have a website registered to verify email domains. Please use invite code or request to join.',
+        message: 'لا تملك هذه الشركة موقعاً إلكترونياً مسجلاً للتحقق من النطاق. يرجى استخدام كود الدعوة أو طلب الانضمام.'
+      });
+    }
+
+    // Extract domains
+    const cleanFirmDomain = getCleanDomain(firm.website);
+    const emailDomain = email.trim().toLowerCase().split('@')[1];
+
+    if (!cleanFirmDomain || cleanFirmDomain !== emailDomain) {
+      return res.status(400).json({
+        message_en: `Your email domain (@${emailDomain}) does not match this firm's website domain (@${cleanFirmDomain}).`,
+        message: `نطاق بريدك الإلكتروني (@${emailDomain}) لا يطابق نطاق موقع الشركة (@${cleanFirmDomain}).`
+      });
+    }
+
+    // Generate 6-digit verification code
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+
+    // Save to otp_codes table
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    await pool.query(
+      `INSERT INTO otp_codes (phone, code, purpose, expires_at) 
+       VALUES ($1, $2, 'firm_email_verify', $3)`,
+      [email.trim().toLowerCase(), code, expiresAt]
+    );
+
+    // Send email using helper
+    await sendOTPEmail({
+      to: email.trim().toLowerCase(),
+      name: firm.name,
+      otp: code,
+      purpose: 'verify'
+    });
+
+    res.json({ success: true, message: 'Verification code sent successfully.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/firms/verify-email-code - verify the 6-digit email code
+router.post('/verify-email-code', async (req, res, next) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({
+        message_en: 'Email and code are required.',
+        message: 'البريد الإلكتروني والرمز مطلوبان.'
+      });
+    }
+
+    const { rows: [otpRecord] } = await pool.query(
+      `SELECT * FROM otp_codes 
+       WHERE phone = $1 AND code = $2 AND purpose = 'firm_email_verify' 
+         AND expires_at > NOW() AND used_at IS NULL
+       ORDER BY created_at DESC LIMIT 1`,
+      [email.trim().toLowerCase(), code.trim()]
+    );
+
+    if (!otpRecord) {
+      return res.status(400).json({
+        message_en: 'Invalid or expired verification code.',
+        message: 'رمز التحقق غير صحيح أو منتهي الصلاحية.'
+      });
+    }
+
+    // Mark as used
+    await pool.query(
+      'UPDATE otp_codes SET used_at = NOW() WHERE id = $1',
+      [otpRecord.id]
+    );
+
+    res.json({ success: true, message: 'Email verified successfully.' });
   } catch (err) {
     next(err);
   }
