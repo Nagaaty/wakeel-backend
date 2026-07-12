@@ -29,6 +29,17 @@ export default function RegisterLawyerScreen() {
   const otpInputs = React.useRef<(TextInput | null)[]>([]);
   const [timeLeft, setTimeLeft] = useState(60);
 
+  const [form, setForm] = useState({
+    name: '', email: '', phone: '', nationalIq: '', password: '',
+    otp: ['', '', '', '', '', ''],
+    syndicateId: '', officeName: '', courtDegree: '',
+    specialization: '', city: 'Cairo', experience: '', fee: '',
+    idPhotoUri: '', idBackUri: '', selfieUri: '',
+    practitioner_type: 'independent', firm_id: null as string | null,
+    invite_code: ''
+  });
+  const updateForm = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
+
   // Firms list state
   const [firmsList, setFirmsList] = useState<any[]>([]);
   const [showFirmDropdown, setShowFirmDropdown] = useState(false);
@@ -169,20 +180,9 @@ export default function RegisterLawyerScreen() {
     }
   };
 
-  const [form, setForm] = useState({
-    name: '', email: '', phone: '', nationalIq: '', password: '',
-    otp: ['', '', '', '', '', ''],
-    syndicateId: '', officeName: '', courtDegree: '',
-    specialization: '', city: 'Cairo', experience: '', fee: '',
-    idPhotoUri: '', idBackUri: '', selfieUri: '',
-    practitioner_type: 'independent', firm_id: null as string | null,
-    invite_code: ''
-  });
   const [verifying, setVerifying] = useState(false);
   const [verifiedAi, setVerifiedAi] = useState(false);
   const [aiText, setAiText] = useState('');
-
-  const updateForm = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
 
   const handleSendUnauthOtp = async () => {
     setLoading(true);
