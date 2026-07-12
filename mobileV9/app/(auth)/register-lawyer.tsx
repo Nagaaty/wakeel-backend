@@ -771,6 +771,7 @@ export default function RegisterLawyerScreen() {
                         </>
                       );
                     })()}
+                  </>
                 ) : (
                   <>
                     <Inp C={C} label={isRTL ? 'اسم الشركة * 🏛️' : 'Firm Name * 🏛️'} value={newFirmName} onChangeText={setNewFirmName} placeholder={isRTL ? 'مثال: شركة النصر للاستشارات القانونية' : 'e.g. El-Nasr Law Firm'} />
