@@ -40,6 +40,7 @@ export default function RegisterLawyerScreen() {
   const [inviteCode, setInviteCode] = useState('');
   const [verifyingCode, setVerifyingCode] = useState(false);
   const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
+  const [requestPendingJoin, setRequestPendingJoin] = useState(false);
   const [newFirmName, setNewFirmName] = useState('');
   const [newFirmWebsite, setNewFirmWebsite] = useState('');
   const [newFirmPhone, setNewFirmPhone] = useState('');
@@ -503,7 +504,7 @@ export default function RegisterLawyerScreen() {
                     )}
 
                     {/* Invite Code verification input */}
-                    <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
+                    <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8, opacity: requestPendingJoin ? 0.5 : 1 }}>
                       {isRTL ? 'كود دعوة الشركة (مطلوب للانضمام) 🔑' : 'Firm Invite Code (Required to Join) 🔑'}
                     </Text>
                     <TextInput
@@ -512,10 +513,12 @@ export default function RegisterLawyerScreen() {
                       placeholder={isRTL ? 'مثال: WAK78A (6 رموز)' : 'e.g. WAK78A (6 chars)'}
                       maxLength={6}
                       autoCapitalize="characters"
+                      editable={!requestPendingJoin}
                       style={{
-                        backgroundColor: C.card, color: C.text, borderWidth: 1,
+                        backgroundColor: C.card, color: requestPendingJoin ? C.muted : C.text, borderWidth: 1,
                         borderColor: inviteCodeValid === true ? C.green : (inviteCodeValid === false ? C.red : C.border),
-                        borderRadius: 10, padding: 12, fontSize: 14, textTransform: 'uppercase'
+                        borderRadius: 10, padding: 12, fontSize: 14, textTransform: 'uppercase',
+                        opacity: requestPendingJoin ? 0.6 : 1
                       }}
                     />
                     <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -536,6 +539,43 @@ export default function RegisterLawyerScreen() {
                         </Text>
                       )}
                     </View>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        const nextVal = !requestPendingJoin;
+                        setRequestPendingJoin(nextVal);
+                        if (nextVal) {
+                          setInviteCode('');
+                          setInviteCodeValid(null);
+                          updateForm('invite_code', '');
+                        }
+                      }}
+                      style={{
+                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginTop: 10,
+                        padding: 10,
+                        borderRadius: 8,
+                        backgroundColor: requestPendingJoin ? C.gold + '10' : 'transparent',
+                        borderWidth: 1,
+                        borderColor: requestPendingJoin ? C.gold + '30' : 'transparent',
+                      }}
+                    >
+                      <View style={{
+                        width: 18, height: 18, borderRadius: 4, borderWidth: 1.5,
+                        borderColor: requestPendingJoin ? C.gold : C.muted,
+                        alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: requestPendingJoin ? C.gold : 'transparent'
+                      }}>
+                        {requestPendingJoin && <Ionicons name="checkmark" size={12} color={C.bg} />}
+                      </View>
+                      <Text style={{ color: C.text, fontSize: 12, fontFamily: 'Cairo-Regular', flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
+                        {isRTL 
+                          ? 'لا أملك كود الدعوة؟ أرسل طلب انضمام للشركة (يتطلب موافقة الإدارة)' 
+                          : "Don't have the invite code? Request to Join (requires admin approval)"}
+                      </Text>
+                    </TouchableOpacity>
                   </>
                 ) : (
                   <>
@@ -626,7 +666,7 @@ export default function RegisterLawyerScreen() {
                 } else {
                   setStep(5);
                 }
-              }} style={{ flex: 2 }} disabled={!form.syndicateId || !form.experience || (form.practitioner_type === 'firm_member' && firmMode === 'join' && (!form.firm_id || inviteCodeValid !== true)) || (form.practitioner_type === 'firm_member' && firmMode === 'create' && !newFirmName.trim()) || loading}>
+              }} style={{ flex: 2 }} disabled={!form.syndicateId || !form.experience || (form.practitioner_type === 'firm_member' && firmMode === 'join' && !form.firm_id) || (form.practitioner_type === 'firm_member' && firmMode === 'join' && !requestPendingJoin && inviteCodeValid !== true) || (form.practitioner_type === 'firm_member' && firmMode === 'create' && !newFirmName.trim()) || loading}>
                 {loading ? (isRTL ? '⏳ جاري المعالجة...' : '⏳ Processing...') : (isRTL ? 'متابعة ←' : 'Continue →')}
               </Btn>
             </View>

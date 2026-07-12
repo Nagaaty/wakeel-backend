@@ -72,6 +72,7 @@ export default function LawyerSetupScreen() {
   const [inviteCode, setInviteCode] = useState('');
   const [verifyingCode, setVerifyingCode] = useState(false);
   const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
+  const [requestPendingJoin, setRequestPendingJoin] = useState(false);
   const [newFirmName, setNewFirmName] = useState('');
   const [newFirmWebsite, setNewFirmWebsite] = useState('');
   const [newFirmPhone, setNewFirmPhone] = useState('');
@@ -144,8 +145,8 @@ export default function LawyerSetupScreen() {
           Alert.alert('', isRTL ? 'يرجى اختيار شركة المحاماة التي تنتمي إليها' : 'Please select the Law Firm you belong to');
           return;
         }
-        if (inviteCodeValid !== true) {
-          Alert.alert('', isRTL ? 'يرجى إدخال كود الدعوة الصحيح للانضمام للشركة' : 'Please enter the correct invite code to join this firm');
+        if (!requestPendingJoin && inviteCodeValid !== true) {
+          Alert.alert('', isRTL ? 'يرجى إدخال كود الدعوة الصحيح للانضمام للشركة أو تفعيل خيار طلب الانضمام' : 'Please enter the correct invite code to join this firm or check the Request to Join option');
           return;
         }
       }
@@ -469,7 +470,7 @@ export default function LawyerSetupScreen() {
                     )}
 
                     {/* Invite Code verification input */}
-                    <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>
+                    <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6, opacity: requestPendingJoin ? 0.5 : 1 }}>
                       {isRTL ? 'كود دعوة الشركة (مطلوب للانضمام) 🔑' : 'Firm Invite Code (Required to Join) 🔑'}
                     </Text>
                     <TextInput
@@ -478,10 +479,12 @@ export default function LawyerSetupScreen() {
                       placeholder={isRTL ? 'مثال: WAK78A (6 رموز)' : 'e.g. WAK78A (6 chars)'}
                       maxLength={6}
                       autoCapitalize="characters"
+                      editable={!requestPendingJoin}
                       style={{
-                        backgroundColor: C.card, color: C.text, borderWidth: 1,
+                        backgroundColor: C.card, color: requestPendingJoin ? C.muted : C.text, borderWidth: 1,
                         borderColor: inviteCodeValid === true ? C.green : (inviteCodeValid === false ? C.red : C.border),
-                        borderRadius: 10, padding: 12, fontSize: 14, textTransform: 'uppercase', marginBottom: 12
+                        borderRadius: 10, padding: 12, fontSize: 14, textTransform: 'uppercase', marginBottom: 12,
+                        opacity: requestPendingJoin ? 0.6 : 1
                       }}
                     />
                     <View style={{ marginTop: -6, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -497,6 +500,43 @@ export default function LawyerSetupScreen() {
                         </Text>
                       )}
                     </View>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        const nextVal = !requestPendingJoin;
+                        setRequestPendingJoin(nextVal);
+                        if (nextVal) {
+                          setInviteCode('');
+                          setInviteCodeValid(null);
+                          updP('invite_code', '');
+                        }
+                      }}
+                      style={{
+                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginBottom: 16,
+                        padding: 10,
+                        borderRadius: 8,
+                        backgroundColor: requestPendingJoin ? C.gold + '10' : 'transparent',
+                        borderWidth: 1,
+                        borderColor: requestPendingJoin ? C.gold + '30' : 'transparent',
+                      }}
+                    >
+                      <View style={{
+                        width: 18, height: 18, borderRadius: 4, borderWidth: 1.5,
+                        borderColor: requestPendingJoin ? C.gold : C.muted,
+                        alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: requestPendingJoin ? C.gold : 'transparent'
+                      }}>
+                        {requestPendingJoin && <Ionicons name="checkmark" size={12} color={C.bg} />}
+                      </View>
+                      <Text style={{ color: C.text, fontSize: 12, fontFamily: 'Cairo-Regular', flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
+                        {isRTL 
+                          ? 'لا أملك كود الدعوة؟ أرسل طلب انضمام للشركة (يتطلب موافقة الإدارة)' 
+                          : "Don't have the invite code? Request to Join (requires admin approval)"}
+                      </Text>
+                    </TouchableOpacity>
                   </>
                 ) : (
                   <>
