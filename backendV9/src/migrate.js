@@ -311,6 +311,14 @@ const MIGRATIONS = [
       `UPDATE lawyer_profiles SET firm_approved = true WHERE firm_id IS NOT NULL`
     ]
   },
+
+  {
+    version: '019_firm_bar_registration',
+    sql: [
+      `ALTER TABLE firms ADD COLUMN IF NOT EXISTS bar_registration_number VARCHAR(100)`,
+      `ALTER TABLE firms ADD COLUMN IF NOT EXISTS document_url VARCHAR(255)`
+    ]
+  },
 ];
 
 // ─── Runner ────────────────────────────────────────────────────────────────

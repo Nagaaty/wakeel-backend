@@ -1,5 +1,7 @@
+import * as DocumentPicker from 'expo-document-picker';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput, Alert, Modal, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useDispatch } from 'react-redux';
@@ -56,61 +58,48 @@ export default function RegisterLawyerScreen() {
   const [newFirmWebsite, setNewFirmWebsite] = useState('');
   const [newFirmPhone, setNewFirmPhone] = useState('');
 
-  const [verificationMethod, setVerificationMethod] = useState<'email' | 'code'>('email');
-  const [professionalEmail, setProfessionalEmail] = useState('');
-  const [emailCode, setEmailCode] = useState('');
-  const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
-  const [verifyingEmailOtp, setVerifyingEmailOtp] = useState(false);
-  const [emailOtpSent, setEmailOtpSent] = useState(false);
-  const [emailOtpVerified, setEmailOtpVerified] = useState(false);
+  // New firm B2B verification states
+  const [newFirmBarReg, setNewFirmBarReg] = useState('');
+  const [newFirmDocUrl, setNewFirmDocUrl] = useState('');
+  const [uploadingFirmDoc, setUploadingFirmDoc] = useState(false);
+  const [uploadedDocName, setUploadedDocName] = useState('');
 
   React.useEffect(() => {
     if (form.firm_id) {
-      setVerificationMethod('email');
-      setEmailOtpSent(false);
-      setEmailOtpVerified(false);
       setInviteCodeValid(null);
       setInviteCode('');
-      setProfessionalEmail('');
-      setEmailCode('');
       setRequestPendingJoin(false);
     }
   }, [form.firm_id]);
 
-  const handleSendEmailOtp = async () => {
-    if (!form.firm_id || !professionalEmail.trim()) return;
-    setSendingEmailOtp(true);
+  const pickFirmDoc = async () => {
     try {
-      await firmsAPI.sendVerification(form.firm_id, professionalEmail.trim());
-      setEmailOtpSent(true);
-      Alert.alert(
-        isRTL ? 'تم الإرسال' : 'Sent',
-        isRTL ? 'تم إرسال رمز التحقق إلى بريدك الإلكتروني المهني.' : 'Verification code sent to your professional email.'
-      );
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*'],
+        copyToCacheDirectory: true
+      });
+      if (res.canceled) return;
+      const file = res.assets[0];
+      setUploadingFirmDoc(true);
+      const formData = new FormData();
+      formData.append('file', {
+        uri: file.uri,
+        name: file.name,
+        type: file.mimeType || 'application/octet-stream'
+      } as any);
+      formData.append('folder', 'firm_verification');
+      formData.append('doc_type', 'firm_license');
+      
+      const uploadRes: any = await uploadAPI.upload(formData);
+      setNewFirmDocUrl(uploadRes.url || uploadRes.file?.url);
+      setUploadedDocName(file.name);
+      Alert.alert('✅', isRTL ? 'تم رفع المستند بنجاح!' : 'Document uploaded successfully!');
     } catch (e: any) {
-      const err = isRTL ? (e?.message || e?.message_ar) : (e?.message_en || e?.message);
-      Alert.alert(isRTL ? 'خطأ' : 'Error', err || (isRTL ? 'فشل إرسال الرمز' : 'Failed to send code'));
-    } finally {
-      setSendingEmailOtp(false);
-    }
-  };
-
-  const handleVerifyEmailOtp = async (code: string) => {
-    setEmailCode(code);
-    if (code.length === 6) {
-      setVerifyingEmailOtp(true);
-      try {
-        await firmsAPI.verifyEmailCode(professionalEmail.trim(), code);
-        setEmailOtpVerified(true);
-        setInviteCodeValid(true);
-        updateForm('invite_code', 'VERIFIED_EMAIL:' + professionalEmail.trim());
-      } catch (e: any) {
-        const err = isRTL ? (e?.message || e?.message_ar) : (e?.message_en || e?.message);
-        Alert.alert(isRTL ? 'خطأ' : 'Error', err || (isRTL ? 'كود التحقق غير صحيح' : 'Invalid code'));
-        setInviteCodeValid(false);
-      } finally {
-        setVerifyingEmailOtp(false);
+      if (!e?.message?.includes('cancel')) {
+        Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'تعذر رفع الملف' : 'Upload failed'));
       }
+    } finally {
+      setUploadingFirmDoc(false);
     }
   };
 
@@ -567,207 +556,79 @@ export default function RegisterLawyerScreen() {
                       return (
                         <>
                           {/* Verification Method Selection */}
-                          <View style={{
-                            flexDirection: 'row', backgroundColor: C.bg, padding: 3, borderRadius: 8,
-                            marginBottom: 16, borderWidth: 1, borderColor: C.border
-                          }}>
-                            <TouchableOpacity
-                              onPress={() => setVerificationMethod('email')}
-                              style={{
-                                flex: 1, paddingVertical: 8, alignItems: 'center',
-                                backgroundColor: verificationMethod === 'email' ? C.card : 'transparent',
-                                borderRadius: 6
-                              }}
-                            >
-                              <Text style={{ color: verificationMethod === 'email' ? C.gold : C.muted, fontSize: 11, fontFamily: 'Cairo-Bold', fontWeight: 'bold' }}>
-                                {isRTL ? 'إيميل الشركة المهني 📧' : 'Work Email 📧'}
+                          {/* Invite Code verification input */}
+                          <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8, opacity: requestPendingJoin ? 0.5 : 1 }}>
+                            {isRTL ? 'كود دعوة الشركة (مطلوب للانضمام) 🔑' : 'Firm Invite Code (Required to Join) 🔑'}
+                          </Text>
+                          <TextInput
+                            value={inviteCode}
+                            onChangeText={handleVerifyInviteCode}
+                            placeholder={isRTL ? 'مثال: WAK78A (6 رموز)' : 'e.g. WAK78A (6 chars)'}
+                            maxLength={6}
+                            autoCapitalize="characters"
+                            editable={!requestPendingJoin}
+                            style={{
+                              backgroundColor: C.card, color: requestPendingJoin ? C.muted : C.text, borderWidth: 1,
+                              borderColor: inviteCodeValid === true ? C.green : (inviteCodeValid === false ? C.red : C.border),
+                              borderRadius: 10, padding: 12, fontSize: 14, textTransform: 'uppercase',
+                              opacity: requestPendingJoin ? 0.6 : 1
+                            }}
+                          />
+                          <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            {verifyingCode && <Text style={{ color: C.gold, fontSize: 11 }}>{isRTL ? '⏳ جاري التحقق من الكود...' : '⏳ Verifying code...'}</Text>}
+                            {!verifyingCode && inviteCodeValid === true && (
+                              <Text style={{ color: C.green, fontSize: 11, fontWeight: '600' }}>
+                                {isRTL ? '✓ تم التحقق بنجاح!' : '✓ Verification successful!'}
                               </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => setVerificationMethod('code')}
-                              style={{
-                                flex: 1, paddingVertical: 8, alignItems: 'center',
-                                backgroundColor: verificationMethod === 'code' ? C.card : 'transparent',
-                                borderRadius: 6
-                              }}
-                            >
-                              <Text style={{ color: verificationMethod === 'code' ? C.gold : C.muted, fontSize: 11, fontFamily: 'Cairo-Bold', fontWeight: 'bold' }}>
-                                {isRTL ? 'كود الدعوة 🔑' : 'Invite Code 🔑'}
+                            )}
+                            {!verifyingCode && inviteCodeValid === false && (
+                              <Text style={{ color: C.red, fontSize: 11, fontWeight: '600' }}>
+                                {isRTL ? '❌ كود غير صحيح. يرجى إدخال الكود الصحيح للمتابعة.' : '❌ Invalid code. Please enter the correct code to proceed.'}
                               </Text>
-                            </TouchableOpacity>
+                            )}
+                            {!verifyingCode && inviteCodeValid === null && inviteCode.length > 0 && inviteCode.length < 6 && (
+                              <Text style={{ color: C.muted, fontSize: 11 }}>
+                                {isRTL ? 'أدخل كود الدعوة المكون من 6 رموز للتنشيط الفوري' : 'Enter 6-char code for instant activation'}
+                              </Text>
+                            )}
                           </View>
 
-                          {verificationMethod === 'email' ? (
-                            hasWebsite ? (
-                              <View style={{ marginBottom: 14 }}>
-                                <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
-                                  {isRTL ? 'البريد الإلكتروني المهني للشركة * 📧' : 'Professional Firm Email * 📧'}
-                                </Text>
-                                
-                                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
-                                  <TextInput
-                                    value={professionalEmail}
-                                    onChangeText={setProfessionalEmail}
-                                    placeholder={isRTL ? 'مثال: omar@elnasr-law.com' : 'e.g. omar@elnasr-law.com'}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                    editable={!emailOtpVerified}
-                                    style={{
-                                      flex: 1, backgroundColor: C.card, color: emailOtpVerified ? C.muted : C.text,
-                                      borderWidth: 1, borderColor: emailOtpVerified ? C.green : C.border,
-                                      borderRadius: 10, padding: 12, fontSize: 14, textAlign: isRTL ? 'right' : 'left'
-                                    }}
-                                  />
-                                  {!emailOtpVerified && (
-                                    <TouchableOpacity
-                                      onPress={handleSendEmailOtp}
-                                      disabled={sendingEmailOtp || !professionalEmail.trim()}
-                                      style={{
-                                        backgroundColor: C.gold, paddingHorizontal: 16, justifyContent: 'center',
-                                        borderRadius: 10, opacity: (!professionalEmail.trim() || sendingEmailOtp) ? 0.6 : 1
-                                      }}
-                                    >
-                                      <Text style={{ color: C.bg, fontSize: 13, fontWeight: '700', fontFamily: 'Cairo-Bold' }}>
-                                        {sendingEmailOtp ? (isRTL ? '⏳ جاري...' : '⏳ Sending...') : (isRTL ? 'إرسال الرمز' : 'Send Code')}
-                                      </Text>
-                                    </TouchableOpacity>
-                                  )}
-                                </View>
-
-                                {selectedFirm?.website && (
-                                  <Text style={{ color: C.muted, fontSize: 11, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>
-                                    {isRTL 
-                                      ? `💡 يجب أن ينتهي بريدك بـ @${selectedFirm.website.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0]}`
-                                      : `💡 Email must end with @${selectedFirm.website.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0]}`}
-                                  </Text>
-                                )}
-
-                                {emailOtpSent && !emailOtpVerified && (
-                                  <View style={{ marginTop: 12 }}>
-                                    <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
-                                      {isRTL ? 'كود التحقق (6 أرقام) * 🔢' : 'Verification Code (6-Digits) * 🔢'}
-                                    </Text>
-                                    <TextInput
-                                      value={emailCode}
-                                      onChangeText={handleVerifyEmailOtp}
-                                      placeholder="123456"
-                                      keyboardType="number-pad"
-                                      maxLength={6}
-                                      style={{
-                                        backgroundColor: C.card, color: C.text, borderWidth: 1, borderColor: C.border,
-                                        borderRadius: 10, padding: 12, fontSize: 16, textAlign: 'center', letterSpacing: 4
-                                      }}
-                                    />
-                                    {verifyingEmailOtp && (
-                                      <Text style={{ color: C.gold, fontSize: 11, marginTop: 6 }}>
-                                        {isRTL ? '⏳ جاري التحقق...' : '⏳ Verifying...'}
-                                      </Text>
-                                    )}
-                                  </View>
-                                )}
-
-                                {emailOtpVerified && (
-                                  <View style={{
-                                    marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: C.green + '15',
-                                    borderWidth: 1, borderColor: C.green + '30', flexDirection: isRTL ? 'row-reverse' : 'row',
-                                    alignItems: 'center', gap: 6
-                                  }}>
-                                    <Ionicons name="checkmark-circle" size={16} color={C.green} />
-                                    <Text style={{ color: C.green, fontSize: 12, fontWeight: '600', fontFamily: 'Cairo-Bold', flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
-                                      {isRTL ? '✓ تم التحقق من الإيميل المهني بنجاح! سيتم ربطك بالشركة وتوثيقك تلقائياً.' : '✓ Email verified! You will be linked and approved.'}
-                                    </Text>
-                                  </View>
-                                )}
-                              </View>
-                            ) : (
-                              <View style={{
-                                marginBottom: 14, padding: 12, borderRadius: 10, backgroundColor: `${C.red}10`,
-                                borderWidth: 1, borderColor: `${C.red}20`
-                              }}>
-                                <Text style={{ color: C.red, fontSize: 12, fontFamily: 'Cairo-Bold', fontWeight: '600', textAlign: isRTL ? 'right' : 'left', lineHeight: 18 }}>
-                                  {isRTL 
-                                    ? '⚠️ لا تملك هذه الشركة موقعاً إلكترونياً مسجلاً للتحقق من البريد الإلكتروني. يرجى استخدام "كود الدعوة" للانضمام.'
-                                    : '⚠️ This firm does not have a registered website for email domain verification. Please use "Invite Code" to join.'}
-                                </Text>
-                              </View>
-                            )
-                          ) : (
-                            <>
-                              {/* Invite Code verification input */}
-                              <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8, opacity: requestPendingJoin ? 0.5 : 1 }}>
-                                {isRTL ? 'كود دعوة الشركة (مطلوب للانضمام) 🔑' : 'Firm Invite Code (Required to Join) 🔑'}
-                              </Text>
-                              <TextInput
-                                value={inviteCode}
-                                onChangeText={handleVerifyInviteCode}
-                                placeholder={isRTL ? 'مثال: WAK78A (6 رموز)' : 'e.g. WAK78A (6 chars)'}
-                                maxLength={6}
-                                autoCapitalize="characters"
-                                editable={!requestPendingJoin}
-                                style={{
-                                  backgroundColor: C.card, color: requestPendingJoin ? C.muted : C.text, borderWidth: 1,
-                                  borderColor: inviteCodeValid === true ? C.green : (inviteCodeValid === false ? C.red : C.border),
-                                  borderRadius: 10, padding: 12, fontSize: 14, textTransform: 'uppercase',
-                                  opacity: requestPendingJoin ? 0.6 : 1
-                                }}
-                              />
-                              <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                {verifyingCode && <Text style={{ color: C.gold, fontSize: 11 }}>{isRTL ? '⏳ جاري التحقق من الكود...' : '⏳ Verifying code...'}</Text>}
-                                {!verifyingCode && inviteCodeValid === true && (
-                                  <Text style={{ color: C.green, fontSize: 11, fontWeight: '600' }}>
-                                    {isRTL ? '✓ تم التحقق بنجاح!' : '✓ Verification successful!'}
-                                  </Text>
-                                )}
-                                {!verifyingCode && inviteCodeValid === false && (
-                                  <Text style={{ color: C.red, fontSize: 11, fontWeight: '600' }}>
-                                    {isRTL ? '❌ كود غير صحيح. يرجى إدخال الكود الصحيح للمتابعة.' : '❌ Invalid code. Please enter the correct code to proceed.'}
-                                  </Text>
-                                )}
-                                {!verifyingCode && inviteCodeValid === null && inviteCode.length > 0 && inviteCode.length < 6 && (
-                                  <Text style={{ color: C.muted, fontSize: 11 }}>
-                                    {isRTL ? 'أدخل كود الدعوة المكون من 6 رموز للتنشيط الفوري' : 'Enter 6-char code for instant activation'}
-                                  </Text>
-                                )}
-                              </View>
-
-                              <TouchableOpacity
-                                onPress={() => {
-                                  const nextVal = !requestPendingJoin;
-                                  setRequestPendingJoin(nextVal);
-                                  if (nextVal) {
-                                    setInviteCode('');
-                                    setInviteCodeValid(null);
-                                    updateForm('invite_code', '');
-                                  }
-                                }}
-                                style={{
-                                  flexDirection: isRTL ? 'row-reverse' : 'row',
-                                  alignItems: 'center',
-                                  gap: 8,
-                                  marginTop: 10,
-                                  padding: 10,
-                                  borderRadius: 8,
-                                  backgroundColor: requestPendingJoin ? C.gold + '10' : 'transparent',
-                                  borderWidth: 1,
-                                  borderColor: requestPendingJoin ? C.gold + '30' : 'transparent',
-                                }}
-                              >
-                                <View style={{
-                                  width: 18, height: 18, borderRadius: 4, borderWidth: 1.5,
-                                  borderColor: requestPendingJoin ? C.gold : C.muted,
-                                  alignItems: 'center', justifyContent: 'center',
-                                  backgroundColor: requestPendingJoin ? C.gold : 'transparent'
-                                }}>
-                                  {requestPendingJoin && <Ionicons name="checkmark" size={12} color={C.bg} />}
-                                </View>
-                                <Text style={{ color: C.text, fontSize: 12, fontFamily: 'Cairo-Regular', flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
-                                  {isRTL 
-                                    ? 'لا أملك كود الدعوة؟ أرسل طلب انضمام للشركة (يتطلب موافقة الإدارة)' 
-                                    : "Don't have the invite code? Request to Join (requires admin approval)"}
-                                </Text>
-                              </TouchableOpacity>
-                            </>
-                          )}
+                          <TouchableOpacity
+                            onPress={() => {
+                              const nextVal = !requestPendingJoin;
+                              setRequestPendingJoin(nextVal);
+                              if (nextVal) {
+                                setInviteCode('');
+                                setInviteCodeValid(null);
+                                updateForm('invite_code', '');
+                              }
+                            }}
+                            style={{
+                              flexDirection: isRTL ? 'row-reverse' : 'row',
+                              alignItems: 'center',
+                              gap: 8,
+                              marginTop: 10,
+                              padding: 10,
+                              borderRadius: 8,
+                              backgroundColor: requestPendingJoin ? C.gold + '10' : 'transparent',
+                              borderWidth: 1,
+                              borderColor: requestPendingJoin ? C.gold + '30' : 'transparent',
+                            }}
+                          >
+                            <View style={{
+                              width: 18, height: 18, borderRadius: 4, borderWidth: 1.5,
+                              borderColor: requestPendingJoin ? C.gold : C.muted,
+                              alignItems: 'center', justifyContent: 'center',
+                              backgroundColor: requestPendingJoin ? C.gold : 'transparent'
+                            }}>
+                              {requestPendingJoin && <Ionicons name="checkmark" size={12} color={C.bg} />}
+                            </View>
+                            <Text style={{ color: C.text, fontSize: 12, fontFamily: 'Cairo-Regular', flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
+                              {isRTL 
+                                ? 'لا أملك كود الدعوة؟ أرسل طلب انضمام للشركة (يتطلب موافقة الإدارة)' 
+                                : "Don't have the invite code? Request to Join (requires admin approval)"}
+                            </Text>
+                          </TouchableOpacity>
                         </>
                       );
                     })()}
@@ -775,6 +636,29 @@ export default function RegisterLawyerScreen() {
                 ) : (
                   <>
                     <Inp C={C} label={isRTL ? 'اسم الشركة * 🏛️' : 'Firm Name * 🏛️'} value={newFirmName} onChangeText={setNewFirmName} placeholder={isRTL ? 'مثال: شركة النصر للاستشارات القانونية' : 'e.g. El-Nasr Law Firm'} />
+                    
+                    <Inp C={C} label={isRTL ? 'رقم قيد النقابة للشركة * 🏛️' : 'Bar Association Firm Registration Number * 🏛️'} value={newFirmBarReg} onChangeText={setNewFirmBarReg} placeholder={isRTL ? 'رقم قيد الشركة بالنقابة' : 'Firm Registration No.'} keyboardType="number-pad" />
+                    
+                    <Text style={{ color: C.text, fontSize: 13, fontWeight: '600', marginBottom: 8 }}>
+                      {isRTL ? 'صورة ترخيص الشركة / عقد التأسيس (اختياري) 📄' : 'Firm License Copy / Association Contract (Optional) 📄'}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={pickFirmDoc}
+                      disabled={uploadingFirmDoc}
+                      style={{
+                        backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
+                        borderRadius: 10, padding: 14, marginBottom: 16, alignItems: 'center',
+                        flexDirection: 'row', justifyContent: 'center', gap: 8
+                      }}
+                    >
+                      <Ionicons name="cloud-upload-outline" size={20} color={C.gold} />
+                      <Text style={{ color: C.gold, fontFamily: 'Cairo-Bold', fontWeight: 'bold' }}>
+                        {uploadingFirmDoc 
+                          ? (isRTL ? '⏳ جاري الرفع...' : '⏳ Uploading...') 
+                          : (uploadedDocName ? `${uploadedDocName} (✓)` : (isRTL ? 'اختر مستند...' : 'Choose document...'))}
+                      </Text>
+                    </TouchableOpacity>
+
                     <Inp C={C} label={isRTL ? 'موقع الشركة الإلكتروني (اختياري) 🌐' : 'Firm Website (Optional) 🌐'} value={newFirmWebsite} onChangeText={setNewFirmWebsite} placeholder="https://example.com" keyboardType="url" autoCapitalize="none" />
                     <Inp C={C} label={isRTL ? 'هاتف الشركة (اختياري) 📞' : 'Firm Phone (Optional) 📞'} value={newFirmPhone} onChangeText={setNewFirmPhone} placeholder="02XXXXXXXX" keyboardType="phone-pad" />
                     
@@ -785,8 +669,8 @@ export default function RegisterLawyerScreen() {
                       <Text style={{ fontSize: 16 }}>ℹ️</Text>
                       <Text style={{ flex: 1, color: C.muted, fontSize: 11, lineHeight: 16 }}>
                         {isRTL 
-                          ? 'تنبيه: سيتم تسجيل الشركة كـ "غير موثقة" في النظام بانتظار مراجعة الإدارة. بعد إنشائها ستحصل على كود دعوة لمشاركته مع زملائك.'
-                          : 'Note: The firm will be created as "Unverified" pending admin review. You will receive a join code to share with your colleagues.'}
+                          ? 'تنبيه: سيتم تسجيل الشركة كـ "غير موثقة" في النظام بانتظار مراجعة الإدارة ومستندات الترخيص. بعد إنشائها ستحصل على كود دعوة لمشاركته مع زملائك.'
+                          : 'Note: The firm will be created as "Unverified" pending admin review of the registration documents. You will receive a join code to share with your colleagues.'}
                       </Text>
                     </View>
                   </>
@@ -835,13 +719,19 @@ export default function RegisterLawyerScreen() {
                     Alert.alert(isRTL ? 'تنبيه' : 'Alert', isRTL ? 'يرجى إدخال اسم الشركة' : 'Please enter the firm name');
                     return;
                   }
+                  if (!newFirmBarReg.trim()) {
+                    Alert.alert(isRTL ? 'تنبيه' : 'Alert', isRTL ? 'يرجى إدخال رقم قيد الشركة بالنقابة' : 'Please enter the firm Bar registration number');
+                    return;
+                  }
                   setLoading(true);
                   try {
                     const res: any = await firmsAPI.create({
                       name: newFirmName.trim(),
                       city: form.city || 'Cairo',
                       website: newFirmWebsite.trim() || undefined,
-                      phone: newFirmPhone.trim() || undefined
+                      phone: newFirmPhone.trim() || undefined,
+                      bar_registration_number: newFirmBarReg.trim(),
+                      document_url: newFirmDocUrl || undefined
                     });
                     const newFirm = res.firm;
                     if (newFirm) {
@@ -861,7 +751,7 @@ export default function RegisterLawyerScreen() {
                 } else {
                   setStep(5);
                 }
-              }} style={{ flex: 2 }} disabled={!form.syndicateId || !form.experience || (form.practitioner_type === 'firm_member' && firmMode === 'join' && !form.firm_id) || (form.practitioner_type === 'firm_member' && firmMode === 'join' && !requestPendingJoin && inviteCodeValid !== true) || (form.practitioner_type === 'firm_member' && firmMode === 'create' && !newFirmName.trim()) || loading}>
+              }} style={{ flex: 2 }} disabled={!form.syndicateId || !form.experience || (form.practitioner_type === 'firm_member' && firmMode === 'join' && !form.firm_id) || (form.practitioner_type === 'firm_member' && firmMode === 'join' && !requestPendingJoin && inviteCodeValid !== true) || (form.practitioner_type === 'firm_member' && firmMode === 'create' && (!newFirmName.trim() || !newFirmBarReg.trim())) || loading}>
                 {loading ? (isRTL ? '⏳ جاري المعالجة...' : '⏳ Processing...') : (isRTL ? 'متابعة ←' : 'Continue →')}
               </Btn>
             </View>

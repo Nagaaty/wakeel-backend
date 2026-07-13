@@ -150,9 +150,15 @@ router.get('/verify-code/:code', async (req, res, next) => {
 // POST /api/firms - create/register a new firm on the fly (unverified by default)
 router.post('/', async (req, res, next) => {
   try {
-    const { name, city } = req.body;
+    const { name, city, bar_registration_number, document_url } = req.body;
     if (!name) {
       return res.status(400).json({ message: 'Firm name is required' });
+    }
+    if (!bar_registration_number) {
+      return res.status(400).json({
+        message_en: 'Bar Association registration number is required to register a new firm.',
+        message: 'رقم قيد النقابة للشركة مطلوب لتسجيل شركة جديدة.'
+      });
     }
 
     const trimmedName = name.trim();
@@ -175,8 +181,9 @@ router.post('/', async (req, res, next) => {
     }
 
     const insertRes = await pool.query(
-      `INSERT INTO firms (name, city, is_verified, invite_code) VALUES ($1, $2, false, $3) RETURNING *`,
-      [trimmedName, city || 'Cairo', inviteCode]
+      `INSERT INTO firms (name, city, is_verified, invite_code, bar_registration_number, document_url) 
+       VALUES ($1, $2, false, $3, $4, $5) RETURNING *`,
+      [trimmedName, city || 'Cairo', inviteCode, bar_registration_number.trim(), document_url || null]
     );
     res.status(201).json({ firm: insertRes.rows[0], message: 'New firm created successfully' });
   } catch (err) {
