@@ -274,22 +274,53 @@ router.post('/send-otp', requireAuth, async (req, res, next) => {
 router.post('/send-otp-public', async (req, res, next) => {
   try {
     const { phone, email, purpose = 'verify' } = req.body;
-    const target = email || phone;
+    const target = email ? email.toLowerCase().trim() : (phone ? phone.trim() : null);
     if (!target) return res.status(400).json({ message: 'phone or email required' });
+
+    // Early duplicate check for registration
+    if (purpose === 'verify') {
+      if (email) {
+        const { rows: [existingEmail] } = await pool.query(
+          'SELECT id FROM users WHERE email=$1 AND deleted_at IS NULL',
+          [email.toLowerCase().trim()]
+        );
+        if (existingEmail) {
+          return res.status(409).json({
+            message_en: 'Email is already registered. Please login instead.',
+            message: 'البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول بدلاً من ذلك.'
+          });
+        }
+      }
+      if (phone) {
+        const { rows: [existingPhone] } = await pool.query(
+          'SELECT id FROM users WHERE phone=$1 AND deleted_at IS NULL',
+          [phone.trim()]
+        );
+        if (existingPhone) {
+          return res.status(409).json({
+            message_en: 'Phone number is already registered. Please login instead.',
+            message: 'رقم الهاتف مسجل بالفعل. يرجى تسجيل الدخول بدلاً من ذلك.'
+          });
+        }
+      }
+    }
+
+    const channel = email ? 'email' : 'phone';
     let result;
     if (email) {
-      result = await sendEmailOTP(email, 'Wakeel User', null, purpose);
+      result = await sendEmailOTP(email.toLowerCase().trim(), 'Wakeel User', null, purpose);
     } else {
       result = await sendPhoneOTP(target, null, purpose);
     }
+
     if (result?.skipped) {
       const { rows: [otp] } = await pool.query(
         `SELECT code FROM otp_codes WHERE phone=$1 AND purpose=$2 AND used_at IS NULL ORDER BY created_at DESC LIMIT 1`,
         [target, purpose]
       );
-      return res.json({ ok: true, message: 'OTP sent (dev mode)', devOtp: otp?.code });
+      return res.json({ ok: true, channel, target, message: 'OTP sent (dev mode)', devOtp: otp?.code });
     }
-    res.json({ ok: true, message: 'OTP sent' });
+    res.json({ ok: true, channel, target, message: 'OTP sent' });
   } catch (err) { next(err); }
 });
 

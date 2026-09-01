@@ -63,6 +63,7 @@ export default function RegisterLawyerScreen() {
   const [newFirmDocUrl, setNewFirmDocUrl] = useState('');
   const [uploadingFirmDoc, setUploadingFirmDoc] = useState(false);
   const [uploadedDocName, setUploadedDocName] = useState('');
+  const [otpChannel, setOtpChannel] = useState<'email' | 'phone'>('email');
 
   React.useEffect(() => {
     if (form.firm_id) {
@@ -172,13 +173,17 @@ export default function RegisterLawyerScreen() {
     setLoading(true);
     try {
       const res: any = await authAPI.sendOtpPublic({ phone: form.phone, email: form.email, purpose: 'verify' });
+      if (res?.channel) {
+        setOtpChannel(res.channel);
+      }
       setStep(3);
       // Dev mode: if email not configured, show OTP in alert
       if (res?.devOtp) {
         Alert.alert('🔐 Dev OTP', `Email not configured on server.\nYour code is: ${res.devOtp}`, [{ text: 'OK' }]);
       }
     } catch(e: any) {
-      Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'تعذر إرسال الرمز' : 'Could not send OTP'));
+      const msg = isRTL ? (e?.message || e?.message_ar) : (e?.message_en || e?.message);
+      Alert.alert(isRTL ? 'تنبيه' : 'Alert', msg || (isRTL ? 'تعذر إرسال الرمز' : 'Could not send OTP'));
     } finally { setLoading(false); }
   };
 
@@ -195,11 +200,13 @@ export default function RegisterLawyerScreen() {
   const handleResendOtp = async () => {
     setLoading(true);
     try {
-      await authAPI.sendOtpPublic({ phone: form.phone, email: form.email, purpose: 'verify' });
+      const res: any = await authAPI.sendOtpPublic({ phone: form.phone, email: form.email, purpose: 'verify' });
+      if (res?.channel) setOtpChannel(res.channel);
       setTimeLeft(60); // Reset timer
       Alert.alert(isRTL ? 'نجاح' : 'Success', isRTL ? 'تم إعادة إرسال الرمز بنجاح' : 'OTP resent successfully');
     } catch(e: any) {
-      Alert.alert(isRTL ? 'خطأ' : 'Error', e?.message || (isRTL ? 'تعذر إعادة الإرسال' : 'Could not resend OTP'));
+      const msg = isRTL ? (e?.message || e?.message_ar) : (e?.message_en || e?.message);
+      Alert.alert(isRTL ? 'خطأ' : 'Error', msg || (isRTL ? 'تعذر إعادة الإرسال' : 'Could not resend OTP'));
     } finally {
       setLoading(false);
     }
@@ -248,8 +255,8 @@ export default function RegisterLawyerScreen() {
   };
 
   const TITLES: Record<number, string> = isRTL
-    ? { 2: 'المعلومات الأساسية', 3: 'تحقق الهاتف', 4: 'البيانات المهنية', 5: 'التحقق من الهوية', 6: 'التحقق والإرسال' }
-    : { 2: 'Basic Information', 3: 'Phone Verification', 4: 'Professional Details', 5: 'Identity Verification', 6: 'Review & Submit' };
+    ? { 2: 'المعلومات الأساسية', 3: 'تحقق الهوية والرمز', 4: 'البيانات المهنية', 5: 'التحقق من الهوية', 6: 'التحقق والإرسال' }
+    : { 2: 'Basic Information', 3: 'Verification & OTP', 4: 'Professional Details', 5: 'Identity Verification', 6: 'Review & Submit' };
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: C.bg }}>
@@ -258,46 +265,40 @@ export default function RegisterLawyerScreen() {
         {/* Header */}
         <View style={{ alignItems: 'center', marginBottom: 24 }}>
           <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <View style={{ width: 24 }} />
-            <Text style={{ fontSize: 36 }}>⚖️</Text>
-            <TouchableOpacity onPress={() => router.back()} style={{ width: 24, alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 24, color: C.text }}>×</Text>
+            <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: C.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border }}>
+              <Text style={{ color: C.text, fontSize: 18 }}>✕</Text>
             </TouchableOpacity>
+            <Text style={{ color: C.gold, fontSize: 14, fontWeight: '700', fontFamily: 'Cairo-Bold' }}>
+              {isRTL ? `الخطوة ${step} من 5` : `Step ${step} of 5`}
+            </Text>
           </View>
-          <Text style={{ fontSize: 26, fontWeight: '800', color: C.text, fontFamily: 'Cairo-Bold', marginBottom: 8 }}>
+          <Text style={{ fontSize: 24, fontWeight: '800', color: C.text, fontFamily: 'Cairo-Bold' }}>
             {isRTL ? 'انضم إلى وكيل' : 'Join Wakeel'}
           </Text>
-          <Text style={{ color: C.muted, fontSize: 13 }}>
-            {isRTL ? `الخطوة ${step} من 5 — ${TITLES[step]}` : `Step ${step} of 5 — ${TITLES[step]}`}
+          <Text style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>
+            {TITLES[step]}
           </Text>
         </View>
 
-        {/* Progress */}
-        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 32 }}>
-          {[1, 2, 3, 4, 5, 6].map(s => (
-            <View key={s} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: s <= step ? C.gold : C.border }} />
+        {/* Step Indicator Bar */}
+        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 28 }}>
+          {[2, 3, 4, 5].map(i => (
+            <View key={i} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: i <= step ? C.gold : C.border }} />
           ))}
         </View>
 
         {/* STEP 2: Basic Info */}
         {step === 2 && (
           <View style={{ flex: 1 }}>
-            <Inp C={C} label={isRTL ? 'الاسم الكامل 👤' : 'Full Name 👤'} value={form.name} onChangeText={(v: string) => updateForm('name', v)} placeholder={isRTL ? 'مثال: أحمد محمد حسن' : 'e.g. Ahmed Mohamed Hassan'} />
-            <Inp C={C} label={isRTL ? 'البريد الإلكتروني ✉️' : 'Email Address ✉️'} value={form.email} onChangeText={(v: string) => updateForm('email', v)} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" />
-            <Inp C={C} label={isRTL ? 'رقم الهاتف 📱' : 'Phone Number 📱'} value={form.phone} onChangeText={(v: string) => updateForm('phone', v)} placeholder="01XXXXXXXXXX" keyboardType="phone-pad" />
-            <Inp C={C} label={isRTL ? 'رقم الهوية الوطنية (14 رقم) 🪪' : 'National ID Number (14 digits) 🪪'} value={form.nationalIq} onChangeText={(v: string) => updateForm('nationalIq', v)} placeholder={isRTL ? 'أدخل رقم هويتك' : 'Enter your National ID'} keyboardType="number-pad" maxLength={14} />
-            <Inp C={C} label={isRTL ? 'كلمة المرور 🔒' : 'Password 🔒'} value={form.password} onChangeText={(v: string) => updateForm('password', v)} placeholder={isRTL ? '8 أحرف على الأقل' : 'At least 8 characters'} secureTextEntry />
+            <Inp C={C} label={isRTL ? 'الاسم الكامل *' : 'Full Name *'} value={form.name} onChangeText={(v: string) => updateForm('name', v)} placeholder={isRTL ? 'مثال: عمر عبد اللطيف' : 'e.g. Omar Abdelatif'} />
+            <Inp C={C} label={isRTL ? 'البريد الإلكتروني *' : 'Email Address *'} value={form.email} onChangeText={(v: string) => updateForm('email', v)} placeholder="name@example.com" keyboardType="email-address" autoCapitalize="none" />
+            <Inp C={C} label={isRTL ? 'رقم الهاتف *' : 'Phone Number *'} value={form.phone} onChangeText={(v: string) => updateForm('phone', v)} placeholder="01XXXXXXXXX" keyboardType="phone-pad" />
+            <Inp C={C} label={isRTL ? 'الرقم القومي (14 رقم) *' : 'National ID (14 digits) *'} value={form.nationalIq} onChangeText={(v: string) => updateForm('nationalIq', v)} placeholder="2990101XXXXXXXX" keyboardType="number-pad" maxLength={14} />
+            <Inp C={C} label={isRTL ? 'كلمة المرور *' : 'Password *'} value={form.password} onChangeText={(v: string) => updateForm('password', v)} placeholder="********" secureTextEntry />
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center', paddingVertical: 14, borderWidth: 1, borderColor: C.border, borderRadius: 12, marginBottom: 24 }}>
-              <Text style={{ fontSize: 16 }}>🔒</Text>
-              <Text style={{ color: C.muted, fontSize: 12 }}>
-                {isRTL ? 'رقم الهوية مشفر ولا يُشارك مع أي طرف ثالث.' : 'Your ID is encrypted and never shared with third parties.'}
-              </Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 'auto' }}>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 'auto', paddingTop: 20 }}>
               <Btn C={C} variant="ghost" onPress={() => router.back()} style={{ flex: 1, borderWidth: 1, borderColor: C.border }}>
-                {isRTL ? '← رجوع' : '← Back'}
+                {isRTL ? '← إلغاء' : '← Cancel'}
               </Btn>
               <Btn C={C} onPress={handleSendUnauthOtp} style={{ flex: 2 }}
                 disabled={!form.name || !form.email || !form.phone || !form.password || form.nationalIq.length < 14 || loading}>
@@ -307,18 +308,22 @@ export default function RegisterLawyerScreen() {
           </View>
         )}
 
-        {/* STEP 3: Phone Verification */}
+        {/* STEP 3: OTP Verification */}
         {step === 3 && (
           <View style={{ flex: 1, alignItems: 'center' }}>
             <View style={{ width: 80, height: 80, backgroundColor: C.gold, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-              <Text style={{ fontSize: 36 }}>📱</Text>
+              <Text style={{ fontSize: 36 }}>{otpChannel === 'email' ? '📧' : '📱'}</Text>
             </View>
-            <Text style={{ color: C.text, fontSize: 20, fontWeight: '700', marginBottom: 8 }}>
-              {isRTL ? 'تحقق من رقم هاتفك' : 'Verify Your Phone'}
+            <Text style={{ color: C.text, fontSize: 20, fontWeight: '700', marginBottom: 8, fontFamily: 'Cairo-Bold' }}>
+              {otpChannel === 'email'
+                ? (isRTL ? 'تحقق من البريد الإلكتروني' : 'Verify Your Email')
+                : (isRTL ? 'تحقق من رقم هاتفك' : 'Verify Your Phone')}
             </Text>
             <Text style={{ color: C.muted, fontSize: 14, marginBottom: 32, textAlign: 'center' }}>
               {isRTL ? `أرسلنا رمز تحقق مكوّن من 6 أرقام إلى` : 'We sent a 6-digit code to'}{'\n'}
-              <Text style={{ color: C.gold, fontWeight: '700' }}>{form.phone || '01XXXXXXXXXX'}</Text>
+              <Text style={{ color: C.gold, fontWeight: '700' }}>
+                {otpChannel === 'email' ? (form.email || 'your@email.com') : (form.phone || '01XXXXXXXXXX')}
+              </Text>
             </Text>
 
             <View style={{ flexDirection: 'row', direction: 'ltr', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
@@ -337,7 +342,9 @@ export default function RegisterLawyerScreen() {
               ))}
             </View>
             <Text style={{ color: C.muted, fontSize: 12, marginBottom: 32 }}>
-              {isRTL ? 'تم إرسال رسالة نصية وبريد إلكتروني' : 'Sent via SMS and Email'}
+              {otpChannel === 'email'
+                ? (isRTL ? 'تم إرسال رمز التحقق إلى البريد الإلكتروني' : 'Sent to your email address')
+                : (isRTL ? 'تم إرسال رسالة نصية قصيرة SMS' : 'Sent via SMS')}
             </Text>
 
             <Btn C={C} onPress={handleVerifyUnauthOtp} full size="lg" disabled={form.otp.some(x => !x) || loading} style={{ marginBottom: 24 }}>

@@ -61,7 +61,10 @@ export default function RegisterScreen() {
       const res: any = await authAPI.sendOtpPublic({ email: email.toLowerCase().trim(), purpose: 'verify' });
       setStep(2);
       if (res?.devOtp) Alert.alert('🔐 Dev OTP', `Email not configured on server.\nYour code is: ${res.devOtp}`, [{ text: 'OK' }]);
-    } catch(e: any) { Alert.alert('Error', e?.message || 'Could not send OTP'); }
+    } catch(e: any) {
+      const msg = isRTL ? (e?.message || e?.message_ar) : (e?.message_en || e?.message);
+      Alert.alert(isRTL ? 'تنبيه' : 'Alert', msg || (isRTL ? 'تعذر إرسال الرمز' : 'Could not send OTP'));
+    }
     finally { setLoadingCode(false); }
   };
 
