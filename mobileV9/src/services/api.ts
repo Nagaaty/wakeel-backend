@@ -2,7 +2,7 @@ import axios from 'axios';
 import { storage } from '../utils/storage';
 import { getConnectivityStatus } from '../utils/network';
 
-export const BASE_URL = 'http://16.171.32.21:5001'; // AWS Production Server (backendV9)
+export const BASE_URL = 'http://56.228.32.54:5001'; // AWS Production Server (backendV9)
 // export const BASE_URL = 'http://192.168.100.42:5001'; // Local testing IP
 
 export function resolveMediaUrl(url: string | null | undefined): string {
